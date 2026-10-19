@@ -1,0 +1,3282 @@
+{
+  "info": {
+    "name": "Dental SaaS Backend API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Generated from src/docs/openapi.ts. Contains all current API endpoints."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "tenantId",
+      "value": "66f100000000000000000001"
+    },
+    {
+      "key": "userId",
+      "value": "user-demo"
+    },
+    {
+      "key": "year",
+      "value": "2026"
+    },
+    {
+      "key": "quarter",
+      "value": "1"
+    },
+    {
+      "key": "search",
+      "value": ""
+    },
+    {
+      "key": "page",
+      "value": "1"
+    },
+    {
+      "key": "pageSize",
+      "value": "20"
+    },
+    {
+      "key": "sortBy",
+      "value": ""
+    },
+    {
+      "key": "sortDirection",
+      "value": "desc"
+    },
+    {
+      "key": "status",
+      "value": ""
+    },
+    {
+      "key": "type",
+      "value": ""
+    },
+    {
+      "key": "from",
+      "value": ""
+    },
+    {
+      "key": "to",
+      "value": ""
+    },
+    {
+      "key": "dateFrom",
+      "value": ""
+    },
+    {
+      "key": "dateTo",
+      "value": ""
+    },
+    {
+      "key": "read",
+      "value": "false"
+    },
+    {
+      "key": "include",
+      "value": "scanCenters,quarterlyTargets,teamMembers"
+    },
+    {
+      "key": "userIdHeader",
+      "value": "user-demo"
+    },
+    {
+      "key": "x_tenant_id",
+      "value": "66f100000000000000000001"
+    },
+    {
+      "key": "x_user_id",
+      "value": "user-demo"
+    },
+    {
+      "key": "clinicId",
+      "value": "clinic-id"
+    },
+    {
+      "key": "doctorId",
+      "value": "doctor-id"
+    },
+    {
+      "key": "patientId",
+      "value": "patient-id"
+    },
+    {
+      "key": "orderId",
+      "value": "order-id"
+    },
+    {
+      "key": "subOrderId",
+      "value": "sub-order-id"
+    },
+    {
+      "key": "caseId",
+      "value": "case-id"
+    },
+    {
+      "key": "recordId",
+      "value": "billing-record-id"
+    },
+    {
+      "key": "requestId",
+      "value": "change-request-id"
+    },
+    {
+      "key": "scanCenterId",
+      "value": "scan-center-id"
+    },
+    {
+      "key": "documentId",
+      "value": "document-id"
+    },
+    {
+      "key": "notificationId",
+      "value": "notification-id"
+    },
+    {
+      "key": "tenantIdParam",
+      "value": "66f100000000000000000001"
+    }
+  ],
+  "item": [
+    {
+      "name": "auth",
+      "item": [
+        {
+          "name": "Authenticate user credentials",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenantId\": \"{{tenantId}}\",\n  \"email\": \"dev-admin@example.test\",\n  \"password\": \"ChangeMe123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const token = json?.data?.accessToken ?? json?.accessToken ?? json?.token;",
+                  "if (token) {",
+                  "  pm.collectionVariables.set('accessToken', token);",
+                  "  console.log('accessToken updated from login response');",
+                  "} else {",
+                  "  console.warn('No access token found in login response body');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh access token using refresh cookie",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "refresh"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Logout and clear refresh cookie",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get current authenticated principal",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "me"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Revoke all active sessions for current user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/sessions/revoke",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "sessions",
+                "revoke"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Required roles: admin."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "billing",
+      "item": [
+        {
+          "name": "List billing records",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/billing",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "pageSize",
+                  "value": "{{pageSize}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "{{sortBy}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortDirection",
+                  "value": "{{sortDirection}}",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "description": "Single status value or comma-separated list of statuses.",
+                  "disabled": true
+                },
+                {
+                  "key": "dateFrom",
+                  "value": "{{dateFrom}}",
+                  "disabled": true
+                },
+                {
+                  "key": "dateTo",
+                  "value": "{{dateTo}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get billing record by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/billing/:recordId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                ":recordId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "recordId",
+                  "value": "{{recordId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Update billing record",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/billing/:recordId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                ":recordId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "recordId",
+                  "value": "{{recordId}}"
+                }
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sample\": \"value\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "cases",
+      "item": [
+        {
+          "name": "List cases",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cases",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cases"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "pageSize",
+                  "value": "{{pageSize}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "{{sortBy}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortDirection",
+                  "value": "{{sortDirection}}",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "description": "Single status value or comma-separated list of statuses.",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get case by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cases/:caseId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cases",
+                ":caseId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "caseId",
+                  "value": "{{caseId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "change-requests",
+      "item": [
+        {
+          "name": "List change requests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/change-requests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "change-requests"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "pageSize",
+                  "value": "{{pageSize}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "{{sortBy}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortDirection",
+                  "value": "{{sortDirection}}",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "description": "Single status value or comma-separated list of statuses.",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get change request by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/change-requests/:requestId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "change-requests",
+                ":requestId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "requestId",
+                  "value": "{{requestId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Approve or reject change request",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/change-requests/:requestId/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "change-requests",
+                ":requestId",
+                "status"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "requestId",
+                  "value": "{{requestId}}"
+                }
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sample\": \"value\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "clinics",
+      "item": [
+        {
+          "name": "List clinics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clinics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clinics"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "pageSize",
+                  "value": "{{pageSize}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "{{sortBy}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortDirection",
+                  "value": "{{sortDirection}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Create clinic",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clinics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clinics"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sample\": \"value\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get clinic by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clinics/:clinicId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clinics",
+                ":clinicId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "clinicId",
+                  "value": "{{clinicId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Update clinic",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clinics/:clinicId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clinics",
+                ":clinicId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "clinicId",
+                  "value": "{{clinicId}}"
+                }
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sample\": \"value\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete clinic",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clinics/:clinicId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clinics",
+                ":clinicId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "clinicId",
+                  "value": "{{clinicId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "doctors",
+      "item": [
+        {
+          "name": "List doctors",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/doctors",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "doctors"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "pageSize",
+                  "value": "{{pageSize}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "{{sortBy}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortDirection",
+                  "value": "{{sortDirection}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Create doctor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/doctors",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "doctors"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sample\": \"value\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get doctor by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/doctors/:doctorId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "doctors",
+                ":doctorId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "doctorId",
+                  "value": "{{doctorId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Update doctor",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/doctors/:doctorId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "doctors",
+                ":doctorId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "doctorId",
+                  "value": "{{doctorId}}"
+                }
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sample\": \"value\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete doctor",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/doctors/:doctorId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "doctors",
+                ":doctorId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "doctorId",
+                  "value": "{{doctorId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "documents",
+      "item": [
+        {
+          "name": "List documents",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/documents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "documents"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "pageSize",
+                  "value": "{{pageSize}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "{{sortBy}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortDirection",
+                  "value": "{{sortDirection}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Create document",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/documents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "documents"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sample\": \"value\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get document by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/documents/:documentId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "documents",
+                ":documentId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "documentId",
+                  "value": "{{documentId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Delete document",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/documents/:documentId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "documents",
+                ":documentId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "documentId",
+                  "value": "{{documentId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "health",
+      "item": [
+        {
+          "name": "Get health snapshot",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "notifications",
+      "item": [
+        {
+          "name": "List notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{x_user_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "pageSize",
+                  "value": "{{pageSize}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "{{sortBy}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortDirection",
+                  "value": "{{sortDirection}}",
+                  "disabled": true
+                },
+                {
+                  "key": "type",
+                  "value": "{{type}}",
+                  "description": "Single type value or comma-separated list of types.",
+                  "disabled": true
+                },
+                {
+                  "key": "read",
+                  "value": "{{read}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Mark notification as read",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{x_user_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/:notificationId/read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                ":notificationId",
+                "read"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "notificationId",
+                  "value": "{{notificationId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Mark all notifications as read",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{x_user_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/read-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "read-all"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "orders",
+      "item": [
+        {
+          "name": "List orders",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "pageSize",
+                  "value": "{{pageSize}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "{{sortBy}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortDirection",
+                  "value": "{{sortDirection}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Create order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sample\": \"value\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get order by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/:orderId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                ":orderId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "orderId",
+                  "value": "{{orderId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Update order",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/:orderId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                ":orderId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "orderId",
+                  "value": "{{orderId}}"
+                }
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sample\": \"value\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete order",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/:orderId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                ":orderId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "orderId",
+                  "value": "{{orderId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "patients",
+      "item": [
+        {
+          "name": "List patients",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "patients"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "pageSize",
+                  "value": "{{pageSize}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "{{sortBy}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortDirection",
+                  "value": "{{sortDirection}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Create patient",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "patients"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sample\": \"value\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get patient by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients/:patientId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "patients",
+                ":patientId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "patientId",
+                  "value": "{{patientId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Update patient",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients/:patientId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "patients",
+                ":patientId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "patientId",
+                  "value": "{{patientId}}"
+                }
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sample\": \"value\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete patient",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients/:patientId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "patients",
+                ":patientId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "patientId",
+                  "value": "{{patientId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "reports",
+      "item": [
+        {
+          "name": "Get dashboard volume metrics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/dashboard/volume",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "dashboard",
+                "volume"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get reports overview metrics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reports/overview",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "overview"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "List orders-range report entries",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reports/orders-range",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "orders-range"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "pageSize",
+                  "value": "{{pageSize}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "{{sortBy}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortDirection",
+                  "value": "{{sortDirection}}",
+                  "disabled": true
+                },
+                {
+                  "key": "from",
+                  "value": "{{from}}",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "{{to}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get quarterly targets by query parameters",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reports/quarterly-targets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "quarterly-targets"
+              ],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "{{year}}",
+                  "disabled": false
+                },
+                {
+                  "key": "quarter",
+                  "value": "{{quarter}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get quarterly targets by route parameters",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reports/quarterly-targets/:year/:quarter",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "quarterly-targets",
+                ":year",
+                ":quarter"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "year",
+                  "value": "{{year}}"
+                },
+                {
+                  "key": "quarter",
+                  "value": "{{quarter}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get team performance report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reports/team-performance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "team-performance"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "scan-centers",
+      "item": [
+        {
+          "name": "List scan centers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/scan-centers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "scan-centers"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "pageSize",
+                  "value": "{{pageSize}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "{{sortBy}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortDirection",
+                  "value": "{{sortDirection}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get scan center by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/scan-centers/:scanCenterId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "scan-centers",
+                ":scanCenterId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "scanCenterId",
+                  "value": "{{scanCenterId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "settings",
+      "item": [
+        {
+          "name": "Get reference datasets for settings-dependent views",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/settings/reference-data",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "settings",
+                "reference-data"
+              ],
+              "query": [
+                {
+                  "key": "include",
+                  "value": "{{include}}",
+                  "description": "Comma-separated sections: scanCenters, quarterlyTargets, teamMembers.",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "sub-orders",
+      "item": [
+        {
+          "name": "List sub-orders for order",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/:orderId/sub-orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                ":orderId",
+                "sub-orders"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "orderId",
+                  "value": "{{orderId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Create sub-orders for order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/:orderId/sub-orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                ":orderId",
+                "sub-orders"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "orderId",
+                  "value": "{{orderId}}"
+                }
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sample\": \"value\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Replace sub-orders for order",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/:orderId/sub-orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                ":orderId",
+                "sub-orders"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "orderId",
+                  "value": "{{orderId}}"
+                }
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sample\": \"value\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get sub-order by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/:orderId/sub-orders/:subOrderId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                ":orderId",
+                "sub-orders",
+                ":subOrderId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "orderId",
+                  "value": "{{orderId}}"
+                },
+                {
+                  "key": "subOrderId",
+                  "value": "{{subOrderId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Update sub-order",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/:orderId/sub-orders/:subOrderId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                ":orderId",
+                "sub-orders",
+                ":subOrderId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "orderId",
+                  "value": "{{orderId}}"
+                },
+                {
+                  "key": "subOrderId",
+                  "value": "{{subOrderId}}"
+                }
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sample\": \"value\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete sub-order",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/:orderId/sub-orders/:subOrderId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                ":orderId",
+                "sub-orders",
+                ":subOrderId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "orderId",
+                  "value": "{{orderId}}"
+                },
+                {
+                  "key": "subOrderId",
+                  "value": "{{subOrderId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "users",
+      "item": [
+        {
+          "name": "List users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "pageSize",
+                  "value": "{{pageSize}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "{{sortBy}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sortDirection",
+                  "value": "{{sortDirection}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Create user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Required roles: admin.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sample\": \"value\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get user by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/:userId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                ":userId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "userId",
+                  "value": "{{userId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Update user role/status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/:userId/role-status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                ":userId",
+                "role-status"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "userId",
+                  "value": "{{userId}}"
+                }
+              ]
+            },
+            "description": "Required roles: admin.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sample\": \"value\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Deactivate user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/:userId/deactivate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                ":userId",
+                "deactivate"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "userId",
+                  "value": "{{userId}}"
+                }
+              ]
+            },
+            "description": "Required roles: admin."
+          },
+          "response": []
+        },
+        {
+          "name": "Reactivate user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{x_tenant_id}}",
+                "type": "text",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/:userId/reactivate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                ":userId",
+                "reactivate"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "userId",
+                  "value": "{{userId}}"
+                }
+              ]
+            },
+            "description": "Required roles: admin."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "legacy-aliases",
+      "item": [
+        {
+          "name": "[Legacy] List orders via /api/order",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/order",
+            "description": "Backward-compatible alias that rewrites to /api/v1/orders."
+          },
+          "response": []
+        },
+        {
+          "name": "[Legacy] Get order by id via /api/order/:orderId",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/order/:orderId",
+            "description": "Backward-compatible alias that rewrites to /api/v1/orders/:orderId."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  }
+}

@@ -1,0 +1,71 @@
+
+> dental-saas-backend@1.0.0 build
+> tsc -p tsconfig.build.json
+
+src/modules/billing/application/billing-service.ts(128,44): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/billing/application/billing-service.ts(129,46): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/billing/application/billing-service.ts(130,45): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/billing/application/billing-service.ts(131,45): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/billing/application/billing-service.ts(135,25): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/cases/application/cases-service.ts(87,30): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/change-requests/application/change-requests-service.ts(91,60): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/change-requests/application/change-requests-service.ts(92,63): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/change-requests/application/change-requests-service.ts(93,62): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/change-requests/application/change-requests-service.ts(96,25): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/change-requests/application/change-requests-service.ts(231,46): error TS7006: Parameter 'order' implicitly has an 'any' type.
+src/modules/change-requests/application/change-requests-service.ts(232,32): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'unknown' is not assignable to parameter of type 'string | number | ObjectId | Uint8Array<ArrayBufferLike> | ObjectIdLike | undefined'.
+src/modules/change-requests/application/change-requests-service.ts(240,45): error TS7006: Parameter 'patient' implicitly has an 'any' type.
+src/modules/change-requests/application/change-requests-service.ts(242,17): error TS7006: Parameter 'order' implicitly has an 'any' type.
+src/modules/documents/application/documents-service.ts(209,42): error TS7006: Parameter 'doctor' implicitly has an 'any' type.
+src/modules/documents/application/documents-service.ts(210,44): error TS7006: Parameter 'patient' implicitly has an 'any' type.
+src/modules/documents/application/documents-service.ts(211,40): error TS7006: Parameter 'order' implicitly has an 'any' type.
+src/modules/documents/application/documents-service.ts(213,3): error TS2322: Type '{ id: string; name: string; category: "Prescriptions" | "Scan Files" | "Patient Photos" | "Invoices" | "Reports"; type: string; size: string; date: string; doctor: {}; patientName: unknown; orderId: string | undefined; orderNumber: unknown; subOrderId: string | undefined; }[]' is not assignable to type 'DocumentDto[]'.
+  Type '{ id: string; name: string; category: "Prescriptions" | "Scan Files" | "Patient Photos" | "Invoices" | "Reports"; type: string; size: string; date: string; doctor: {}; patientName: unknown; orderId: string | undefined; orderNumber: unknown; subOrderId: string | undefined; }' is not assignable to type 'DocumentDto' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+    Types of property 'doctor' are incompatible.
+      Type '{}' is not assignable to type 'string'.
+src/modules/notifications/application/notifications-service.ts(72,25): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/reports/application/reports-service.ts(56,5): error TS2532: Object is possibly 'undefined'.
+src/modules/reports/application/reports-service.ts(58,7): error TS2532: Object is possibly 'undefined'.
+src/modules/reports/application/reports-service.ts(84,63): error TS18046: 'item' is of type 'unknown'.
+src/modules/reports/application/reports-service.ts(87,60): error TS18046: 'item' is of type 'unknown'.
+src/modules/reports/application/reports-service.ts(168,68): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/reports/application/reports-service.ts(169,66): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/reports/application/reports-service.ts(171,28): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/reports/application/reports-service.ts(199,27): error TS7006: Parameter 'item' implicitly has an 'any' type.
+src/modules/reports/application/reports-service.ts(265,61): error TS7006: Parameter 'order' implicitly has an 'any' type.
+src/modules/scan-centers/presentation/scan-centers.routes.ts(55,19): error TS2345: Argument of type 'string | number | undefined' is not assignable to parameter of type 'string | number'.
+  Type 'undefined' is not assignable to type 'string | number'.
+src/modules/scan-centers/presentation/scan-centers.routes.ts(55,20): error TS2352: Conversion of type 'ScanCenterSetting' to type 'Record<string, string | number>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'ScanCenterSetting'.
+src/modules/scan-centers/presentation/scan-centers.routes.ts(55,76): error TS2352: Conversion of type 'ScanCenterSetting' to type 'Record<string, string | number>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'ScanCenterSetting'.
+src/shared/infrastructure/persistence/mongoose/models/auth-session.model.ts(49,32): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/auth-session.model.ts(49,63): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/billing-record.model.ts(54,34): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/billing-record.model.ts(54,67): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/case.model.ts(53,25): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/case.model.ts(53,49): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/change-request.model.ts(44,34): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/change-request.model.ts(44,67): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/clinic.model.ts(36,27): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/clinic.model.ts(36,53): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/doctor.model.ts(48,27): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/doctor.model.ts(48,53): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/document.model.ts(43,29): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/document.model.ts(43,57): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/notification.model.ts(39,33): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/notification.model.ts(39,65): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/order.model.ts(166,26): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/order.model.ts(166,51): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/patient.model.ts(49,28): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/patient.model.ts(49,55): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/sub-order.model.ts(103,29): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/sub-order.model.ts(103,57): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/user.model.ts(54,25): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/user.model.ts(54,49): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/presentation/http/http-utils.ts(89,35): error TS2379: Argument of type '{ page?: string | number | undefined; pageSize?: string | number | undefined; }' is not assignable to parameter of type '{ page?: string | number; pageSize?: string | number; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'page' are incompatible.
+    Type 'string | number | undefined' is not assignable to type 'string | number'.
+      Type 'undefined' is not assignable to type 'string | number'.

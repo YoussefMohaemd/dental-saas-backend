@@ -1,0 +1,157 @@
+
+> dental-saas-backend@1.0.0 typecheck
+> tsc --noEmit
+
+src/modules/billing/application/billing-service.ts(5,3): error TS2724: '"../../../shared/application/contracts/dental-api-contract"' has no exported member named 'BILLING_STATUSES'. Did you mean 'BillingStatus'?
+src/modules/billing/application/billing-service.ts(130,44): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/billing/application/billing-service.ts(131,46): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/billing/application/billing-service.ts(132,45): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/billing/application/billing-service.ts(133,45): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/billing/application/billing-service.ts(137,25): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/billing/presentation/billing.routes.ts(33,43): error TS2379: Argument of type '{ search?: string | undefined; page?: number | undefined; pageSize?: number | undefined; sortBy?: string | undefined; sortDirection?: "asc" | "desc" | undefined; status?: string | string[] | undefined; dateFrom?: string | undefined; dateTo?: string | undefined; }' is not assignable to parameter of type '{ page?: string | number; pageSize?: string | number; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'page' are incompatible.
+    Type 'number | undefined' is not assignable to type 'string | number'.
+      Type 'undefined' is not assignable to type 'string | number'.
+src/modules/billing/presentation/billing.routes.ts(35,5): error TS2379: Argument of type '{ search?: string | undefined; page?: number | undefined; pageSize?: number | undefined; sortBy?: string | undefined; sortDirection?: "asc" | "desc" | undefined; status?: string | string[] | undefined; dateFrom?: string | undefined; dateTo?: string | undefined; }' is not assignable to parameter of type '{ sortBy?: string; sortDirection?: "asc" | "desc"; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'sortBy' are incompatible.
+    Type 'string | undefined' is not assignable to type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+src/modules/billing/presentation/billing.routes.ts(42,43): error TS2379: Argument of type '{ pagination: PaginationQuery; search: string | undefined; statuses: BillingStatus[] | undefined; dateFrom: Date | undefined; dateTo: Date | undefined; sortBy: "dueDate" | "amount" | "status" | "createdAt" | "updatedAt" | "invoiceDate"; sortDirection: "asc" | "desc"; tenantId: Types.ObjectId | undefined; }' is not assignable to parameter of type 'BillingListInput' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'search' are incompatible.
+    Type 'string | undefined' is not assignable to type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+src/modules/cases/application/cases-service.ts(3,24): error TS2724: '"../../../shared/application/contracts/dental-api-contract"' has no exported member named 'CASE_STATUSES'. Did you mean 'CaseStatus'?
+src/modules/cases/application/cases-service.ts(86,30): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/cases/presentation/cases.routes.ts(24,43): error TS2379: Argument of type '{ search?: string | undefined; page?: number | undefined; pageSize?: number | undefined; sortBy?: string | undefined; sortDirection?: "asc" | "desc" | undefined; status?: string | string[] | undefined; }' is not assignable to parameter of type '{ page?: string | number; pageSize?: string | number; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'page' are incompatible.
+    Type 'number | undefined' is not assignable to type 'string | number'.
+      Type 'undefined' is not assignable to type 'string | number'.
+src/modules/cases/presentation/cases.routes.ts(26,5): error TS2379: Argument of type '{ search?: string | undefined; page?: number | undefined; pageSize?: number | undefined; sortBy?: string | undefined; sortDirection?: "asc" | "desc" | undefined; status?: string | string[] | undefined; }' is not assignable to parameter of type '{ sortBy?: string; sortDirection?: "asc" | "desc"; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'sortBy' are incompatible.
+    Type 'string | undefined' is not assignable to type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+src/modules/cases/presentation/cases.routes.ts(33,34): error TS2379: Argument of type '{ pagination: PaginationQuery; search: string | undefined; statuses: CaseStatus[] | undefined; sortBy: "caseNumber" | "title" | "createdAt" | "updatedAt" | "priority" | "status"; sortDirection: "asc" | "desc"; tenantId: Types.ObjectId | undefined; }' is not assignable to parameter of type 'CasesListInput' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'search' are incompatible.
+    Type 'string | undefined' is not assignable to type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+src/modules/change-requests/application/change-requests-service.ts(5,3): error TS2724: '"../../../shared/application/contracts/dental-api-contract"' has no exported member named 'CHANGE_REQUEST_STATUSES'. Did you mean 'ChangeRequestStatus'?
+src/modules/change-requests/application/change-requests-service.ts(6,3): error TS2724: '"../../../shared/application/contracts/dental-api-contract"' has no exported member named 'PRIORITIES'. Did you mean 'Priority'?
+src/modules/change-requests/application/change-requests-service.ts(91,60): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/change-requests/application/change-requests-service.ts(92,63): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/change-requests/application/change-requests-service.ts(93,62): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/change-requests/application/change-requests-service.ts(96,25): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/change-requests/application/change-requests-service.ts(231,46): error TS7006: Parameter 'order' implicitly has an 'any' type.
+src/modules/change-requests/application/change-requests-service.ts(232,32): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'unknown' is not assignable to parameter of type 'string | number | ObjectId | Uint8Array<ArrayBufferLike> | ObjectIdLike | undefined'.
+src/modules/change-requests/application/change-requests-service.ts(240,45): error TS7006: Parameter 'patient' implicitly has an 'any' type.
+src/modules/change-requests/application/change-requests-service.ts(242,17): error TS7006: Parameter 'order' implicitly has an 'any' type.
+src/modules/change-requests/presentation/change-requests.routes.ts(32,43): error TS2379: Argument of type '{ search?: string | undefined; page?: number | undefined; pageSize?: number | undefined; sortBy?: string | undefined; sortDirection?: "asc" | "desc" | undefined; status?: string | string[] | undefined; priority?: string | ... 1 more ... | undefined; }' is not assignable to parameter of type '{ page?: string | number; pageSize?: string | number; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'page' are incompatible.
+    Type 'number | undefined' is not assignable to type 'string | number'.
+      Type 'undefined' is not assignable to type 'string | number'.
+src/modules/change-requests/presentation/change-requests.routes.ts(34,5): error TS2379: Argument of type '{ search?: string | undefined; page?: number | undefined; pageSize?: number | undefined; sortBy?: string | undefined; sortDirection?: "asc" | "desc" | undefined; status?: string | string[] | undefined; priority?: string | ... 1 more ... | undefined; }' is not assignable to parameter of type '{ sortBy?: string; sortDirection?: "asc" | "desc"; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'sortBy' are incompatible.
+    Type 'string | undefined' is not assignable to type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+src/modules/change-requests/presentation/change-requests.routes.ts(42,43): error TS2379: Argument of type '{ pagination: PaginationQuery; search: string | undefined; statuses: ChangeRequestStatus[] | undefined; priorities: Priority[] | undefined; sortBy: "createdAt" | "updatedAt" | "priority" | "status" | "requestNumber"; sortDirection: "asc" | "desc"; tenantId: Types.ObjectId | undefined; }' is not assignable to parameter of type '{ pagination: PaginationQuery; search?: string; statuses?: ChangeRequestStatus[]; priorities?: Priority[]; sortBy: "status" | "priority" | "updatedAt" | "createdAt" | "requestNumber"; sortDirection: "asc" | "desc"; tenantId?: ObjectId; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'search' are incompatible.
+    Type 'string | undefined' is not assignable to type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+src/modules/documents/application/documents-service.ts(5,3): error TS2305: Module '"../../../shared/application/contracts/dental-api-contract"' has no exported member 'DOCUMENT_CATEGORIES'.
+src/modules/documents/application/documents-service.ts(211,42): error TS7006: Parameter 'doctor' implicitly has an 'any' type.
+src/modules/documents/application/documents-service.ts(212,44): error TS7006: Parameter 'patient' implicitly has an 'any' type.
+src/modules/documents/application/documents-service.ts(213,40): error TS7006: Parameter 'order' implicitly has an 'any' type.
+src/modules/documents/application/documents-service.ts(215,3): error TS2322: Type '{ id: string; name: string; category: "Prescriptions" | "Scan Files" | "Patient Photos" | "Invoices" | "Reports"; type: string; size: string; date: string; doctor: {}; patientName: unknown; orderId: string | undefined; orderNumber: unknown; subOrderId: string | undefined; }[]' is not assignable to type 'DocumentDto[]'.
+  Type '{ id: string; name: string; category: "Prescriptions" | "Scan Files" | "Patient Photos" | "Invoices" | "Reports"; type: string; size: string; date: string; doctor: {}; patientName: unknown; orderId: string | undefined; orderNumber: unknown; subOrderId: string | undefined; }' is not assignable to type 'DocumentDto' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+    Types of property 'doctor' are incompatible.
+      Type '{}' is not assignable to type 'string'.
+src/modules/documents/presentation/documents.routes.ts(32,43): error TS2379: Argument of type '{ search?: string | undefined; page?: number | undefined; pageSize?: number | undefined; sortBy?: string | undefined; sortDirection?: "asc" | "desc" | undefined; category?: string | string[] | undefined; }' is not assignable to parameter of type '{ page?: string | number; pageSize?: string | number; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'page' are incompatible.
+    Type 'number | undefined' is not assignable to type 'string | number'.
+      Type 'undefined' is not assignable to type 'string | number'.
+src/modules/documents/presentation/documents.routes.ts(33,26): error TS2379: Argument of type '{ search?: string | undefined; page?: number | undefined; pageSize?: number | undefined; sortBy?: string | undefined; sortDirection?: "asc" | "desc" | undefined; category?: string | string[] | undefined; }' is not assignable to parameter of type '{ sortBy?: string; sortDirection?: "asc" | "desc"; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'sortBy' are incompatible.
+    Type 'string | undefined' is not assignable to type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+src/modules/documents/presentation/documents.routes.ts(37,38): error TS2379: Argument of type '{ pagination: PaginationQuery; search: string | undefined; categories: ("Prescriptions" | "Scan Files" | "Patient Photos" | "Invoices" | "Reports")[] | undefined; sortBy: "name" | "date" | "sizeBytes" | "category" | "type"; sortDirection: "asc" | "desc"; tenantId: Types.ObjectId | undefined; }' is not assignable to parameter of type '{ pagination: PaginationQuery; search?: string; categories?: ("Prescriptions" | "Scan Files" | "Patient Photos" | "Invoices" | "Reports")[]; sortBy: "date" | "type" | "name" | "category" | "sizeBytes"; sortDirection: "asc" | "desc"; tenantId?: ObjectId; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'search' are incompatible.
+    Type 'string | undefined' is not assignable to type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+src/modules/notifications/application/notifications-service.ts(4,3): error TS2724: '"../../../shared/application/contracts/dental-api-contract"' has no exported member named 'NOTIFICATION_TYPES'. Did you mean 'NotificationType'?
+src/modules/notifications/application/notifications-service.ts(74,25): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/notifications/presentation/notifications.routes.ts(31,43): error TS2379: Argument of type '{ search?: string | undefined; page?: number | undefined; pageSize?: number | undefined; sortBy?: string | undefined; sortDirection?: "asc" | "desc" | undefined; type?: string | string[] | undefined; read?: string | ... 1 more ... | undefined; }' is not assignable to parameter of type '{ page?: string | number; pageSize?: string | number; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'page' are incompatible.
+    Type 'number | undefined' is not assignable to type 'string | number'.
+      Type 'undefined' is not assignable to type 'string | number'.
+src/modules/notifications/presentation/notifications.routes.ts(32,26): error TS2379: Argument of type '{ search?: string | undefined; page?: number | undefined; pageSize?: number | undefined; sortBy?: string | undefined; sortDirection?: "asc" | "desc" | undefined; type?: string | string[] | undefined; read?: string | ... 1 more ... | undefined; }' is not assignable to parameter of type '{ sortBy?: string; sortDirection?: "asc" | "desc"; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'sortBy' are incompatible.
+    Type 'string | undefined' is not assignable to type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+src/modules/notifications/presentation/notifications.routes.ts(38,42): error TS2379: Argument of type '{ pagination: PaginationQuery; search: string | undefined; types: NotificationType[] | undefined; read: boolean | undefined; sortBy: "createdAt" | "type" | "read" | "title"; sortDirection: "asc" | "desc"; tenantId: Types.ObjectId | undefined; recipientId: Types.ObjectId | undefined; }' is not assignable to parameter of type '{ pagination: PaginationQuery; search?: string; types?: NotificationType[]; read?: boolean; sortBy: "type" | "read" | "createdAt" | "title"; sortDirection: "asc" | "desc"; tenantId?: ObjectId; recipientId?: ObjectId; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'search' are incompatible.
+    Type 'string | undefined' is not assignable to type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+src/modules/notifications/presentation/notifications.routes.ts(65,47): error TS2379: Argument of type '{ tenantId: Types.ObjectId | undefined; recipientId: Types.ObjectId | undefined; }' is not assignable to parameter of type '{ tenantId?: ObjectId; recipientId?: ObjectId; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'tenantId' are incompatible.
+    Type 'ObjectId | undefined' is not assignable to type 'ObjectId'.
+      Type 'undefined' is not assignable to type 'ObjectId'.
+src/modules/reports/application/reports-service.ts(56,5): error TS2532: Object is possibly 'undefined'.
+src/modules/reports/application/reports-service.ts(58,7): error TS2532: Object is possibly 'undefined'.
+src/modules/reports/application/reports-service.ts(84,63): error TS18046: 'item' is of type 'unknown'.
+src/modules/reports/application/reports-service.ts(87,60): error TS18046: 'item' is of type 'unknown'.
+src/modules/reports/application/reports-service.ts(168,68): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/reports/application/reports-service.ts(169,66): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/reports/application/reports-service.ts(171,28): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/modules/reports/application/reports-service.ts(199,27): error TS7006: Parameter 'item' implicitly has an 'any' type.
+src/modules/reports/application/reports-service.ts(265,61): error TS7006: Parameter 'order' implicitly has an 'any' type.
+src/modules/reports/presentation/reports.routes.ts(44,43): error TS2379: Argument of type '{ search?: string | undefined; page?: number | undefined; pageSize?: number | undefined; sortBy?: string | undefined; sortDirection?: "asc" | "desc" | undefined; from?: string | undefined; to?: string | undefined; }' is not assignable to parameter of type '{ page?: string | number; pageSize?: string | number; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'page' are incompatible.
+    Type 'number | undefined' is not assignable to type 'string | number'.
+      Type 'undefined' is not assignable to type 'string | number'.
+src/modules/reports/presentation/reports.routes.ts(46,5): error TS2379: Argument of type '{ search?: string | undefined; page?: number | undefined; pageSize?: number | undefined; sortBy?: string | undefined; sortDirection?: "asc" | "desc" | undefined; from?: string | undefined; to?: string | undefined; }' is not assignable to parameter of type '{ sortBy?: string; sortDirection?: "asc" | "desc"; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'sortBy' are incompatible.
+    Type 'string | undefined' is not assignable to type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+src/modules/reports/presentation/reports.routes.ts(51,43): error TS2379: Argument of type '{ pagination: PaginationQuery; from: Date | undefined; to: Date | undefined; search: string | undefined; sortBy: "receivedAt" | "sentAt" | "amount" | "archiveDate" | "chargedAt" | "orderNumber"; sortDirection: "asc" | "desc"; tenantId: Types.ObjectId | undefined; }' is not assignable to parameter of type '{ pagination: PaginationQuery; from?: Date; to?: Date; search?: string; sortBy: "amount" | "archiveDate" | "sentAt" | "chargedAt" | "orderNumber" | "receivedAt"; sortDirection: "asc" | "desc"; tenantId?: ObjectId; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'from' are incompatible.
+    Type 'Date | undefined' is not assignable to type 'Date'.
+      Type 'undefined' is not assignable to type 'Date'.
+src/modules/scan-centers/presentation/scan-centers.routes.ts(31,43): error TS2379: Argument of type '{ search?: string | undefined; page?: number | undefined; pageSize?: number | undefined; sortBy?: "name" | "status" | "location" | "operator" | "devices" | "activeOrders" | "completedToday" | undefined; sortDirection?: "asc" | ... 1 more ... | undefined; status?: string | undefined; }' is not assignable to parameter of type '{ page?: string | number; pageSize?: string | number; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'page' are incompatible.
+    Type 'number | undefined' is not assignable to type 'string | number'.
+      Type 'undefined' is not assignable to type 'string | number'.
+src/modules/scan-centers/presentation/scan-centers.routes.ts(32,26): error TS2379: Argument of type '{ search?: string | undefined; page?: number | undefined; pageSize?: number | undefined; sortBy?: "name" | "status" | "location" | "operator" | "devices" | "activeOrders" | "completedToday" | undefined; sortDirection?: "asc" | ... 1 more ... | undefined; status?: string | undefined; }' is not assignable to parameter of type '{ sortBy?: string; sortDirection?: "asc" | "desc"; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'sortBy' are incompatible.
+    Type 'string | undefined' is not assignable to type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+src/modules/scan-centers/presentation/scan-centers.routes.ts(55,19): error TS2345: Argument of type 'string | number | undefined' is not assignable to parameter of type 'string | number'.
+  Type 'undefined' is not assignable to type 'string | number'.
+src/modules/scan-centers/presentation/scan-centers.routes.ts(55,20): error TS2352: Conversion of type 'ScanCenterSetting' to type 'Record<string, string | number>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'ScanCenterSetting'.
+src/modules/scan-centers/presentation/scan-centers.routes.ts(55,76): error TS2352: Conversion of type 'ScanCenterSetting' to type 'Record<string, string | number>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'ScanCenterSetting'.
+src/shared/infrastructure/persistence/mongoose/models/auth-session.model.ts(49,32): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/auth-session.model.ts(49,63): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/billing-record.model.ts(54,34): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/billing-record.model.ts(54,67): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/case.model.ts(53,25): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/case.model.ts(53,49): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/change-request.model.ts(44,34): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/change-request.model.ts(44,67): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/clinic.model.ts(36,27): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/clinic.model.ts(36,53): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/doctor.model.ts(48,27): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/doctor.model.ts(48,53): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/document.model.ts(43,29): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/document.model.ts(43,57): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/notification.model.ts(39,33): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/notification.model.ts(39,65): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/order.model.ts(166,26): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/order.model.ts(166,51): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/patient.model.ts(49,28): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/patient.model.ts(49,55): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/sub-order.model.ts(103,29): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/sub-order.model.ts(103,57): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/user.model.ts(54,25): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
+src/shared/infrastructure/persistence/mongoose/models/user.model.ts(54,49): error TS2707: Generic type 'Model<TRawDocType, TQueryHelpers, TInstanceMethods, TVirtuals, THydratedDocumentType, TSchema>' requires between 1 and 6 type arguments.
