@@ -5,6 +5,7 @@ import { DOMAIN_ERROR_CODES, DomainError } from '../../../shared/domain/errors/d
 import { type Order, type OrderListQuery, type OrderUpdatePayload, type OrderWritePayload } from '../domain/order';
 import { type NameReferences, type OrderRepository } from '../domain/orders-repository';
 import { type SubOrder, type SubOrderUpdatePayload, type SubOrderWritePayload } from '../domain/sub-order';
+import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 import { assertOrderStatusTransition } from './order-workflow';
 
 export class OrdersService {
@@ -17,15 +18,15 @@ export class OrdersService {
     return this.toOrderDto(created);
   }
 
-  public async getOrderById(orderId: string): Promise<OrderDetailDto> {
-    const order = await this.orderRepository.findOrderById(orderId);
+  public async getOrderById(orderId: string, scope?: DataVisibilityScope): Promise<OrderDetailDto> {
+    const order = await this.orderRepository.findOrderById(orderId, scope);
     if (order === null) {
       throw new DomainError(`Order ${orderId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
     }
 
     const [orderDto, subOrders] = await Promise.all([
       this.toOrderDto(order),
-      this.listSubOrders(orderId),
+      this.listSubOrders(orderId, scope),
     ]);
 
     return {
@@ -53,7 +54,11 @@ export class OrdersService {
     };
   }
 
-  public async updateOrder(orderId: string, payload: OrderUpdatePayload): Promise<OrderDto> {
+  public async updateOrder(
+    orderId: string,
+    payload: OrderUpdatePayload,
+    scope?: DataVisibilityScope,
+  ): Promise<OrderDto> {
     if (payload.orderNumber !== undefined) {
       await this.ensureUniqueOrderNumber(payload.orderNumber, orderId);
     }
@@ -64,7 +69,7 @@ export class OrdersService {
       payload.doctorId !== undefined ||
       payload.clinicId !== undefined;
     const existing = requiresExistingOrder
-      ? await this.orderRepository.findOrderById(orderId)
+      ? await this.orderRepository.findOrderById(orderId, scope)
       : null;
 
     if (requiresExistingOrder && existing === null) {
@@ -83,7 +88,7 @@ export class OrdersService {
       );
     }
 
-    const updated = await this.orderRepository.updateOrder(orderId, payload);
+    const updated = await this.orderRepository.updateOrder(orderId, payload, scope);
     if (updated === null) {
       throw new DomainError(`Order ${orderId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
     }
@@ -91,8 +96,8 @@ export class OrdersService {
     return this.toOrderDto(updated);
   }
 
-  public async deleteOrder(orderId: string): Promise<void> {
-    const deleted = await this.orderRepository.deleteOrder(orderId);
+  public async deleteOrder(orderId: string, scope?: DataVisibilityScope): Promise<void> {
+    const deleted = await this.orderRepository.deleteOrder(orderId, scope);
     if (!deleted) {
       throw new DomainError(`Order ${orderId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
     }
@@ -100,23 +105,31 @@ export class OrdersService {
     await this.orderRepository.deleteSubOrdersByOrder(orderId);
   }
 
-  public async listSubOrders(orderId: string): Promise<SubOrderDto[]> {
-    await this.ensureOrderExists(orderId);
-    const subOrders = await this.orderRepository.listSubOrders(orderId);
+  public async listSubOrders(orderId: string, scope?: DataVisibilityScope): Promise<SubOrderDto[]> {
+    await this.ensureOrderExists(orderId, scope);
+    const subOrders = await this.orderRepository.listSubOrders(orderId, scope);
     return subOrders.map((subOrder) => this.toSubOrderDto(subOrder));
   }
 
-  public async createSubOrders(orderId: string, payloads: SubOrderWritePayload[]): Promise<SubOrderDto[]> {
-    await this.ensureOrderExists(orderId);
+  public async createSubOrders(
+    orderId: string,
+    payloads: SubOrderWritePayload[],
+    scope?: DataVisibilityScope,
+  ): Promise<SubOrderDto[]> {
+    await this.ensureOrderExists(orderId, scope);
     payloads.forEach((payload) => this.assertSubOrderProgress(payload));
-    const created = await this.orderRepository.createSubOrders(orderId, payloads);
+    const created = await this.orderRepository.createSubOrders(orderId, payloads, scope);
     return created.map((subOrder) => this.toSubOrderDto(subOrder));
   }
 
-  public async replaceSubOrders(orderId: string, payloads: SubOrderWritePayload[]): Promise<SubOrderDto[]> {
-    await this.ensureOrderExists(orderId);
+  public async replaceSubOrders(
+    orderId: string,
+    payloads: SubOrderWritePayload[],
+    scope?: DataVisibilityScope,
+  ): Promise<SubOrderDto[]> {
+    await this.ensureOrderExists(orderId, scope);
     payloads.forEach((payload) => this.assertSubOrderProgress(payload));
-    const replaced = await this.orderRepository.replaceSubOrders(orderId, payloads);
+    const replaced = await this.orderRepository.replaceSubOrders(orderId, payloads, scope);
     return replaced.map((subOrder) => this.toSubOrderDto(subOrder));
   }
 
@@ -124,10 +137,11 @@ export class OrdersService {
     orderId: string,
     subOrderId: string,
     payload: SubOrderUpdatePayload,
+    scope?: DataVisibilityScope,
   ): Promise<SubOrderDto> {
-    await this.ensureOrderExists(orderId);
+    await this.ensureOrderExists(orderId, scope);
     this.assertSubOrderProgress(payload);
-    const updated = await this.orderRepository.updateSubOrder(orderId, subOrderId, payload);
+    const updated = await this.orderRepository.updateSubOrder(orderId, subOrderId, payload, scope);
     if (updated === null) {
       throw new DomainError(
         `Sub-order ${subOrderId} was not found under order ${orderId}`,
@@ -138,9 +152,13 @@ export class OrdersService {
     return this.toSubOrderDto(updated);
   }
 
-  public async getSubOrder(orderId: string, subOrderId: string): Promise<SubOrderDto> {
-    await this.ensureOrderExists(orderId);
-    const subOrder = await this.orderRepository.findSubOrderById(orderId, subOrderId);
+  public async getSubOrder(
+    orderId: string,
+    subOrderId: string,
+    scope?: DataVisibilityScope,
+  ): Promise<SubOrderDto> {
+    await this.ensureOrderExists(orderId, scope);
+    const subOrder = await this.orderRepository.findSubOrderById(orderId, subOrderId, scope);
     if (subOrder === null) {
       throw new DomainError(
         `Sub-order ${subOrderId} was not found under order ${orderId}`,
@@ -151,9 +169,13 @@ export class OrdersService {
     return this.toSubOrderDto(subOrder);
   }
 
-  public async deleteSubOrder(orderId: string, subOrderId: string): Promise<void> {
-    await this.ensureOrderExists(orderId);
-    const deleted = await this.orderRepository.deleteSubOrder(orderId, subOrderId);
+  public async deleteSubOrder(
+    orderId: string,
+    subOrderId: string,
+    scope?: DataVisibilityScope,
+  ): Promise<void> {
+    await this.ensureOrderExists(orderId, scope);
+    const deleted = await this.orderRepository.deleteSubOrder(orderId, subOrderId, scope);
     if (!deleted) {
       throw new DomainError(
         `Sub-order ${subOrderId} was not found under order ${orderId}`,
@@ -162,8 +184,8 @@ export class OrdersService {
     }
   }
 
-  private async ensureOrderExists(orderId: string): Promise<void> {
-    const order = await this.orderRepository.findOrderById(orderId);
+  private async ensureOrderExists(orderId: string, scope?: DataVisibilityScope): Promise<void> {
+    const order = await this.orderRepository.findOrderById(orderId, scope);
     if (order === null) {
       throw new DomainError(`Order ${orderId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
     }
@@ -275,14 +297,6 @@ export class OrdersService {
     const doctorName = references.doctorById.get(order.doctorId);
     const clinicName = references.clinicById.get(order.clinicId);
 
-    if (patientName === undefined || doctorName === undefined || clinicName === undefined) {
-      throw new ApplicationError({
-        message: `Order ${order.id} has missing patient, doctor, or clinic links`,
-        statusCode: 500,
-        code: APPLICATION_ERROR_CODES.INTERNAL_ERROR,
-      });
-    }
-
     const technicianName =
       order.technicianId === undefined ? undefined : references.technicianById.get(order.technicianId);
 
@@ -290,11 +304,11 @@ export class OrdersService {
       id: order.id,
       orderNumber: order.orderNumber,
       patientId: order.patientId,
-      patientName,
+      patientName: patientName ?? '',
       doctorId: order.doctorId,
-      doctorName,
+      doctorName: doctorName ?? '',
       clinicId: order.clinicId,
-      clinicName,
+      clinicName: clinicName ?? '',
       scanCenterId: order.scanCenterId ?? '',
       scanCenterName:
         order.scanCenterId === undefined

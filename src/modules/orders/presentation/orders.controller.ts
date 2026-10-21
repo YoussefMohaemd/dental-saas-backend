@@ -19,6 +19,7 @@ import {
   updateOrderBodySchema,
   updateSubOrderBodySchema,
 } from './orders.schemas';
+import { getAuthenticatedDataScope } from '../../../shared/presentation/http/http-utils';
 
 export class OrdersController {
   public constructor(private readonly ordersService: OrdersService) {}
@@ -35,7 +36,10 @@ export class OrdersController {
     const { orderId } = orderIdParamsSchema.parse(req.params);
     assertValidObjectId(orderId, 'orderId');
 
-    const order = await this.ordersService.getOrderById(orderId);
+    const order = await this.ordersService.getOrderById(
+      orderId,
+      await getAuthenticatedDataScope(req),
+    );
     sendOk(res, order, this.buildMeta(req as RequestWithContext));
   };
 
@@ -48,6 +52,7 @@ export class OrdersController {
 
     const result = await this.ordersService.listOrders(
       {
+        scope: await getAuthenticatedDataScope(req),
         ...(query.search !== undefined ? { search: query.search } : {}),
         sortBy: query.sortBy,
         sortDirection: query.sortDirection,
@@ -72,14 +77,21 @@ export class OrdersController {
     ensureNonEmptyOrderUpdate(payload);
     this.assertOrderLinkIds(payload);
 
-    const updated = await this.ordersService.updateOrder(orderId, payload);
+    const updated = await this.ordersService.updateOrder(
+      orderId,
+      payload,
+      await getAuthenticatedDataScope(req),
+    );
     sendOk(res, updated, this.buildMeta(req as RequestWithContext));
   };
 
   public deleteOrder = async (req: Request, res: Response): Promise<void> => {
     const { orderId } = orderIdParamsSchema.parse(req.params);
     assertValidObjectId(orderId, 'orderId');
-    await this.ordersService.deleteOrder(orderId);
+    await this.ordersService.deleteOrder(
+      orderId,
+      await getAuthenticatedDataScope(req),
+    );
     sendNoContent(res);
   };
 
@@ -87,7 +99,10 @@ export class OrdersController {
     const { orderId } = orderIdParamsSchema.parse(req.params);
     assertValidObjectId(orderId, 'orderId');
 
-    const subOrders = await this.ordersService.listSubOrders(orderId);
+    const subOrders = await this.ordersService.listSubOrders(
+      orderId,
+      await getAuthenticatedDataScope(req),
+    );
     sendOk(res, subOrders, this.buildMeta(req as RequestWithContext));
   };
 
@@ -96,7 +111,11 @@ export class OrdersController {
     assertValidObjectId(orderId, 'orderId');
 
     const payload = createSubOrdersBodySchema.parse(req.body);
-    const created = await this.ordersService.createSubOrders(orderId, payload);
+    const created = await this.ordersService.createSubOrders(
+      orderId,
+      payload,
+      await getAuthenticatedDataScope(req),
+    );
     sendCreated(res, created, this.buildMeta(req as RequestWithContext));
   };
 
@@ -105,7 +124,11 @@ export class OrdersController {
     assertValidObjectId(orderId, 'orderId');
 
     const payload = createSubOrdersBodySchema.parse(req.body);
-    const replaced = await this.ordersService.replaceSubOrders(orderId, payload);
+    const replaced = await this.ordersService.replaceSubOrders(
+      orderId,
+      payload,
+      await getAuthenticatedDataScope(req),
+    );
     sendOk(res, replaced, this.buildMeta(req as RequestWithContext));
   };
 
@@ -114,7 +137,11 @@ export class OrdersController {
     assertValidObjectId(orderId, 'orderId');
     assertValidObjectId(subOrderId, 'subOrderId');
 
-    const subOrder = await this.ordersService.getSubOrder(orderId, subOrderId);
+    const subOrder = await this.ordersService.getSubOrder(
+      orderId,
+      subOrderId,
+      await getAuthenticatedDataScope(req),
+    );
     sendOk(res, subOrder, this.buildMeta(req as RequestWithContext));
   };
 
@@ -126,7 +153,12 @@ export class OrdersController {
     const payload = removeUndefined(updateSubOrderBodySchema.parse(req.body));
     ensureNonEmptySubOrderUpdate(payload);
 
-    const updated = await this.ordersService.updateSubOrder(orderId, subOrderId, payload);
+    const updated = await this.ordersService.updateSubOrder(
+      orderId,
+      subOrderId,
+      payload,
+      await getAuthenticatedDataScope(req),
+    );
     sendOk(res, updated, this.buildMeta(req as RequestWithContext));
   };
 
@@ -135,7 +167,11 @@ export class OrdersController {
     assertValidObjectId(orderId, 'orderId');
     assertValidObjectId(subOrderId, 'subOrderId');
 
-    await this.ordersService.deleteSubOrder(orderId, subOrderId);
+    await this.ordersService.deleteSubOrder(
+      orderId,
+      subOrderId,
+      await getAuthenticatedDataScope(req),
+    );
     sendNoContent(res);
   };
 
@@ -144,7 +180,6 @@ export class OrdersController {
       'patientId',
       'doctorId',
       'clinicId',
-      'scanCenterId',
       'changeRequestId',
       'technicianId',
     ] as const;

@@ -1,4 +1,5 @@
 import { ENTITY_ACTIVITY_STATUSES, type EntityActivityStatus } from '../../../shared/domain/entities/dental-data-model';
+import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 
 export interface Doctor {
   id: string;
@@ -16,6 +17,7 @@ export interface Doctor {
 }
 
 export interface DoctorListQuery {
+  scope?: DataVisibilityScope;
   search?: string | undefined;
   page: number;
   pageSize: number;

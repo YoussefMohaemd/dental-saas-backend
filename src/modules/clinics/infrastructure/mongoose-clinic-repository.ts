@@ -2,6 +2,7 @@ import { type FilterQuery, type Model, type SortOrder, Types } from 'mongoose';
 
 import { type Clinic, type ClinicListQuery, type ClinicUpdatePayload, type ClinicWritePayload } from '../domain/clinic';
 import { type ClinicListResult, type ClinicRepository } from '../domain/clinic-repository';
+import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 import { ClinicModel } from '../../../shared/infrastructure/persistence/mongoose/models/clinic.model';
 import { DoctorModel } from '../../../shared/infrastructure/persistence/mongoose/models/doctor.model';
 import { OrderModel } from '../../../shared/infrastructure/persistence/mongoose/models/order.model';
@@ -27,8 +28,12 @@ export class MongooseClinicRepository implements ClinicRepository {
     return this.toClinicRecord(created.toObject());
   }
 
-  public async findById(clinicId: string): Promise<Clinic | null> {
-    const found = await clinicModel.findOne({ _id: clinicId, tenantId: DEFAULT_TENANT_ID })
+  public async findById(clinicId: string, scope?: DataVisibilityScope): Promise<Clinic | null> {
+    const found = await clinicModel.findOne({
+      _id: clinicId,
+      tenantId: DEFAULT_TENANT_ID,
+      ...clinicScopeFilter(scope),
+    })
       .lean<ClinicRecord | null>()
       .exec();
     return found === null ? null : this.toClinicRecord(found);
@@ -50,6 +55,10 @@ export class MongooseClinicRepository implements ClinicRepository {
       ...(query.statuses.length > 0 ? { status: { $in: query.statuses } } : {}),
     };
 
+    if (query.scope && !query.scope.isAdmin) {
+      filter._id = query.scope.clinicId ?? { $in: [] };
+    }
+
     const sortValue: SortOrder = query.sortDirection === 'asc' ? 1 : -1;
     const sortBy = clinicSortFields[query.sortBy];
     const skip = (query.page - 1) * query.pageSize;
@@ -70,9 +79,13 @@ export class MongooseClinicRepository implements ClinicRepository {
     };
   }
 
-  public async update(clinicId: string, payload: ClinicUpdatePayload): Promise<Clinic | null> {
+  public async update(
+    clinicId: string,
+    payload: ClinicUpdatePayload,
+    scope?: DataVisibilityScope,
+  ): Promise<Clinic | null> {
     const updated = await clinicModel.findOneAndUpdate(
-      { _id: clinicId, tenantId: DEFAULT_TENANT_ID },
+      { _id: clinicId, tenantId: DEFAULT_TENANT_ID, ...clinicScopeFilter(scope) },
       payload,
       { new: true },
     )
@@ -82,10 +95,11 @@ export class MongooseClinicRepository implements ClinicRepository {
     return updated === null ? null : this.toClinicRecord(updated);
   }
 
-  public async delete(clinicId: string): Promise<boolean> {
+  public async delete(clinicId: string, scope?: DataVisibilityScope): Promise<boolean> {
     const deleted = await clinicModel.findOneAndDelete({
       _id: clinicId,
       tenantId: DEFAULT_TENANT_ID,
+      ...clinicScopeFilter(scope),
     }).exec();
 
     return deleted !== null;
@@ -157,6 +171,14 @@ const clinicModel = ClinicModel as unknown as Model<ClinicRecord>;
 const doctorModel = DoctorModel as unknown as Model<{ _id: Types.ObjectId; tenantId: Types.ObjectId; clinicId: Types.ObjectId }>;
 const patientModel = PatientModel as unknown as Model<{ _id: Types.ObjectId; tenantId: Types.ObjectId; clinicId: Types.ObjectId }>;
 const orderModel = OrderModel as unknown as Model<{ _id: Types.ObjectId; tenantId: Types.ObjectId; clinicId: Types.ObjectId }>;
+
+function clinicScopeFilter(scope?: DataVisibilityScope): Record<string, unknown> {
+  if (!scope || scope.isAdmin) {
+    return {};
+  }
+
+  return { _id: scope.clinicId ?? { $in: [] } };
+}
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

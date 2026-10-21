@@ -2,7 +2,7 @@
   "info": {
     "name": "Dental SaaS Backend API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Generated from src/docs/openapi.ts. Contains all current API endpoints."
+    "description": "Executable Postman collection for the Dental SaaS backend. Run either login request first; the test script stores accessToken automatically. Seeded IDs are ready for local development after running npm run seed:dev. Create/update bodies match the Zod schemas in src/modules."
   },
   "variable": [
     {
@@ -14,12 +14,28 @@
       "value": ""
     },
     {
+      "key": "adminEmail",
+      "value": "def.admin@export.test"
+    },
+    {
+      "key": "adminPassword",
+      "value": "ChangeMe123!"
+    },
+    {
+      "key": "regularEmail",
+      "value": "doctor1@example.test"
+    },
+    {
+      "key": "regularPassword",
+      "value": "ChangeMe123!"
+    },
+    {
       "key": "tenantId",
       "value": "66f100000000000000000001"
     },
     {
       "key": "userId",
-      "value": "user-demo"
+      "value": "66f100000000000000000007"
     },
     {
       "key": "year",
@@ -83,7 +99,7 @@
     },
     {
       "key": "userIdHeader",
-      "value": "user-demo"
+      "value": "66f100000000000000000007"
     },
     {
       "key": "x_tenant_id",
@@ -91,55 +107,61 @@
     },
     {
       "key": "x_user_id",
-      "value": "user-demo"
+      "value": "66f100000000000000000007"
     },
     {
       "key": "clinicId",
-      "value": "clinic-id"
+      "value": "06e17f57cf52f959baefcc50"
     },
     {
       "key": "doctorId",
-      "value": "doctor-id"
+      "value": "c7083d867b8d7800640e067d"
     },
     {
       "key": "patientId",
-      "value": "patient-id"
+      "value": "762587eda1684fa58d6e562c"
     },
     {
       "key": "orderId",
-      "value": "order-id"
+      "value": "3687ee7fb3a440223274fcf6"
     },
     {
       "key": "subOrderId",
-      "value": "sub-order-id"
+      "value": "be423928efff9f0adcac6ad8"
     },
     {
       "key": "caseId",
-      "value": "case-id"
+      "value": "9c1d4f1f4dd17b1b5fec1e44"
     },
     {
       "key": "recordId",
-      "value": "billing-record-id"
+      "value": "39fcff770c0f93d6be1e6296"
     },
     {
       "key": "requestId",
-      "value": "change-request-id"
+      "value": "484a836fa1611f5bdfe77311"
     },
     {
       "key": "scanCenterId",
-      "value": "scan-center-id"
+      "value": "scan-center-1"
     },
     {
       "key": "documentId",
-      "value": "document-id"
+      "value": "fc5e244a28b44ea65ed32171"
     },
     {
       "key": "notificationId",
-      "value": "notification-id"
+      "value": "343dfd8e58af32e7d724f1e8"
     },
     {
       "key": "tenantIdParam",
       "value": "66f100000000000000000001"
+    },
+    {
+      "key": "managedUserId",
+      "value": "d25a4c612bc50eac2fe6fd7f",
+      "type": "string",
+      "description": "Seeded doctor user used by user-management examples."
     }
   ],
   "item": [
@@ -164,21 +186,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/auth/login",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "auth",
-                "login"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"],
               "query": [],
               "variable": []
             },
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"tenantId\": \"{{tenantId}}\",\n  \"email\": \"dev-admin@example.test\",\n  \"password\": \"ChangeMe123!\"\n}",
+              "raw": "{\n  \"tenantId\": \"{{tenantId}}\",\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -195,11 +211,73 @@
                 "exec": [
                   "const json = pm.response.json();",
                   "const token = json?.data?.accessToken ?? json?.accessToken ?? json?.token;",
+                  "const user = json?.data?.user ?? json?.user;",
                   "if (token) {",
                   "  pm.collectionVariables.set('accessToken', token);",
                   "  console.log('accessToken updated from login response');",
                   "} else {",
                   "  console.warn('No access token found in login response body');",
+                  "}",
+                  "if (user?.userId) {",
+                  "  pm.collectionVariables.set('userId', user.userId);",
+                  "  pm.collectionVariables.set('userIdHeader', user.userId);",
+                  "  pm.collectionVariables.set('x_user_id', user.userId);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Authenticate regular doctor account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"],
+              "query": [],
+              "variable": []
+            },
+            "description": "Logs in as doctor1@example.test by default. Change regularEmail to test another seeded doctor account.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenantId\": \"{{tenantId}}\",\n  \"email\": \"{{regularEmail}}\",\n  \"password\": \"{{regularPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const token = json?.data?.accessToken ?? json?.accessToken ?? json?.token;",
+                  "const user = json?.data?.user ?? json?.user;",
+                  "if (!token) { throw new Error('Regular account login did not return an access token'); }",
+                  "pm.collectionVariables.set('accessToken', token);",
+                  "if (user?.userId) {",
+                  "  pm.collectionVariables.set('userId', user.userId);",
+                  "  pm.collectionVariables.set('userIdHeader', user.userId);",
+                  "  pm.collectionVariables.set('x_user_id', user.userId);",
                   "}"
                 ]
               }
@@ -219,14 +297,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/auth/refresh",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "auth",
-                "refresh"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "refresh"],
               "query": [],
               "variable": []
             },
@@ -247,14 +319,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/auth/logout",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "auth",
-                "logout"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "logout"],
               "query": [],
               "variable": []
             },
@@ -281,14 +347,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/auth/me",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "auth",
-                "me"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"],
               "query": [],
               "variable": []
             },
@@ -315,15 +375,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/auth/sessions/revoke",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "auth",
-                "sessions",
-                "revoke"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "sessions", "revoke"],
               "query": [],
               "variable": []
             },
@@ -355,14 +408,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/billing",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "billing"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "billing"],
               "query": [
                 {
                   "key": "search",
@@ -431,15 +478,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/billing/:recordId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "billing",
-                ":recordId"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "billing", ":recordId"],
               "query": [],
               "variable": [
                 {
@@ -476,15 +516,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/billing/:recordId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "billing",
-                ":recordId"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "billing", ":recordId"],
               "query": [],
               "variable": [
                 {
@@ -493,10 +526,10 @@
                 }
               ]
             },
-            "description": "",
+            "description": "Body uses the seeded collection variables and valid backend schema values.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sample\": \"value\"\n}",
+              "raw": "{\n  \"amount\": 500,\n  \"status\": \"Invoiced\",\n  \"invoiceNumber\": \"INV-PM-{{$timestamp}}\",\n  \"invoiceDate\": \"2026-10-21T00:00:00.000Z\",\n  \"dueDate\": \"2026-11-20T00:00:00.000Z\",\n  \"vouchers\": 0,\n  \"notes\": \"Updated from the Postman collection.\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -530,14 +563,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/cases",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "cases"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "cases"],
               "query": [
                 {
                   "key": "search",
@@ -596,15 +623,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/cases/:caseId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "cases",
-                ":caseId"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "cases", ":caseId"],
               "query": [],
               "variable": [
                 {
@@ -641,14 +661,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/change-requests",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "change-requests"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "change-requests"],
               "query": [
                 {
                   "key": "search",
@@ -707,15 +721,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/change-requests/:requestId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "change-requests",
-                ":requestId"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "change-requests", ":requestId"],
               "query": [],
               "variable": [
                 {
@@ -752,16 +759,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/change-requests/:requestId/status",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "change-requests",
-                ":requestId",
-                "status"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "change-requests", ":requestId", "status"],
               "query": [],
               "variable": [
                 {
@@ -770,10 +769,10 @@
                 }
               ]
             },
-            "description": "",
+            "description": "Body uses the seeded collection variables and valid backend schema values.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sample\": \"value\"\n}",
+              "raw": "{\n  \"status\": \"Approved\",\n  \"note\": \"Approved from the Postman collection example.\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -807,14 +806,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/clinics",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "clinics"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "clinics"],
               "query": [
                 {
                   "key": "search",
@@ -872,21 +865,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/clinics",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "clinics"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "clinics"],
               "query": [],
               "variable": []
             },
-            "description": "",
+            "description": "Body uses the seeded collection variables and valid backend schema values.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sample\": \"value\"\n}",
+              "raw": "{\n  \"name\": \"Postman Dental Clinic {{$timestamp}}\",\n  \"address\": \"10 Postman Street\",\n  \"city\": \"Cairo\",\n  \"phone\": \"+20 10 5555 0199\",\n  \"email\": \"postman.clinic.{{$timestamp}}@example.test\",\n  \"status\": \"Active\",\n  \"accountManager\": \"Postman QA\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -915,15 +902,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/clinics/:clinicId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "clinics",
-                ":clinicId"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "clinics", ":clinicId"],
               "query": [],
               "variable": [
                 {
@@ -960,15 +940,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/clinics/:clinicId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "clinics",
-                ":clinicId"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "clinics", ":clinicId"],
               "query": [],
               "variable": [
                 {
@@ -977,10 +950,10 @@
                 }
               ]
             },
-            "description": "",
+            "description": "Body uses the seeded collection variables and valid backend schema values.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sample\": \"value\"\n}",
+              "raw": "{\n  \"name\": \"Updated Postman Dental Clinic\",\n  \"address\": \"11 Postman Street\",\n  \"city\": \"Giza\",\n  \"phone\": \"+20 10 5555 0200\",\n  \"email\": \"postman.clinic.updated.{{$timestamp}}@example.test\",\n  \"status\": \"Active\",\n  \"accountManager\": \"Postman QA\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1009,15 +982,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/clinics/:clinicId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "clinics",
-                ":clinicId"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "clinics", ":clinicId"],
               "query": [],
               "variable": [
                 {
@@ -1054,14 +1020,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/doctors",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "doctors"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "doctors"],
               "query": [
                 {
                   "key": "search",
@@ -1119,21 +1079,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/doctors",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "doctors"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "doctors"],
               "query": [],
               "variable": []
             },
-            "description": "",
+            "description": "Body uses the seeded collection variables and valid backend schema values.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sample\": \"value\"\n}",
+              "raw": "{\n  \"lookupId\": \"DR-PM-{{$timestamp}}\",\n  \"name\": \"Postman Test Doctor\",\n  \"specialty\": \"Prosthodontics\",\n  \"clinicId\": \"{{clinicId}}\",\n  \"email\": \"postman.doctor.{{$timestamp}}@example.test\",\n  \"phone\": \"+20 11 4444 0199\",\n  \"status\": \"Active\",\n  \"joinedDate\": \"2026-10-21T00:00:00.000Z\",\n  \"avatar\": \"\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1162,15 +1116,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/doctors/:doctorId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "doctors",
-                ":doctorId"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "doctors", ":doctorId"],
               "query": [],
               "variable": [
                 {
@@ -1207,15 +1154,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/doctors/:doctorId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "doctors",
-                ":doctorId"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "doctors", ":doctorId"],
               "query": [],
               "variable": [
                 {
@@ -1224,10 +1164,10 @@
                 }
               ]
             },
-            "description": "",
+            "description": "Body uses the seeded collection variables and valid backend schema values.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sample\": \"value\"\n}",
+              "raw": "{\n  \"specialty\": \"Restorative Dentistry\",\n  \"phone\": \"+20 11 4444 0200\",\n  \"status\": \"Active\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1256,15 +1196,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/doctors/:doctorId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "doctors",
-                ":doctorId"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "doctors", ":doctorId"],
               "query": [],
               "variable": [
                 {
@@ -1301,14 +1234,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/documents",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "documents"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "documents"],
               "query": [
                 {
                   "key": "search",
@@ -1366,21 +1293,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/documents",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "documents"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "documents"],
               "query": [],
               "variable": []
             },
-            "description": "",
+            "description": "Body uses the seeded collection variables and valid backend schema values.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sample\": \"value\"\n}",
+              "raw": "{\n  \"name\": \"Postman clinical report.pdf\",\n  \"category\": \"Reports\",\n  \"type\": \"PDF\",\n  \"sizeBytes\": 262144,\n  \"date\": \"2026-10-21T00:00:00.000Z\",\n  \"doctorId\": \"{{doctorId}}\",\n  \"patientId\": \"{{patientId}}\",\n  \"clinicId\": \"{{clinicId}}\",\n  \"orderId\": \"{{orderId}}\",\n  \"subOrderId\": \"{{subOrderId}}\",\n  \"uploadedBy\": \"{{userId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1409,15 +1330,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/documents/:documentId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "documents",
-                ":documentId"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "documents", ":documentId"],
               "query": [],
               "variable": [
                 {
@@ -1449,15 +1363,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/documents/:documentId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "documents",
-                ":documentId"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "documents", ":documentId"],
               "query": [],
               "variable": [
                 {
@@ -1488,13 +1395,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/health",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "health"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health"],
               "query": [],
               "variable": []
             },
@@ -1532,14 +1434,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/notifications",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "notifications"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "notifications"],
               "query": [
                 {
                   "key": "search",
@@ -1609,16 +1505,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/notifications/:notificationId/read",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "notifications",
-                ":notificationId",
-                "read"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "notifications", ":notificationId", "read"],
               "query": [],
               "variable": [
                 {
@@ -1656,15 +1544,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/notifications/read-all",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "notifications",
-                "read-all"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "notifications", "read-all"],
               "query": [],
               "variable": []
             },
@@ -1696,14 +1577,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/orders",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "orders"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders"],
               "query": [
                 {
                   "key": "search",
@@ -1761,21 +1636,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/orders",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "orders"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders"],
               "query": [],
               "variable": []
             },
-            "description": "",
+            "description": "Body uses the seeded collection variables and valid backend schema values.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sample\": \"value\"\n}",
+              "raw": "{\n  \"orderNumber\": \"PM-{{$timestamp}}\",\n  \"patientId\": \"{{patientId}}\",\n  \"doctorId\": \"{{doctorId}}\",\n  \"clinicId\": \"{{clinicId}}\",\n  \"scanCenterId\": \"{{scanCenterId}}\",\n  \"status\": \"New\",\n  \"priority\": \"Normal\",\n  \"restoration\": \"Crown\",\n  \"arch\": \"Maxilla\",\n  \"format\": \"STL\",\n  \"shade\": \"A2\",\n  \"units\": 1,\n  \"amount\": 460,\n  \"billed\": false,\n  \"billedAmount\": 0,\n  \"billTo\": \"doctor\",\n  \"vouchers\": 0,\n  \"isLocked\": false,\n  \"hasNotes\": true,\n  \"notes\": \"Postman order creation example.\",\n  \"receivedAt\": \"2026-10-21T09:00:00.000Z\",\n  \"sentAt\": \"2026-10-21T10:00:00.000Z\",\n  \"dueDate\": \"2026-12-01T00:00:00.000Z\",\n  \"creationData\": {\n    \"services\": [\n      {\n        \"serviceId\": \"final-restoration\",\n        \"serviceDetails\": {\n          \"restorationType\": \"Crown\",\n          \"material\": \"Zirconia\"\n        },\n        \"serviceForm\": {\n          \"preparation\": \"Full coverage crown\",\n          \"occlusion\": \"Standard\"\n        },\n        \"selectedTeeth\": [\n          11\n        ],\n        \"scanRequirements\": [\n          \"Prep scan\",\n          \"Antagonist scan\"\n        ],\n        \"fileReferences\": [\n          \"prep-scan.stl\"\n        ]\n      }\n    ],\n    \"communication\": {\n      \"internalCaseNote\": \"Please review the shade before production.\",\n      \"internalCaseFiles\": [\n        \"shade-reference.jpg\"\n      ],\n      \"sendMailTo\": [\n        \"Production\",\n        \"QMS\"\n      ],\n      \"sendIhTaskTo\": \"Production\",\n      \"rushTask\": false\n    }\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1804,15 +1673,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/orders/:orderId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "orders",
-                ":orderId"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", ":orderId"],
               "query": [],
               "variable": [
                 {
@@ -1826,7 +1688,7 @@
           "response": []
         },
         {
-          "name": "Update order",
+          "name": "Advance order workflow (New to Review)",
           "request": {
             "method": "PATCH",
             "header": [
@@ -1849,15 +1711,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/orders/:orderId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "orders",
-                ":orderId"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", ":orderId"],
               "query": [],
               "variable": [
                 {
@@ -1866,10 +1721,10 @@
                 }
               ]
             },
-            "description": "",
+            "description": "Uses the deterministic seeded orderId by default. Run once per workflow stage with the next valid status: Review, Design, Production, Quality Check, Ready, then Completed.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sample\": \"value\"\n}",
+              "raw": "{\n  \"status\": \"Review\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1898,15 +1753,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/orders/:orderId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "orders",
-                ":orderId"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", ":orderId"],
               "query": [],
               "variable": [
                 {
@@ -1943,14 +1791,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/patients",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "patients"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "patients"],
               "query": [
                 {
                   "key": "search",
@@ -2008,21 +1850,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/patients",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "patients"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "patients"],
               "query": [],
               "variable": []
             },
-            "description": "",
+            "description": "Body uses the seeded collection variables and valid backend schema values.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sample\": \"value\"\n}",
+              "raw": "{\n  \"name\": \"Postman Test Patient {{$timestamp}}\",\n  \"dob\": \"1990-05-10T00:00:00.000Z\",\n  \"gender\": \"M\",\n  \"phone\": \"+20 12 3333 0199\",\n  \"email\": \"postman.patient.{{$timestamp}}@example.test\",\n  \"clinicId\": \"{{clinicId}}\",\n  \"doctorId\": \"{{doctorId}}\",\n  \"status\": \"Active\",\n  \"lastVisit\": \"2026-10-21T00:00:00.000Z\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2051,15 +1887,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/patients/:patientId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "patients",
-                ":patientId"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "patients", ":patientId"],
               "query": [],
               "variable": [
                 {
@@ -2096,15 +1925,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/patients/:patientId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "patients",
-                ":patientId"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "patients", ":patientId"],
               "query": [],
               "variable": [
                 {
@@ -2113,10 +1935,10 @@
                 }
               ]
             },
-            "description": "",
+            "description": "Body uses the seeded collection variables and valid backend schema values.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sample\": \"value\"\n}",
+              "raw": "{\n  \"phone\": \"+20 12 3333 0200\",\n  \"status\": \"Active\",\n  \"lastVisit\": \"2026-10-21T00:00:00.000Z\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2145,15 +1967,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/patients/:patientId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "patients",
-                ":patientId"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "patients", ":patientId"],
               "query": [],
               "variable": [
                 {
@@ -2190,15 +2005,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/dashboard/volume",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "dashboard",
-                "volume"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "dashboard", "volume"],
               "query": [],
               "variable": []
             },
@@ -2225,15 +2033,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/reports/overview",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "reports",
-                "overview"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "reports", "overview"],
               "query": [],
               "variable": []
             },
@@ -2260,15 +2061,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/reports/orders-range",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "reports",
-                "orders-range"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "reports", "orders-range"],
               "query": [
                 {
                   "key": "search",
@@ -2331,15 +2125,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/reports/quarterly-targets",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "reports",
-                "quarterly-targets"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "reports", "quarterly-targets"],
               "query": [
                 {
                   "key": "year",
@@ -2377,17 +2164,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/reports/quarterly-targets/:year/:quarter",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "reports",
-                "quarterly-targets",
-                ":year",
-                ":quarter"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "reports", "quarterly-targets", ":year", ":quarter"],
               "query": [],
               "variable": [
                 {
@@ -2423,15 +2201,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/reports/team-performance",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "reports",
-                "team-performance"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "reports", "team-performance"],
               "query": [],
               "variable": []
             },
@@ -2463,14 +2234,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/scan-centers",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "scan-centers"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "scan-centers"],
               "query": [
                 {
                   "key": "search",
@@ -2523,15 +2288,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/scan-centers/:scanCenterId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "scan-centers",
-                ":scanCenterId"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "scan-centers", ":scanCenterId"],
               "query": [],
               "variable": [
                 {
@@ -2562,15 +2320,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/settings/reference-data",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "settings",
-                "reference-data"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "settings", "reference-data"],
               "query": [
                 {
                   "key": "include",
@@ -2609,16 +2360,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/orders/:orderId/sub-orders",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "orders",
-                ":orderId",
-                "sub-orders"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", ":orderId", "sub-orders"],
               "query": [],
               "variable": [
                 {
@@ -2655,16 +2398,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/orders/:orderId/sub-orders",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "orders",
-                ":orderId",
-                "sub-orders"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", ":orderId", "sub-orders"],
               "query": [],
               "variable": [
                 {
@@ -2673,10 +2408,10 @@
                 }
               ]
             },
-            "description": "",
+            "description": "Body uses the seeded collection variables and valid backend schema values.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sample\": \"value\"\n}",
+              "raw": "[\n  {\n    \"service\": \"Postman Crown Design\",\n    \"icon\": \"🦷\",\n    \"status\": \"pending\",\n    \"formsComplete\": 0,\n    \"formsTotal\": 2,\n    \"scansComplete\": 0,\n    \"scansTotal\": 2,\n    \"teeth\": [\n      11\n    ],\n    \"priority\": \"Normal\",\n    \"dueDate\": \"2026-12-01T00:00:00.000Z\",\n    \"notes\": \"Created from the Postman collection.\",\n    \"creationData\": {\n      \"serviceId\": \"final-restoration\",\n      \"serviceDetails\": {\n        \"material\": \"Zirconia\"\n      },\n      \"serviceForm\": {\n        \"preparation\": \"Full coverage crown\"\n      },\n      \"selectedTeeth\": [\n        11\n      ],\n      \"scanRequirements\": [\n        \"Prep scan\",\n        \"Antagonist scan\"\n      ],\n      \"fileReferences\": [\n        \"prep-scan.stl\"\n      ]\n    }\n  }\n]",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2710,16 +2445,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/orders/:orderId/sub-orders",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "orders",
-                ":orderId",
-                "sub-orders"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", ":orderId", "sub-orders"],
               "query": [],
               "variable": [
                 {
@@ -2728,10 +2455,10 @@
                 }
               ]
             },
-            "description": "",
+            "description": "Body uses the seeded collection variables and valid backend schema values.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sample\": \"value\"\n}",
+              "raw": "[\n  {\n    \"service\": \"Postman Crown Design\",\n    \"icon\": \"🦷\",\n    \"status\": \"pending\",\n    \"formsComplete\": 0,\n    \"formsTotal\": 2,\n    \"scansComplete\": 0,\n    \"scansTotal\": 2,\n    \"teeth\": [\n      11\n    ],\n    \"priority\": \"Normal\",\n    \"dueDate\": \"2026-12-01T00:00:00.000Z\",\n    \"notes\": \"Replaced from the Postman collection.\",\n    \"creationData\": {\n      \"serviceId\": \"final-restoration\",\n      \"serviceDetails\": {\n        \"material\": \"Zirconia\"\n      },\n      \"serviceForm\": {\n        \"preparation\": \"Full coverage crown\"\n      },\n      \"selectedTeeth\": [\n        11\n      ],\n      \"scanRequirements\": [\n        \"Prep scan\",\n        \"Antagonist scan\"\n      ],\n      \"fileReferences\": [\n        \"prep-scan.stl\"\n      ]\n    }\n  }\n]",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2760,17 +2487,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/orders/:orderId/sub-orders/:subOrderId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "orders",
-                ":orderId",
-                "sub-orders",
-                ":subOrderId"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", ":orderId", "sub-orders", ":subOrderId"],
               "query": [],
               "variable": [
                 {
@@ -2811,17 +2529,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/orders/:orderId/sub-orders/:subOrderId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "orders",
-                ":orderId",
-                "sub-orders",
-                ":subOrderId"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", ":orderId", "sub-orders", ":subOrderId"],
               "query": [],
               "variable": [
                 {
@@ -2834,10 +2543,10 @@
                 }
               ]
             },
-            "description": "",
+            "description": "Body uses the seeded collection variables and valid backend schema values.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sample\": \"value\"\n}",
+              "raw": "{\n  \"status\": \"in-progress\",\n  \"formsComplete\": 1,\n  \"formsTotal\": 2,\n  \"scansComplete\": 1,\n  \"scansTotal\": 2,\n  \"teeth\": [\n    11\n  ],\n  \"priority\": \"High\",\n  \"dueDate\": \"2026-12-01T00:00:00.000Z\",\n  \"notes\": \"Updated from the Postman collection.\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2866,17 +2575,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/orders/:orderId/sub-orders/:subOrderId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "orders",
-                ":orderId",
-                "sub-orders",
-                ":subOrderId"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", ":orderId", "sub-orders", ":subOrderId"],
               "query": [],
               "variable": [
                 {
@@ -2923,14 +2623,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/users",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users"],
               "query": [
                 {
                   "key": "search",
@@ -2994,21 +2688,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/users",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users"],
               "query": [],
               "variable": []
             },
             "description": "Required roles: admin.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sample\": \"value\"\n}",
+              "raw": "{\n  \"fullName\": \"Postman Test User\",\n  \"email\": \"postman.user.{{$timestamp}}@example.test\",\n  \"roles\": [\n    \"technician\"\n  ],\n  \"status\": \"active\",\n  \"clinicId\": \"{{clinicId}}\",\n  \"avatarUrl\": \"https://example.test/avatar.png\",\n  \"password\": \"ChangeMe123!\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3043,20 +2731,13 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/:userId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                ":userId"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", ":userId"],
               "query": [],
               "variable": [
                 {
                   "key": "userId",
-                  "value": "{{userId}}"
+                  "value": "{{managedUserId}}"
                 }
               ]
             },
@@ -3094,28 +2775,20 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/:userId/role-status",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                ":userId",
-                "role-status"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", ":userId", "role-status"],
               "query": [],
               "variable": [
                 {
                   "key": "userId",
-                  "value": "{{userId}}"
+                  "value": "{{managedUserId}}"
                 }
               ]
             },
             "description": "Required roles: admin.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sample\": \"value\"\n}",
+              "raw": "{\n  \"roles\": [\n    \"technician\"\n  ],\n  \"status\": \"active\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3150,21 +2823,13 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/:userId/deactivate",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                ":userId",
-                "deactivate"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", ":userId", "deactivate"],
               "query": [],
               "variable": [
                 {
                   "key": "userId",
-                  "value": "{{userId}}"
+                  "value": "{{managedUserId}}"
                 }
               ]
             },
@@ -3197,21 +2862,13 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/:userId/reactivate",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                ":userId",
-                "reactivate"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", ":userId", "reactivate"],
               "query": [],
               "variable": [
                 {
                   "key": "userId",
-                  "value": "{{userId}}"
+                  "value": "{{managedUserId}}"
                 }
               ]
             },
@@ -3261,7 +2918,7 @@
                 "type": "text"
               }
             ],
-            "url": "{{baseUrl}}/api/order/:orderId",
+            "url": "{{baseUrl}}/api/order/{{orderId}}",
             "description": "Backward-compatible alias that rewrites to /api/v1/orders/:orderId."
           },
           "response": []

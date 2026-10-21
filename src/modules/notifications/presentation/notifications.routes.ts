@@ -8,6 +8,7 @@ import {
   ensureObjectId,
   getAuthenticatedTenantId,
   getAuthenticatedUserId,
+  getAuthenticatedDataScope,
   parseOptionalBoolean,
   parsePaginationQuery,
   parseSort,
@@ -34,7 +35,8 @@ notificationsRouter.get('/notifications', async (req, res) => {
   const types = parseNotificationTypeFilters(query.type);
   const read = parseOptionalBoolean(query.read);
   const tenantId = getAuthenticatedTenantId(req);
-  const recipientId = getAuthenticatedUserId(req);
+  const scope = await getAuthenticatedDataScope(req);
+  const recipientId = scope.isAdmin ? undefined : getAuthenticatedUserId(req);
 
   const result = await listNotifications({
     pagination,
@@ -54,7 +56,8 @@ notificationsRouter.post('/notifications/:notificationId/read', async (req, res)
   const params = z.object({ notificationId: z.string() }).parse(req.params);
   const notificationId = ensureObjectId(params.notificationId, 'notification id');
   const tenantId = getAuthenticatedTenantId(req);
-  const recipientId = getAuthenticatedUserId(req);
+  const scope = await getAuthenticatedDataScope(req);
+  const recipientId = scope.isAdmin ? undefined : getAuthenticatedUserId(req);
 
   const data = await markNotificationRead(notificationId, tenantId, recipientId);
   sendOk(res, data, buildRequestMeta(req));
@@ -62,7 +65,8 @@ notificationsRouter.post('/notifications/:notificationId/read', async (req, res)
 
 notificationsRouter.post('/notifications/read-all', async (req, res) => {
   const tenantId = getAuthenticatedTenantId(req);
-  const recipientId = getAuthenticatedUserId(req);
+  const scope = await getAuthenticatedDataScope(req);
+  const recipientId = scope.isAdmin ? undefined : getAuthenticatedUserId(req);
   const data = await markAllNotificationsRead({ tenantId, recipientId });
 
   sendOk(res, data, buildRequestMeta(req));

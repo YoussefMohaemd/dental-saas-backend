@@ -9,6 +9,7 @@ import {
   type RestorativeType,
   type SubOrderCreationDataEntity,
 } from '../../../shared/domain/entities/dental-data-model';
+import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 
 export interface OrderCreationData {
   services: SubOrderCreationDataEntity[];
@@ -57,6 +58,7 @@ export interface Order {
 }
 
 export interface OrderListQuery {
+  scope?: DataVisibilityScope;
   search?: string | undefined;
   page: number;
   pageSize: number;

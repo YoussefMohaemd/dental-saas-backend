@@ -12,6 +12,8 @@ import {
   type PaginationMeta,
   type PaginationQuery,
 } from '../../application/contracts/pagination';
+import { DoctorModel } from '../../infrastructure/persistence/mongoose/models/doctor.model';
+import { UserModel } from '../../infrastructure/persistence/mongoose/models/user.model';
 import { hasAuthenticatedPrincipal, type RequestWithContext } from './request-context';
 
 const OBJECT_ID_REGEX = /^[a-f\d]{24}$/i;
@@ -166,6 +168,52 @@ export function getAuthenticatedTenantId(req: Request): Types.ObjectId {
 export function getAuthenticatedUserId(req: Request): Types.ObjectId {
   const principal = getAuthenticatedPrincipal(req);
   return parsePrincipalObjectId(principal.userId, 'user');
+}
+
+export interface AuthenticatedDataScope {
+  tenantId: Types.ObjectId;
+  userId: Types.ObjectId;
+  clinicId?: Types.ObjectId;
+  doctorId?: Types.ObjectId;
+  isAdmin: boolean;
+}
+
+export async function getAuthenticatedDataScope(req: Request): Promise<AuthenticatedDataScope> {
+  const principal = getAuthenticatedPrincipal(req);
+  const tenantId = parsePrincipalObjectId(principal.tenantId, 'tenant');
+  const userId = parsePrincipalObjectId(principal.userId, 'user');
+  const roles = principal.roles.map((role) => role.trim().toLowerCase());
+  const isAdmin = roles.includes('admin');
+
+  const user = await UserModel.findOne({ _id: userId, tenantId })
+    .select({ email: 1, clinicId: 1 })
+    .lean<{ email?: string; clinicId?: Types.ObjectId } | null>()
+    .exec();
+
+  if (!user) {
+    throw new ApplicationError({
+      message: 'Authenticated user was not found',
+      statusCode: 401,
+      code: APPLICATION_ERROR_CODES.UNAUTHORIZED,
+      expose: true,
+    });
+  }
+
+  const doctor =
+    !isAdmin && roles.includes('doctor') && user.email
+      ? await DoctorModel.findOne({ tenantId, email: user.email })
+          .select({ _id: 1 })
+          .lean<{ _id: Types.ObjectId } | null>()
+          .exec()
+      : null;
+
+  return {
+    tenantId,
+    userId,
+    ...(user.clinicId ? { clinicId: user.clinicId } : {}),
+    ...(doctor ? { doctorId: doctor._id } : {}),
+    isAdmin,
+  };
 }
 
 function parseStringList(value: unknown): string[] | undefined {

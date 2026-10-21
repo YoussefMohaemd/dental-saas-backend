@@ -7,6 +7,7 @@ import { OrderModel } from '../../../shared/infrastructure/persistence/mongoose/
 import { PatientModel } from '../../../shared/infrastructure/persistence/mongoose/models/patient.model';
 import { UserModel } from '../../../shared/infrastructure/persistence/mongoose/models/user.model';
 import { InMemorySettingsStore } from '../../settings/infrastructure/settings-store';
+import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 
 interface OrderProjection {
   _id: Types.ObjectId;
@@ -29,12 +30,15 @@ interface OrderProjection {
 
 const settingsStore = new InMemorySettingsStore();
 
-export async function getDashboardVolume(tenantId?: Types.ObjectId): Promise<{
+export async function getDashboardVolume(
+  tenantId?: Types.ObjectId,
+  scope?: DataVisibilityScope,
+): Promise<{
   weeks: Array<{ week: string; orders: number; completed: number }>;
 }> {
   const now = new Date();
   const weekRanges = buildWeekRanges(now, 8);
-  const filter = tenantId ? { tenantId } : {};
+  const filter = buildScopedFilter(tenantId, scope);
 
   const orders: Array<{ receivedAt: Date; status: string }> = await OrderModel.find(filter)
     .select({ receivedAt: 1, status: 1 })
@@ -67,13 +71,16 @@ export async function getDashboardVolume(tenantId?: Types.ObjectId): Promise<{
   return { weeks };
 }
 
-export async function getReportsOverview(tenantId?: Types.ObjectId): Promise<{
+export async function getReportsOverview(
+  tenantId?: Types.ObjectId,
+  scope?: DataVisibilityScope,
+): Promise<{
   monthlyRevenue: Array<{ month: string; revenue: number }>;
   restorationBreakdown: Array<{ name: string; value: number }>;
   turnaround: Array<{ day: string; days: number }>;
   workflowShare: Array<{ stage: string; count: number; percent: number }>;
 }> {
-  const filter = tenantId ? { tenantId } : {};
+  const filter = buildScopedFilter(tenantId, scope);
   const [orders, billingRecords]: [
     Array<{ restoration: string; status: string; receivedAt: Date; sentAt?: Date }>,
     Array<{ amount: number; invoiceDate?: Date; dueDate: Date }>,
@@ -119,6 +126,7 @@ export async function getOrdersRangeReport(input: {
   sortBy: 'receivedAt' | 'sentAt' | 'amount' | 'archiveDate' | 'chargedAt' | 'orderNumber';
   sortDirection: 'asc' | 'desc';
   tenantId?: Types.ObjectId | undefined;
+  scope?: DataVisibilityScope | undefined;
 }): Promise<{
   items: Array<{
     id: string;
@@ -139,7 +147,7 @@ export async function getOrdersRangeReport(input: {
   }>;
   totalItems: number;
 }> {
-  const filter: Record<string, unknown> = input.tenantId ? { tenantId: input.tenantId } : {};
+  const filter: Record<string, unknown> = buildScopedFilter(input.tenantId, input.scope);
   if (input.from || input.to) {
     filter.receivedAt = {};
     if (input.from) {
@@ -181,9 +189,11 @@ export async function getOrdersRangeReport(input: {
   let items = records.map((record) => {
     const scanCenterKey = record.scanCenterId?.toString();
     const scanCenter = scanCenterKey ? scanCenterMap.get(scanCenterKey) : undefined;
-    const receivedAtIso = record.receivedAt.toISOString();
-    const sentAtIso = record.sentAt?.toISOString() ?? receivedAtIso;
-    const archiveDateIso = record.archiveDate?.toISOString() ?? receivedAtIso;
+    const receivedAtIso = toDate(record.receivedAt).toISOString();
+    const sentAtIso = record.sentAt ? toDate(record.sentAt).toISOString() : receivedAtIso;
+    const archiveDateIso = record.archiveDate
+      ? toDate(record.archiveDate).toISOString()
+      : receivedAtIso;
 
     return {
       id: record._id.toString(),
@@ -200,7 +210,7 @@ export async function getOrdersRangeReport(input: {
       sentAt: sentAtIso,
       operator: scanCenter?.operator ?? 'N/A',
       archiveDate: archiveDateIso,
-      chargedAt: record.chargedAt ? record.chargedAt.toISOString() : null,
+      chargedAt: record.chargedAt ? toDate(record.chargedAt).toISOString() : null,
     };
   });
 
@@ -253,7 +263,10 @@ export function getQuarterlyTargets(year: number, quarter?: 1 | 2 | 3 | 4): {
   };
 }
 
-export async function getTeamPerformance(tenantId?: Types.ObjectId): Promise<{
+export async function getTeamPerformance(
+  tenantId?: Types.ObjectId,
+  scope?: DataVisibilityScope,
+): Promise<{
   records: Array<{
     userId: number;
     type: string;
@@ -266,7 +279,7 @@ export async function getTeamPerformance(tenantId?: Types.ObjectId): Promise<{
   }>;
 }> {
   const baseMembers = settingsStore.getSnapshot().teamMembers;
-  const filter = tenantId ? { tenantId } : {};
+  const filter = buildScopedFilter(tenantId, scope);
   const orders: Array<{
     technicianId?: Types.ObjectId;
     status: string;
@@ -348,7 +361,10 @@ export async function getTeamPerformance(tenantId?: Types.ObjectId): Promise<{
   return { records };
 }
 
-export async function getReportingSeedData(tenantId?: Types.ObjectId): Promise<{
+export async function getReportingSeedData(
+  tenantId?: Types.ObjectId,
+  scope?: DataVisibilityScope,
+): Promise<{
   startYear: number;
   endYear: number;
   services: Array<{ key: string; label: string; basePrice: number }>;
@@ -360,7 +376,7 @@ export async function getReportingSeedData(tenantId?: Types.ObjectId): Promise<{
   employeeTypes: string[];
   employeeNames: string[];
 }> {
-  const filter = tenantId ? { tenantId } : {};
+  const filter = buildScopedFilter(tenantId, scope);
   const [orders, doctors, patients] = await Promise.all([
     OrderModel.find(filter)
       .select({ restoration: 1, amount: 1, receivedAt: 1 })
@@ -434,6 +450,24 @@ export async function getReportingSeedData(tenantId?: Types.ObjectId): Promise<{
 }
 
 export { buildPaginationMeta };
+
+function buildScopedFilter(
+  tenantId?: Types.ObjectId,
+  scope?: DataVisibilityScope,
+): Record<string, unknown> {
+  const filter: Record<string, unknown> = tenantId ? { tenantId } : {};
+  if (!scope || scope.isAdmin) {
+    return filter;
+  }
+
+  if (scope.doctorId) {
+    filter.doctorId = scope.doctorId;
+  } else {
+    filter.technicianId = scope.userId;
+  }
+
+  return filter;
+}
 
 function toServiceKey(value: string): string {
   return value
@@ -580,12 +614,12 @@ async function buildNameMap(
       };
     };
   },
-  ids: Types.ObjectId[],
+  ids: Array<Types.ObjectId | string>,
   field: string,
 ): Promise<Map<string, string>> {
-  const uniqueIds = [...new Set(ids.map((id) => id.toString()))].map(
-    (id) => new Types.ObjectId(id),
-  );
+  const uniqueIds = [...new Set(ids.map((id) => id.toString()))]
+    .filter((id) => Types.ObjectId.isValid(id))
+    .map((id) => new Types.ObjectId(id));
 
   if (uniqueIds.length === 0) {
     return new Map();
@@ -598,4 +632,8 @@ async function buildNameMap(
     .exec();
 
   return new Map(records.map((record) => [record._id.toString(), record[field] ?? '']));
+}
+
+function toDate(value: Date | string): Date {
+  return value instanceof Date ? value : new Date(value);
 }

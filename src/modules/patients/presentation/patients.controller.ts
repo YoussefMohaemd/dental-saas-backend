@@ -12,6 +12,7 @@ import {
   patientsListQuerySchema,
   updatePatientBodySchema,
 } from './patients.schemas';
+import { getAuthenticatedDataScope } from '../../../shared/presentation/http/http-utils';
 
 export class PatientsController {
   public constructor(private readonly patientService: PatientService) {}
@@ -29,7 +30,10 @@ export class PatientsController {
     const { patientId } = patientIdParamsSchema.parse(req.params);
     assertValidObjectId(patientId, 'patientId');
 
-    const patient = await this.patientService.getPatientById(patientId);
+    const patient = await this.patientService.getPatientById(
+      patientId,
+      await getAuthenticatedDataScope(req),
+    );
     sendOk(res, patient, this.buildMeta(req as RequestWithContext));
   };
 
@@ -41,6 +45,7 @@ export class PatientsController {
     });
     const result = await this.patientService.listPatients(
       {
+        scope: await getAuthenticatedDataScope(req),
         ...(query.search !== undefined ? { search: query.search } : {}),
         sortBy: query.sortBy,
         sortDirection: query.sortDirection,
@@ -68,7 +73,11 @@ export class PatientsController {
       assertValidObjectId(payload.doctorId, 'doctorId');
     }
 
-    const updated = await this.patientService.updatePatient(patientId, payload);
+    const updated = await this.patientService.updatePatient(
+      patientId,
+      payload,
+      await getAuthenticatedDataScope(req),
+    );
     sendOk(res, updated, this.buildMeta(req as RequestWithContext));
   };
 
@@ -76,7 +85,10 @@ export class PatientsController {
     const { patientId } = patientIdParamsSchema.parse(req.params);
     assertValidObjectId(patientId, 'patientId');
 
-    await this.patientService.deletePatient(patientId);
+    await this.patientService.deletePatient(
+      patientId,
+      await getAuthenticatedDataScope(req),
+    );
     sendNoContent(res);
   };
 

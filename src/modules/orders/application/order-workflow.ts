@@ -3,12 +3,12 @@ import { type OrderStatus } from '../../../shared/domain/entities/dental-data-mo
 
 export const ORDER_WORKFLOW_TRANSITIONS: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
   New: ['Review', 'Cancelled'],
-  Review: ['Design', 'Cancelled'],
-  Design: ['Production', 'Cancelled'],
-  Production: ['Quality Check', 'Cancelled'],
-  'Quality Check': ['Ready', 'Cancelled'],
-  Ready: ['Completed', 'Cancelled'],
-  Completed: [],
+  Review: ['New', 'Design', 'Cancelled'],
+  Design: ['Review', 'Production', 'Cancelled'],
+  Production: ['Design', 'Quality Check', 'Cancelled'],
+  'Quality Check': ['Production', 'Ready', 'Cancelled'],
+  Ready: ['Quality Check', 'Completed', 'Cancelled'],
+  Completed: ['Ready'],
   Cancelled: [],
 };
 

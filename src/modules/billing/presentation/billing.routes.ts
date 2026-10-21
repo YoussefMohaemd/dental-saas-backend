@@ -6,7 +6,7 @@ import {
   baseListQuerySchema,
   buildRequestMeta,
   ensureObjectId,
-  getAuthenticatedTenantId,
+  getAuthenticatedDataScope,
   parsePaginationQuery,
   parseSort,
 } from '../../../shared/presentation/http/http-utils';
@@ -37,7 +37,7 @@ billingRouter.get('/billing', async (req, res) => {
     'dueDate',
   );
   const statuses = parseBillingStatusFilters(query.status);
-  const tenantId = getAuthenticatedTenantId(req);
+  const scope = await getAuthenticatedDataScope(req);
 
   const result = await listBillingRecords({
     pagination,
@@ -47,7 +47,8 @@ billingRouter.get('/billing', async (req, res) => {
     dateTo: parseOptionalDate(query.dateTo),
     sortBy: sort.sortBy as 'dueDate' | 'amount' | 'status' | 'createdAt' | 'updatedAt' | 'invoiceDate',
     sortDirection: sort.sortDirection,
-    tenantId,
+    tenantId: scope.tenantId,
+    scope,
   });
 
   sendOk(res, result.items, buildRequestMeta(req, buildPaginationMeta(result.totalItems, pagination)));
@@ -56,8 +57,8 @@ billingRouter.get('/billing', async (req, res) => {
 billingRouter.get('/billing/:recordId', async (req, res) => {
   const params = z.object({ recordId: z.string() }).parse(req.params);
   const billingId = ensureObjectId(params.recordId, 'billing record id');
-  const tenantId = getAuthenticatedTenantId(req);
-  const data = await getBillingRecord(billingId, tenantId);
+  const scope = await getAuthenticatedDataScope(req);
+  const data = await getBillingRecord(billingId, scope.tenantId, scope);
 
   sendOk(res, data, buildRequestMeta(req));
 });
@@ -66,8 +67,8 @@ billingRouter.patch('/billing/:recordId', async (req, res) => {
   const params = z.object({ recordId: z.string() }).parse(req.params);
   const billingId = ensureObjectId(params.recordId, 'billing record id');
   const payload = parseBillingPatchPayload(req.body);
-  const tenantId = getAuthenticatedTenantId(req);
-  const data = await updateBillingRecord(billingId, payload, tenantId);
+  const scope = await getAuthenticatedDataScope(req);
+  const data = await updateBillingRecord(billingId, payload, scope.tenantId, scope);
 
   sendOk(res, data, buildRequestMeta(req));
 });

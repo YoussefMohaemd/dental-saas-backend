@@ -7,6 +7,7 @@ import { sendCreated, sendNoContent, sendOk } from '../../../shared/presentation
 import { type RequestWithContext } from '../../../shared/presentation/http/request-context';
 import { ensureNonEmptyDoctorUpdate, type DoctorService } from '../application/doctor-service';
 import { createDoctorBodySchema, doctorIdParamsSchema, doctorsListQuerySchema, updateDoctorBodySchema } from './doctors.schemas';
+import { getAuthenticatedDataScope } from '../../../shared/presentation/http/http-utils';
 
 export class DoctorsController {
   public constructor(private readonly doctorService: DoctorService) {}
@@ -23,7 +24,10 @@ export class DoctorsController {
     const { doctorId } = doctorIdParamsSchema.parse(req.params);
     assertValidObjectId(doctorId, 'doctorId');
 
-    const doctor = await this.doctorService.getDoctorById(doctorId);
+    const doctor = await this.doctorService.getDoctorById(
+      doctorId,
+      await getAuthenticatedDataScope(req),
+    );
     sendOk(res, doctor, this.buildMeta(req as RequestWithContext));
   };
 
@@ -39,6 +43,7 @@ export class DoctorsController {
     });
     const result = await this.doctorService.listDoctors(
       {
+        scope: await getAuthenticatedDataScope(req),
         ...(query.search !== undefined ? { search: query.search } : {}),
         sortBy: query.sortBy,
         sortDirection: query.sortDirection,
@@ -64,7 +69,11 @@ export class DoctorsController {
       assertValidObjectId(payload.clinicId, 'clinicId');
     }
 
-    const updated = await this.doctorService.updateDoctor(doctorId, payload);
+    const updated = await this.doctorService.updateDoctor(
+      doctorId,
+      payload,
+      await getAuthenticatedDataScope(req),
+    );
     sendOk(res, updated, this.buildMeta(req as RequestWithContext));
   };
 
@@ -72,7 +81,10 @@ export class DoctorsController {
     const { doctorId } = doctorIdParamsSchema.parse(req.params);
     assertValidObjectId(doctorId, 'doctorId');
 
-    await this.doctorService.deleteDoctor(doctorId);
+    await this.doctorService.deleteDoctor(
+      doctorId,
+      await getAuthenticatedDataScope(req),
+    );
     sendNoContent(res);
   };
 

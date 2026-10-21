@@ -16,6 +16,7 @@ import {
   type PatientReference,
 } from '../domain/orders-repository';
 import { type SubOrder, type SubOrderUpdatePayload, type SubOrderWritePayload } from '../domain/sub-order';
+import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 
 const DEFAULT_TENANT_ID = new Types.ObjectId('66f100000000000000000001');
 const settingsStore = new InMemorySettingsStore();
@@ -32,6 +33,16 @@ const orderSortFields: Record<OrderListQuery['sortBy'], string> = {
   updatedAt: 'updatedAt',
 };
 
+function orderScopeFilter(scope?: DataVisibilityScope): Record<string, unknown> {
+  if (!scope || scope.isAdmin) {
+    return {};
+  }
+
+  return scope.doctorId
+    ? { doctorId: scope.doctorId }
+    : { technicianId: scope.userId };
+}
+
 export class MongooseOrdersRepository implements OrderRepository {
   public async createOrder(payload: OrderWritePayload): Promise<Order> {
     const created = await orderModel.create({
@@ -41,8 +52,12 @@ export class MongooseOrdersRepository implements OrderRepository {
     return this.toOrder(created.toObject());
   }
 
-  public async findOrderById(orderId: string): Promise<Order | null> {
-    const found = await orderModel.findOne({ _id: orderId, tenantId: DEFAULT_TENANT_ID })
+  public async findOrderById(orderId: string, scope?: DataVisibilityScope): Promise<Order | null> {
+    const found = await orderModel.findOne({
+      _id: orderId,
+      tenantId: DEFAULT_TENANT_ID,
+      ...orderScopeFilter(scope),
+    })
       .lean<OrderRecord | null>()
       .exec();
     return found === null ? null : this.toOrder(found);
@@ -70,9 +85,13 @@ export class MongooseOrdersRepository implements OrderRepository {
     };
   }
 
-  public async updateOrder(orderId: string, payload: OrderUpdatePayload): Promise<Order | null> {
+  public async updateOrder(
+    orderId: string,
+    payload: OrderUpdatePayload,
+    scope?: DataVisibilityScope,
+  ): Promise<Order | null> {
     const updated = await orderModel.findOneAndUpdate(
-      { _id: orderId, tenantId: DEFAULT_TENANT_ID },
+      { _id: orderId, tenantId: DEFAULT_TENANT_ID, ...orderScopeFilter(scope) },
       this.toOrderDocumentPayload(payload),
       { new: true },
     )
@@ -82,10 +101,11 @@ export class MongooseOrdersRepository implements OrderRepository {
     return updated === null ? null : this.toOrder(updated);
   }
 
-  public async deleteOrder(orderId: string): Promise<boolean> {
+  public async deleteOrder(orderId: string, scope?: DataVisibilityScope): Promise<boolean> {
     const deleted = await orderModel.findOneAndDelete({
       _id: orderId,
       tenantId: DEFAULT_TENANT_ID,
+      ...orderScopeFilter(scope),
     }).exec();
     return deleted !== null;
   }
@@ -196,7 +216,7 @@ export class MongooseOrdersRepository implements OrderRepository {
     return scanCenter?.name ?? null;
   }
 
-  public async listSubOrders(orderId: string): Promise<SubOrder[]> {
+  public async listSubOrders(orderId: string, _scope?: DataVisibilityScope): Promise<SubOrder[]> {
     const records = await subOrderModel.find({
       tenantId: DEFAULT_TENANT_ID,
       orderId: new Types.ObjectId(orderId),
@@ -207,7 +227,11 @@ export class MongooseOrdersRepository implements OrderRepository {
     return records.map((record) => this.toSubOrder(record));
   }
 
-  public async findSubOrderById(orderId: string, subOrderId: string): Promise<SubOrder | null> {
+  public async findSubOrderById(
+    orderId: string,
+    subOrderId: string,
+    _scope?: DataVisibilityScope,
+  ): Promise<SubOrder | null> {
     const record = await subOrderModel.findOne({
       _id: subOrderId,
       tenantId: DEFAULT_TENANT_ID,
@@ -218,7 +242,11 @@ export class MongooseOrdersRepository implements OrderRepository {
     return record === null ? null : this.toSubOrder(record);
   }
 
-  public async createSubOrders(orderId: string, payloads: SubOrderWritePayload[]): Promise<SubOrder[]> {
+  public async createSubOrders(
+    orderId: string,
+    payloads: SubOrderWritePayload[],
+    _scope?: DataVisibilityScope,
+  ): Promise<SubOrder[]> {
     if (payloads.length === 0) {
       return [];
     }
@@ -233,19 +261,24 @@ export class MongooseOrdersRepository implements OrderRepository {
     return created.map((item) => this.toSubOrder(item.toObject() as SubOrderRecord));
   }
 
-  public async replaceSubOrders(orderId: string, payloads: SubOrderWritePayload[]): Promise<SubOrder[]> {
+  public async replaceSubOrders(
+    orderId: string,
+    payloads: SubOrderWritePayload[],
+    scope?: DataVisibilityScope,
+  ): Promise<SubOrder[]> {
     await subOrderModel.deleteMany({
       tenantId: DEFAULT_TENANT_ID,
       orderId: new Types.ObjectId(orderId),
     }).exec();
 
-    return this.createSubOrders(orderId, payloads);
+    return this.createSubOrders(orderId, payloads, scope);
   }
 
   public async updateSubOrder(
     orderId: string,
     subOrderId: string,
     payload: SubOrderUpdatePayload,
+    _scope?: DataVisibilityScope,
   ): Promise<SubOrder | null> {
     const update: Record<string, unknown> = {};
     if (payload.service !== undefined) {
@@ -300,7 +333,11 @@ export class MongooseOrdersRepository implements OrderRepository {
     return updated === null ? null : this.toSubOrder(updated);
   }
 
-  public async deleteSubOrder(orderId: string, subOrderId: string): Promise<boolean> {
+  public async deleteSubOrder(
+    orderId: string,
+    subOrderId: string,
+    _scope?: DataVisibilityScope,
+  ): Promise<boolean> {
     const deleted = await subOrderModel.findOneAndDelete({
       _id: subOrderId,
       tenantId: DEFAULT_TENANT_ID,
@@ -358,6 +395,13 @@ export class MongooseOrdersRepository implements OrderRepository {
         ...(doctorIds.length > 0 ? [{ doctorId: { $in: doctorIds } }] : []),
         ...(clinicIds.length > 0 ? [{ clinicId: { $in: clinicIds } }] : []),
       ];
+    }
+
+    if (query.scope && !query.scope.isAdmin) {
+      const ownershipFilter = query.scope.doctorId
+        ? { doctorId: query.scope.doctorId }
+        : { technicianId: query.scope.userId };
+      filter.$and = [...(filter.$and ?? []), ownershipFilter];
     }
 
     return filter;
@@ -500,17 +544,17 @@ export class MongooseOrdersRepository implements OrderRepository {
       isLocked: document.isLocked,
       hasNotes: document.hasNotes,
       notes: document.notes,
-      ...(document.archiveDate !== undefined ? { archiveDate: document.archiveDate } : {}),
-      receivedAt: document.receivedAt,
-      ...(document.sentAt !== undefined ? { sentAt: document.sentAt } : {}),
-      ...(document.chargedAt !== undefined ? { chargedAt: document.chargedAt } : {}),
-      dueDate: document.dueDate,
+      ...(document.archiveDate !== undefined ? { archiveDate: toDate(document.archiveDate) } : {}),
+      receivedAt: toDate(document.receivedAt),
+      ...(document.sentAt !== undefined ? { sentAt: toDate(document.sentAt) } : {}),
+      ...(document.chargedAt !== undefined ? { chargedAt: toDate(document.chargedAt) } : {}),
+      dueDate: toDate(document.dueDate),
       ...(document.changeRequestId !== undefined ? { changeRequestId: document.changeRequestId.toString() } : {}),
       ...(document.csTask !== undefined ? { csTask: document.csTask } : {}),
       ...(document.technicianId !== undefined ? { technicianId: document.technicianId.toString() } : {}),
       ...(document.creationData !== undefined ? { creationData: mapOrderCreationData(document.creationData) } : {}),
-      createdAt: document.createdAt,
-      updatedAt: document.updatedAt,
+      createdAt: toDate(document.createdAt),
+      updatedAt: toDate(document.updatedAt),
     };
   }
 
@@ -659,7 +703,13 @@ const userModel = UserModel as unknown as Model<TechnicianNameRecord & { tenantI
 
 function uniqueObjectIds(ids: string[]): Types.ObjectId[] {
   const unique = new Set(ids);
-  return [...unique].map((id) => new Types.ObjectId(id));
+  return [...unique]
+    .filter((id) => Types.ObjectId.isValid(id))
+    .map((id) => new Types.ObjectId(id));
+}
+
+function toDate(value: Date | string): Date {
+  return value instanceof Date ? value : new Date(value);
 }
 
 function buildDurationRange(

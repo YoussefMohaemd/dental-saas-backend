@@ -14,6 +14,7 @@ import { DoctorModel } from '../../../shared/infrastructure/persistence/mongoose
 import { OrderModel } from '../../../shared/infrastructure/persistence/mongoose/models/order.model';
 import { PatientModel } from '../../../shared/infrastructure/persistence/mongoose/models/patient.model';
 import { parseEnumList } from '../../../shared/presentation/http/http-utils';
+import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 
 interface BillingRecord {
   _id: Types.ObjectId;
@@ -41,6 +42,7 @@ interface BillingListInput {
   sortBy: 'dueDate' | 'amount' | 'status' | 'createdAt' | 'updatedAt' | 'invoiceDate';
   sortDirection: 'asc' | 'desc';
   tenantId?: Types.ObjectId | undefined;
+  scope?: DataVisibilityScope | undefined;
 }
 
 const billingPatchSchema = z
@@ -106,6 +108,7 @@ export async function listBillingRecords(input: BillingListInput): Promise<{
   if (input.tenantId) {
     filter.tenantId = input.tenantId;
   }
+  applyScopeFilter(filter, input.scope);
 
   if (input.statuses && input.statuses.length > 0) {
     filter.status = { $in: input.statuses };
@@ -155,11 +158,13 @@ export async function listBillingRecords(input: BillingListInput): Promise<{
 export async function getBillingRecord(
   billingId: Types.ObjectId,
   tenantId?: Types.ObjectId,
+  scope?: DataVisibilityScope,
 ): Promise<BillingRecordDto> {
   const filter: FilterQuery<BillingRecord> = { _id: billingId };
   if (tenantId) {
     filter.tenantId = tenantId;
   }
+  applyScopeFilter(filter, scope);
 
   const record = await BillingRecordModel.findOne(filter).lean<BillingRecord | null>().exec();
   if (!record) {
@@ -185,11 +190,13 @@ export async function updateBillingRecord(
   billingId: Types.ObjectId,
   payload: z.infer<typeof billingPatchSchema>,
   tenantId?: Types.ObjectId,
+  scope?: DataVisibilityScope,
 ): Promise<BillingRecordDto> {
   const filter: FilterQuery<BillingRecord> = { _id: billingId };
   if (tenantId) {
     filter.tenantId = tenantId;
   }
+  applyScopeFilter(filter, scope);
 
   const record = await BillingRecordModel.findOneAndUpdate(
     filter,
@@ -211,10 +218,26 @@ export async function updateBillingRecord(
     });
   }
 
-  return getBillingRecord(record._id, tenantId);
+  return getBillingRecord(record._id, tenantId, scope);
 }
 
 export { buildPaginationMeta };
+
+function applyScopeFilter(
+  filter: FilterQuery<BillingRecord>,
+  scope?: DataVisibilityScope,
+): void {
+  if (!scope || scope.isAdmin) {
+    return;
+  }
+
+  if (scope.doctorId) {
+    filter.doctorId = scope.doctorId;
+    return;
+  }
+
+  filter.clinicId = scope.clinicId ?? { $in: [] };
+}
 
 async function buildNamedMap<TDoc extends { _id: Types.ObjectId }>(
   model: {

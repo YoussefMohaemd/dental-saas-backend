@@ -7,6 +7,7 @@ import {
 } from '../../../shared/application/errors/application-error';
 import { type PaginationMeta, type PaginationQuery } from '../../../shared/application/contracts/pagination';
 import { buildPaginationMeta } from '../../../shared/application/contracts/pagination';
+import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 import { CASE_STATUSES } from '../../../shared/domain/entities/dental-data-model';
 import { CaseModel } from '../../../shared/infrastructure/persistence/mongoose/models/case.model';
 import { ClinicModel } from '../../../shared/infrastructure/persistence/mongoose/models/clinic.model';
@@ -36,6 +37,7 @@ interface CasesListInput {
   sortBy: 'caseNumber' | 'title' | 'createdAt' | 'updatedAt' | 'priority' | 'status';
   sortDirection: 'asc' | 'desc';
   tenantId?: Types.ObjectId | undefined;
+  scope?: DataVisibilityScope | undefined;
 }
 
 interface CasesListResult {
@@ -48,6 +50,7 @@ export async function listCases(input: CasesListInput): Promise<CasesListResult>
   if (input.tenantId) {
     filter.tenantId = input.tenantId;
   }
+  applyScopeFilter(filter, input.scope);
 
   if (input.statuses && input.statuses.length > 0) {
     filter.status = { $in: input.statuses };
@@ -92,11 +95,16 @@ export async function listCases(input: CasesListInput): Promise<CasesListResult>
   };
 }
 
-export async function getCaseById(caseId: Types.ObjectId, tenantId?: Types.ObjectId): Promise<CaseDto> {
+export async function getCaseById(
+  caseId: Types.ObjectId,
+  tenantId?: Types.ObjectId,
+  scope?: DataVisibilityScope,
+): Promise<CaseDto> {
   const filter: FilterQuery<CaseRecord> = { _id: caseId };
   if (tenantId) {
     filter.tenantId = tenantId;
   }
+  applyScopeFilter(filter, scope);
 
   const record = await CaseModel.findOne(filter).lean<CaseRecord | null>().exec();
   if (!record) {
@@ -120,6 +128,22 @@ export async function getCaseById(caseId: Types.ObjectId, tenantId?: Types.Objec
     createNameMap(doctor ? [doctor] : []),
     createNameMap(clinic ? [clinic] : []),
   );
+}
+
+function applyScopeFilter(
+  filter: FilterQuery<CaseRecord>,
+  scope?: DataVisibilityScope,
+): void {
+  if (!scope || scope.isAdmin) {
+    return;
+  }
+
+  if (scope.doctorId) {
+    filter.doctorId = scope.doctorId;
+    return;
+  }
+
+  filter.clinicId = scope.clinicId ?? { $in: [] };
 }
 
 export function parseCaseStatusFilters(value: unknown): CaseDto['status'][] | undefined {

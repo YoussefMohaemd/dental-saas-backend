@@ -8,6 +8,7 @@ import { env } from '../config/env';
 import { logger } from '../config/logger';
 import { PasswordHasher } from '../modules/auth/application/password-hasher';
 import { registerPersistenceModels } from '../shared/infrastructure/persistence/mongoose';
+import { generatedSeedData } from './generated-seed-data';
 
 interface ClinicSeed {
   id: string;
@@ -162,6 +163,7 @@ const toObjectId = (value: string): mongoose.Types.ObjectId => new mongoose.Type
 const fixedTenantId = toObjectId('66f100000000000000000001');
 const fixedAdminUserId = toObjectId('66f100000000000000000005');
 const fixedTechnicianUserId = toObjectId('66f100000000000000000006');
+const fixedPlatformAdminAliasId = toObjectId('66f100000000000000000007');
 
 const passwordHasher = new PasswordHasher();
 
@@ -174,6 +176,13 @@ const seedDataDirectory = resolve(
 
 function readSeedDataFile<T>(fileName: string): T {
   const filePath = resolve(seedDataDirectory, fileName);
+  if (!existsSync(filePath)) {
+    const generated = generatedSeedData[fileName];
+    if (generated === undefined) {
+      throw new Error(`Seed data file not found: ${filePath}`);
+    }
+    return generated as T;
+  }
   const content = readFileSync(filePath, 'utf8');
   return JSON.parse(content) as T;
 }
@@ -245,10 +254,6 @@ function buildUniqueEmail(baseLocalPart: string, usedEmails: Set<string>): strin
 const seedDevelopmentData = async (): Promise<void> => {
   if (env.NODE_ENV === 'production') {
     throw new Error('Refusing to seed development data while NODE_ENV=production');
-  }
-
-  if (!existsSync(seedDataDirectory)) {
-    throw new Error(`Seed data directory not found: ${seedDataDirectory}`);
   }
 
   const clinicsSource = readSeedDataFile<ClinicSeed[]>('clinics.json');
@@ -344,8 +349,18 @@ const seedDevelopmentData = async (): Promise<void> => {
   registerUser({
     key: 'dev-admin',
     id: fixedAdminUserId,
-    fullName: 'Platform Admin (DEV ONLY)',
+    fullName: 'Platform Admin',
     email: 'dev-admin@example.test',
+    roles: ['admin'],
+    status: 'active',
+    passwordHash: defaultPasswordHash,
+    ...(defaultClinicId ? { clinicId: defaultClinicId } : {}),
+  });
+  registerUser({
+    key: 'platform-admin-alias',
+    id: fixedPlatformAdminAliasId,
+    fullName: 'Platform Admin',
+    email: 'def.admin@export.test',
     roles: ['admin'],
     status: 'active',
     passwordHash: defaultPasswordHash,
@@ -371,6 +386,7 @@ const seedDevelopmentData = async (): Promise<void> => {
       fullName: doctor.name,
       email: doctor.email,
       roles: ['doctor'],
+      passwordHash: defaultPasswordHash,
       ...(clinicId ? { clinicId } : {}),
     });
     doctorUserByName.set(doctor.name, doctorUserId);
@@ -388,6 +404,7 @@ const seedDevelopmentData = async (): Promise<void> => {
       id: objectIdFromSeed('user-technician', trimmedName),
       fullName: trimmedName,
       roles: ['technician'],
+      passwordHash: defaultPasswordHash,
       ...(clinicId ? { clinicId } : {}),
     });
     technicianUserByName.set(trimmedName, technicianUserId);

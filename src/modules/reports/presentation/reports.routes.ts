@@ -5,7 +5,7 @@ import { sendOk } from '../../../shared/presentation/http/api-response';
 import {
   baseListQuerySchema,
   buildRequestMeta,
-  getAuthenticatedTenantId,
+  getAuthenticatedDataScope,
   parsePaginationQuery,
   parseSort,
 } from '../../../shared/presentation/http/http-utils';
@@ -27,22 +27,22 @@ const ordersRangeQuerySchema = baseListQuerySchema.extend({
 });
 
 reportsRouter.get('/dashboard/volume', async (req, res) => {
-  const tenantId = getAuthenticatedTenantId(req);
-  const data = await getDashboardVolume(tenantId);
+  const scope = await getAuthenticatedDataScope(req);
+  const data = await getDashboardVolume(scope.tenantId, scope);
 
   sendOk(res, data, buildRequestMeta(req));
 });
 
 reportsRouter.get('/reports/overview', async (req, res) => {
-  const tenantId = getAuthenticatedTenantId(req);
-  const data = await getReportsOverview(tenantId);
+  const scope = await getAuthenticatedDataScope(req);
+  const data = await getReportsOverview(scope.tenantId, scope);
 
   sendOk(res, data, buildRequestMeta(req));
 });
 
 reportsRouter.get('/reports/seed', async (req, res) => {
-  const tenantId = getAuthenticatedTenantId(req);
-  const data = await getReportingSeedData(tenantId);
+  const scope = await getAuthenticatedDataScope(req);
+  const data = await getReportingSeedData(scope.tenantId, scope);
 
   sendOk(res, data, buildRequestMeta(req));
 });
@@ -55,7 +55,7 @@ reportsRouter.get('/reports/orders-range', async (req, res) => {
     ['receivedAt', 'sentAt', 'amount', 'archiveDate', 'chargedAt', 'orderNumber'],
     'receivedAt',
   );
-  const tenantId = getAuthenticatedTenantId(req);
+  const scope = await getAuthenticatedDataScope(req);
   const data = await getOrdersRangeReport({
     pagination,
     from: parseDateOrUndefined(query.from),
@@ -63,7 +63,8 @@ reportsRouter.get('/reports/orders-range', async (req, res) => {
     search: query.search,
     sortBy: sort.sortBy as 'receivedAt' | 'sentAt' | 'amount' | 'archiveDate' | 'chargedAt' | 'orderNumber',
     sortDirection: sort.sortDirection,
-    tenantId,
+    tenantId: scope.tenantId,
+    scope,
   });
 
   sendOk(res, data.items, buildRequestMeta(req, buildPaginationMeta(data.totalItems, pagination)));
@@ -94,8 +95,8 @@ reportsRouter.get('/reports/quarterly-targets/:year/:quarter', (req, res) => {
 });
 
 reportsRouter.get('/reports/team-performance', async (req, res) => {
-  const tenantId = getAuthenticatedTenantId(req);
-  const data = await getTeamPerformance(tenantId);
+  const scope = await getAuthenticatedDataScope(req);
+  const data = await getTeamPerformance(scope.tenantId, scope);
   sendOk(res, data.records, buildRequestMeta(req));
 });
 

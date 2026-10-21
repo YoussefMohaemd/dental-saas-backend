@@ -8,6 +8,7 @@ import { type RequestWithContext } from '../../../shared/presentation/http/reque
 import { APPLICATION_ERROR_CODES, ApplicationError } from '../../../shared/application/errors/application-error';
 import { ensureNonEmptyUpdate } from '../application/clinic-service';
 import { normalizePaginationQuery } from '../../../shared/application/contracts/pagination';
+import { getAuthenticatedDataScope } from '../../../shared/presentation/http/http-utils';
 
 export class ClinicsController {
   public constructor(private readonly clinicService: ClinicService) {}
@@ -22,7 +23,10 @@ export class ClinicsController {
     const { clinicId } = clinicIdParamsSchema.parse(req.params);
     assertValidObjectId(clinicId, 'clinicId');
 
-    const clinic = await this.clinicService.getClinicById(clinicId);
+    const clinic = await this.clinicService.getClinicById(
+      clinicId,
+      await getAuthenticatedDataScope(req),
+    );
     sendOk(res, clinic, this.buildMeta(req as RequestWithContext));
   };
 
@@ -34,6 +38,7 @@ export class ClinicsController {
     });
     const result = await this.clinicService.listClinics(
       {
+        scope: await getAuthenticatedDataScope(req),
         ...(query.search !== undefined ? { search: query.search } : {}),
         sortBy: query.sortBy,
         sortDirection: query.sortDirection,
@@ -54,7 +59,11 @@ export class ClinicsController {
 
     const payload = removeUndefined(updateClinicBodySchema.parse(req.body));
     ensureNonEmptyUpdate(payload);
-    const updated = await this.clinicService.updateClinic(clinicId, payload);
+    const updated = await this.clinicService.updateClinic(
+      clinicId,
+      payload,
+      await getAuthenticatedDataScope(req),
+    );
     sendOk(res, updated, this.buildMeta(req as RequestWithContext));
   };
 
@@ -62,7 +71,10 @@ export class ClinicsController {
     const { clinicId } = clinicIdParamsSchema.parse(req.params);
     assertValidObjectId(clinicId, 'clinicId');
 
-    await this.clinicService.deleteClinic(clinicId);
+    await this.clinicService.deleteClinic(
+      clinicId,
+      await getAuthenticatedDataScope(req),
+    );
     sendNoContent(res);
   };
 

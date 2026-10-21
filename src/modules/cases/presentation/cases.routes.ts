@@ -7,7 +7,7 @@ import {
   buildRequestMeta,
   createPaginationMeta,
   ensureObjectId,
-  getAuthenticatedTenantId,
+  getAuthenticatedDataScope,
   parsePaginationQuery,
   parseSort,
 } from '../../../shared/presentation/http/http-utils';
@@ -28,7 +28,7 @@ casesRouter.get('/cases', async (req, res) => {
     'updatedAt',
   );
   const statuses = parseCaseStatusFilters(query.status);
-  const tenantId = getAuthenticatedTenantId(req);
+  const scope = await getAuthenticatedDataScope(req);
 
   const result = await listCases({
     pagination,
@@ -36,7 +36,8 @@ casesRouter.get('/cases', async (req, res) => {
     statuses,
     sortBy: sort.sortBy as 'caseNumber' | 'title' | 'createdAt' | 'updatedAt' | 'priority' | 'status',
     sortDirection: sort.sortDirection,
-    tenantId,
+    tenantId: scope.tenantId,
+    scope,
   });
 
   sendOk(res, result.items, buildRequestMeta(req, createPaginationMeta(result.pagination.totalItems, pagination)));
@@ -45,8 +46,8 @@ casesRouter.get('/cases', async (req, res) => {
 casesRouter.get('/cases/:caseId', async (req, res) => {
   const params = z.object({ caseId: z.string() }).parse(req.params);
   const caseId = ensureObjectId(params.caseId, 'case id');
-  const tenantId = getAuthenticatedTenantId(req);
-  const data = await getCaseById(caseId, tenantId);
+  const scope = await getAuthenticatedDataScope(req);
+  const data = await getCaseById(caseId, scope.tenantId, scope);
 
   sendOk(res, data, buildRequestMeta(req));
 });

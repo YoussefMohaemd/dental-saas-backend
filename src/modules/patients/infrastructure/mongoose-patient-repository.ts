@@ -6,6 +6,7 @@ import { OrderModel } from '../../../shared/infrastructure/persistence/mongoose/
 import { PatientModel } from '../../../shared/infrastructure/persistence/mongoose/models/patient.model';
 import { type Patient, type PatientListQuery, type PatientUpdatePayload, type PatientWritePayload } from '../domain/patient';
 import { type DoctorReference, type PatientListResult, type PatientRepository } from '../domain/patient-repository';
+import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 
 const DEFAULT_TENANT_ID = new Types.ObjectId('66f100000000000000000001');
 
@@ -28,8 +29,12 @@ export class MongoosePatientRepository implements PatientRepository {
     return this.toPatientRecord(created.toObject());
   }
 
-  public async findById(patientId: string): Promise<Patient | null> {
-    const found = await patientModel.findOne({ _id: patientId, tenantId: DEFAULT_TENANT_ID })
+  public async findById(patientId: string, scope?: DataVisibilityScope): Promise<Patient | null> {
+    const found = await patientModel.findOne({
+      _id: patientId,
+      tenantId: DEFAULT_TENANT_ID,
+      ...(await patientScopeFilter(scope)),
+    })
       .lean<PatientRecord | null>()
       .exec();
     return found === null ? null : this.toPatientRecord(found);
@@ -49,6 +54,18 @@ export class MongoosePatientRepository implements PatientRepository {
         : {}),
       ...(query.statuses.length > 0 ? { status: { $in: query.statuses } } : {}),
     };
+
+    if (query.scope && !query.scope.isAdmin) {
+      if (query.scope.doctorId) {
+        filter.doctorId = query.scope.doctorId;
+      } else {
+        const patientIds = await orderModel.distinct("patientId", {
+          tenantId: DEFAULT_TENANT_ID,
+          technicianId: query.scope.userId,
+        }).exec();
+        filter._id = { $in: patientIds };
+      }
+    }
 
     const sortValue: SortOrder = query.sortDirection === 'asc' ? 1 : -1;
     const sortBy = patientSortFields[query.sortBy];
@@ -70,9 +87,17 @@ export class MongoosePatientRepository implements PatientRepository {
     };
   }
 
-  public async update(patientId: string, payload: PatientUpdatePayload): Promise<Patient | null> {
+  public async update(
+    patientId: string,
+    payload: PatientUpdatePayload,
+    scope?: DataVisibilityScope,
+  ): Promise<Patient | null> {
     const updated = await patientModel.findOneAndUpdate(
-      { _id: patientId, tenantId: DEFAULT_TENANT_ID },
+      {
+        _id: patientId,
+        tenantId: DEFAULT_TENANT_ID,
+        ...(await patientScopeFilter(scope)),
+      },
       payload,
       { new: true },
     )
@@ -82,10 +107,11 @@ export class MongoosePatientRepository implements PatientRepository {
     return updated === null ? null : this.toPatientRecord(updated);
   }
 
-  public async delete(patientId: string): Promise<boolean> {
+  public async delete(patientId: string, scope?: DataVisibilityScope): Promise<boolean> {
     const deleted = await patientModel.findOneAndDelete({
       _id: patientId,
       tenantId: DEFAULT_TENANT_ID,
+      ...(await patientScopeFilter(scope)),
     }).exec();
 
     return deleted !== null;
@@ -191,6 +217,22 @@ const doctorModel = DoctorModel as unknown as Model<{
   clinicId: Types.ObjectId;
 }>;
 const orderModel = OrderModel as unknown as Model<{ _id: Types.ObjectId; tenantId: Types.ObjectId; patientId: Types.ObjectId }>;
+
+async function patientScopeFilter(scope?: DataVisibilityScope): Promise<Record<string, unknown>> {
+  if (!scope || scope.isAdmin) {
+    return {};
+  }
+
+  if (scope.doctorId) {
+    return { doctorId: scope.doctorId };
+  }
+
+  const patientIds = await orderModel.distinct('patientId', {
+    tenantId: DEFAULT_TENANT_ID,
+    technicianId: scope.userId,
+  }).exec();
+  return { _id: { $in: patientIds } };
+}
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

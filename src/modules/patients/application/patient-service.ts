@@ -4,6 +4,7 @@ import { type PatientDto } from '../../../shared/application/contracts/dental-ap
 import { DOMAIN_ERROR_CODES, DomainError } from '../../../shared/domain/errors/domain-error';
 import { type Patient, type PatientListQuery, type PatientUpdatePayload, type PatientWritePayload } from '../domain/patient';
 import { type PatientRepository } from '../domain/patient-repository';
+import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 
 export class PatientService {
   public constructor(private readonly patientRepository: PatientRepository) {}
@@ -14,8 +15,8 @@ export class PatientService {
     return this.toPatientDto(patient);
   }
 
-  public async getPatientById(patientId: string): Promise<PatientDto> {
-    const patient = await this.patientRepository.findById(patientId);
+  public async getPatientById(patientId: string, scope?: DataVisibilityScope): Promise<PatientDto> {
+    const patient = await this.patientRepository.findById(patientId, scope);
     if (patient === null) {
       throw new DomainError(`Patient ${patientId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
     }
@@ -41,9 +42,13 @@ export class PatientService {
     };
   }
 
-  public async updatePatient(patientId: string, payload: PatientUpdatePayload): Promise<PatientDto> {
+  public async updatePatient(
+    patientId: string,
+    payload: PatientUpdatePayload,
+    scope?: DataVisibilityScope,
+  ): Promise<PatientDto> {
     if (payload.clinicId !== undefined || payload.doctorId !== undefined) {
-      const existing = await this.patientRepository.findById(patientId);
+      const existing = await this.patientRepository.findById(patientId, scope);
       if (existing === null) {
         throw new DomainError(`Patient ${patientId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
       }
@@ -53,7 +58,7 @@ export class PatientService {
       await this.assertClinicDoctorLink(clinicId, doctorId);
     }
 
-    const updated = await this.patientRepository.update(patientId, payload);
+    const updated = await this.patientRepository.update(patientId, payload, scope);
     if (updated === null) {
       throw new DomainError(`Patient ${patientId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
     }
@@ -61,8 +66,8 @@ export class PatientService {
     return this.toPatientDto(updated);
   }
 
-  public async deletePatient(patientId: string): Promise<void> {
-    const deleted = await this.patientRepository.delete(patientId);
+  public async deletePatient(patientId: string, scope?: DataVisibilityScope): Promise<void> {
+    const deleted = await this.patientRepository.delete(patientId, scope);
     if (!deleted) {
       throw new DomainError(`Patient ${patientId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
     }

@@ -4,6 +4,7 @@ import { APPLICATION_ERROR_CODES, ApplicationError } from '../../../shared/appli
 import { DOMAIN_ERROR_CODES, DomainError } from '../../../shared/domain/errors/domain-error';
 import { type Clinic, type ClinicListQuery, type ClinicUpdatePayload, type ClinicWritePayload } from '../domain/clinic';
 import { type ClinicRepository } from '../domain/clinic-repository';
+import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 
 export class ClinicService {
   public constructor(private readonly clinicRepository: ClinicRepository) {}
@@ -14,8 +15,8 @@ export class ClinicService {
     return this.toClinicDto(clinic);
   }
 
-  public async getClinicById(clinicId: string): Promise<ClinicDto> {
-    const clinic = await this.clinicRepository.findById(clinicId);
+  public async getClinicById(clinicId: string, scope?: DataVisibilityScope): Promise<ClinicDto> {
+    const clinic = await this.clinicRepository.findById(clinicId, scope);
     if (clinic === null) {
       throw new DomainError(`Clinic ${clinicId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
     }
@@ -41,12 +42,16 @@ export class ClinicService {
     };
   }
 
-  public async updateClinic(clinicId: string, payload: ClinicUpdatePayload): Promise<ClinicDto> {
+  public async updateClinic(
+    clinicId: string,
+    payload: ClinicUpdatePayload,
+    scope?: DataVisibilityScope,
+  ): Promise<ClinicDto> {
     if (payload.name !== undefined) {
       await this.ensureUniqueName(payload.name, clinicId);
     }
 
-    const updated = await this.clinicRepository.update(clinicId, payload);
+    const updated = await this.clinicRepository.update(clinicId, payload, scope);
     if (updated === null) {
       throw new DomainError(`Clinic ${clinicId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
     }
@@ -54,8 +59,8 @@ export class ClinicService {
     return this.toClinicDto(updated);
   }
 
-  public async deleteClinic(clinicId: string): Promise<void> {
-    const existing = await this.clinicRepository.findById(clinicId);
+  public async deleteClinic(clinicId: string, scope?: DataVisibilityScope): Promise<void> {
+    const existing = await this.clinicRepository.findById(clinicId, scope);
     if (existing === null) {
       throw new DomainError(`Clinic ${clinicId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
     }
@@ -72,7 +77,7 @@ export class ClinicService {
       );
     }
 
-    await this.clinicRepository.delete(clinicId);
+    await this.clinicRepository.delete(clinicId, scope);
   }
 
   private async ensureUniqueName(name: string, clinicIdToExclude?: string): Promise<void> {
