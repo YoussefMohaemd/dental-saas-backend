@@ -28,7 +28,10 @@ export class OrdersController {
     const payload = removeUndefined(createOrderBodySchema.parse(req.body));
     this.assertOrderLinkIds(payload);
 
-    const created = await this.ordersService.createOrder(payload);
+    const created = await this.ordersService.createOrder(
+      payload,
+      await getAuthenticatedDataScope(req),
+    );
     sendCreated(res, created, this.buildMeta(req as RequestWithContext));
   };
 

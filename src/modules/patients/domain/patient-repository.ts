@@ -13,14 +13,14 @@ export interface DoctorReference {
 }
 
 export interface PatientRepository {
-  create(payload: PatientWritePayload): Promise<Patient>;
-  findById(patientId: string, scope?: DataVisibilityScope): Promise<Patient | null>;
+  create(payload: PatientWritePayload, scope: DataVisibilityScope): Promise<Patient>;
+  findById(patientId: string, scope: DataVisibilityScope): Promise<Patient | null>;
   list(query: PatientListQuery): Promise<PatientListResult>;
-  update(patientId: string, payload: PatientUpdatePayload, scope?: DataVisibilityScope): Promise<Patient | null>;
-  delete(patientId: string, scope?: DataVisibilityScope): Promise<boolean>;
-  clinicExists(clinicId: string): Promise<boolean>;
-  findDoctorById(doctorId: string): Promise<DoctorReference | null>;
-  findClinicNameById(clinicId: string): Promise<string | null>;
-  findDoctorNameById(doctorId: string): Promise<string | null>;
-  countOrders(patientId: string): Promise<number>;
+  update(patientId: string, payload: PatientUpdatePayload, scope: DataVisibilityScope): Promise<Patient | null>;
+  delete(patientId: string, scope: DataVisibilityScope): Promise<boolean>;
+  clinicExists(clinicId: string, scope: DataVisibilityScope): Promise<boolean>;
+  findDoctorById(doctorId: string, scope: DataVisibilityScope): Promise<DoctorReference | null>;
+  findClinicNameById(clinicId: string, scope: DataVisibilityScope): Promise<string | null>;
+  findDoctorNameById(doctorId: string, scope: DataVisibilityScope): Promise<string | null>;
+  countOrders(patientId: string, scope: DataVisibilityScope): Promise<number>;
 }

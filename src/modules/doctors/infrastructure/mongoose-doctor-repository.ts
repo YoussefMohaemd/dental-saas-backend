@@ -1,4 +1,5 @@
-import { type FilterQuery, type Model, type SortOrder, Types } from 'mongoose';
+import { type FilterQuery, type Model, type SortOrder } from 'mongoose';
+import type { Types } from 'mongoose';
 
 import { ClinicModel } from '../../../shared/infrastructure/persistence/mongoose/models/clinic.model';
 import { DoctorModel } from '../../../shared/infrastructure/persistence/mongoose/models/doctor.model';
@@ -13,8 +14,6 @@ import {
 import { type DoctorListResult, type DoctorRepository } from '../domain/doctor-repository';
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 
-const DEFAULT_TENANT_ID = new Types.ObjectId('66f100000000000000000001');
-
 const doctorSortFields: Record<DoctorListQuery['sortBy'], string> = {
   name: 'name',
   specialty: 'specialty',
@@ -25,19 +24,19 @@ const doctorSortFields: Record<DoctorListQuery['sortBy'], string> = {
 };
 
 export class MongooseDoctorRepository implements DoctorRepository {
-  public async create(payload: DoctorWritePayload): Promise<Doctor> {
+  public async create(payload: DoctorWritePayload, scope: DataVisibilityScope): Promise<Doctor> {
     const created = await doctorModel.create({
       ...payload,
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: scope.tenantId,
     });
     return this.toDoctorRecord(created.toObject());
   }
 
-  public async findById(doctorId: string, scope?: DataVisibilityScope): Promise<Doctor | null> {
+  public async findById(doctorId: string, scope: DataVisibilityScope): Promise<Doctor | null> {
     const found = await doctorModel
       .findOne({
         _id: doctorId,
-        tenantId: DEFAULT_TENANT_ID,
+        tenantId: scope.tenantId,
         ...doctorScopeFilter(scope),
       })
       .lean<DoctorRecord | null>()
@@ -47,7 +46,7 @@ export class MongooseDoctorRepository implements DoctorRepository {
 
   public async list(query: DoctorListQuery): Promise<DoctorListResult> {
     const filter: FilterQuery<DoctorRecord> = {
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: query.scope.tenantId,
       ...(query.search !== undefined
         ? {
             $or: [
@@ -62,7 +61,7 @@ export class MongooseDoctorRepository implements DoctorRepository {
       ...(query.clinicId !== undefined ? { clinicId: query.clinicId } : {}),
     };
 
-    if (query.scope && !query.scope.isAdmin) {
+    if (!query.scope.isAdmin) {
       filter._id = query.scope.doctorId ?? { $in: [] };
     }
 
@@ -90,11 +89,11 @@ export class MongooseDoctorRepository implements DoctorRepository {
   public async update(
     doctorId: string,
     payload: DoctorUpdatePayload,
-    scope?: DataVisibilityScope,
+    scope: DataVisibilityScope,
   ): Promise<Doctor | null> {
     const updated = await doctorModel
       .findOneAndUpdate(
-        { _id: doctorId, tenantId: DEFAULT_TENANT_ID, ...doctorScopeFilter(scope) },
+        { _id: doctorId, tenantId: scope.tenantId, ...doctorScopeFilter(scope) },
         payload,
         { new: true },
       )
@@ -104,11 +103,11 @@ export class MongooseDoctorRepository implements DoctorRepository {
     return updated === null ? null : this.toDoctorRecord(updated);
   }
 
-  public async delete(doctorId: string, scope?: DataVisibilityScope): Promise<boolean> {
+  public async delete(doctorId: string, scope: DataVisibilityScope): Promise<boolean> {
     const deleted = await doctorModel
       .findOneAndDelete({
         _id: doctorId,
-        tenantId: DEFAULT_TENANT_ID,
+        tenantId: scope.tenantId,
         ...doctorScopeFilter(scope),
       })
       .exec();
@@ -116,9 +115,13 @@ export class MongooseDoctorRepository implements DoctorRepository {
     return deleted !== null;
   }
 
-  public async existsByEmail(email: string, excludeDoctorId?: string): Promise<boolean> {
+  public async existsByEmail(
+    email: string,
+    scope: DataVisibilityScope,
+    excludeDoctorId?: string,
+  ): Promise<boolean> {
     const query = {
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: scope.tenantId,
       email,
       ...(excludeDoctorId !== undefined ? { _id: { $ne: excludeDoctorId } } : {}),
     };
@@ -126,9 +129,13 @@ export class MongooseDoctorRepository implements DoctorRepository {
     return existing !== null;
   }
 
-  public async existsByLookupId(lookupId: string, excludeDoctorId?: string): Promise<boolean> {
+  public async existsByLookupId(
+    lookupId: string,
+    scope: DataVisibilityScope,
+    excludeDoctorId?: string,
+  ): Promise<boolean> {
     const query = {
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: scope.tenantId,
       lookupId,
       ...(excludeDoctorId !== undefined ? { _id: { $ne: excludeDoctorId } } : {}),
     };
@@ -136,11 +143,11 @@ export class MongooseDoctorRepository implements DoctorRepository {
     return existing !== null;
   }
 
-  public async clinicExists(clinicId: string): Promise<boolean> {
+  public async clinicExists(clinicId: string, scope: DataVisibilityScope): Promise<boolean> {
     const existing = await clinicModel
       .findOne({
         _id: clinicId,
-        tenantId: DEFAULT_TENANT_ID,
+        tenantId: scope.tenantId,
       })
       .select('_id')
       .lean()
@@ -149,11 +156,11 @@ export class MongooseDoctorRepository implements DoctorRepository {
     return existing !== null;
   }
 
-  public async findClinicNameById(clinicId: string): Promise<string | null> {
+  public async findClinicNameById(clinicId: string, scope: DataVisibilityScope): Promise<string | null> {
     const clinic = await clinicModel
       .findOne({
         _id: clinicId,
-        tenantId: DEFAULT_TENANT_ID,
+        tenantId: scope.tenantId,
       })
       .select('name')
       .lean()
@@ -162,15 +169,15 @@ export class MongooseDoctorRepository implements DoctorRepository {
     return clinic === null ? null : clinic.name;
   }
 
-  public async hasPatients(doctorId: string): Promise<boolean> {
+  public async hasPatients(doctorId: string, scope: DataVisibilityScope): Promise<boolean> {
     const count = await patientModel
-      .countDocuments({ tenantId: DEFAULT_TENANT_ID, doctorId })
+      .countDocuments({ tenantId: scope.tenantId, doctorId })
       .exec();
     return count > 0;
   }
 
-  public async countOrders(doctorId: string): Promise<number> {
-    return orderModel.countDocuments({ tenantId: DEFAULT_TENANT_ID, doctorId }).exec();
+  public async countOrders(doctorId: string, scope: DataVisibilityScope): Promise<number> {
+    return orderModel.countDocuments({ tenantId: scope.tenantId, doctorId }).exec();
   }
 
   private toDoctorRecord(document: DoctorRecord): Doctor {
@@ -225,8 +232,8 @@ const orderModel = OrderModel as unknown as Model<{
   doctorId: Types.ObjectId;
 }>;
 
-function doctorScopeFilter(scope?: DataVisibilityScope): Record<string, unknown> {
-  if (!scope || scope.isAdmin) {
+function doctorScopeFilter(scope: DataVisibilityScope): Record<string, unknown> {
+  if (scope.isAdmin) {
     return {};
   }
 

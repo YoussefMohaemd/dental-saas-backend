@@ -2,6 +2,7 @@ import { type FilterQuery, type Model, type SortOrder, Types } from 'mongoose';
 
 import { InMemorySettingsStore } from '../../settings/infrastructure/settings-store';
 import { ClinicModel } from '../../../shared/infrastructure/persistence/mongoose/models/clinic.model';
+import { ChangeRequestModel } from '../../../shared/infrastructure/persistence/mongoose/models/change-request.model';
 import { DoctorModel } from '../../../shared/infrastructure/persistence/mongoose/models/doctor.model';
 import { OrderModel } from '../../../shared/infrastructure/persistence/mongoose/models/order.model';
 import { PatientModel } from '../../../shared/infrastructure/persistence/mongoose/models/patient.model';
@@ -18,7 +19,6 @@ import {
 import { type SubOrder, type SubOrderUpdatePayload, type SubOrderWritePayload } from '../domain/sub-order';
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 
-const DEFAULT_TENANT_ID = new Types.ObjectId('66f100000000000000000001');
 const settingsStore = new InMemorySettingsStore();
 
 const orderSortFields: Record<OrderListQuery['sortBy'], string> = {
@@ -33,8 +33,8 @@ const orderSortFields: Record<OrderListQuery['sortBy'], string> = {
   updatedAt: 'updatedAt',
 };
 
-function orderScopeFilter(scope?: DataVisibilityScope): Record<string, unknown> {
-  if (!scope || scope.isAdmin) {
+function orderScopeFilter(scope: DataVisibilityScope): Record<string, unknown> {
+  if (scope.isAdmin) {
     return {};
   }
 
@@ -44,18 +44,18 @@ function orderScopeFilter(scope?: DataVisibilityScope): Record<string, unknown> 
 }
 
 export class MongooseOrdersRepository implements OrderRepository {
-  public async createOrder(payload: OrderWritePayload): Promise<Order> {
+  public async createOrder(payload: OrderWritePayload, scope: DataVisibilityScope): Promise<Order> {
     const created = await orderModel.create({
       ...this.toOrderDocumentPayload(payload),
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: scope.tenantId,
     });
     return this.toOrder(created.toObject());
   }
 
-  public async findOrderById(orderId: string, scope?: DataVisibilityScope): Promise<Order | null> {
+  public async findOrderById(orderId: string, scope: DataVisibilityScope): Promise<Order | null> {
     const found = await orderModel.findOne({
       _id: orderId,
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: scope.tenantId,
       ...orderScopeFilter(scope),
     })
       .lean<OrderRecord | null>()
@@ -88,10 +88,10 @@ export class MongooseOrdersRepository implements OrderRepository {
   public async updateOrder(
     orderId: string,
     payload: OrderUpdatePayload,
-    scope?: DataVisibilityScope,
+    scope: DataVisibilityScope,
   ): Promise<Order | null> {
     const updated = await orderModel.findOneAndUpdate(
-      { _id: orderId, tenantId: DEFAULT_TENANT_ID, ...orderScopeFilter(scope) },
+      { _id: orderId, tenantId: scope.tenantId, ...orderScopeFilter(scope) },
       this.toOrderDocumentPayload(payload),
       { new: true },
     )
@@ -101,18 +101,22 @@ export class MongooseOrdersRepository implements OrderRepository {
     return updated === null ? null : this.toOrder(updated);
   }
 
-  public async deleteOrder(orderId: string, scope?: DataVisibilityScope): Promise<boolean> {
+  public async deleteOrder(orderId: string, scope: DataVisibilityScope): Promise<boolean> {
     const deleted = await orderModel.findOneAndDelete({
       _id: orderId,
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: scope.tenantId,
       ...orderScopeFilter(scope),
     }).exec();
     return deleted !== null;
   }
 
-  public async isOrderNumberTaken(orderNumber: string, excludeOrderId?: string): Promise<boolean> {
+  public async isOrderNumberTaken(
+    orderNumber: string,
+    scope: DataVisibilityScope,
+    excludeOrderId?: string,
+  ): Promise<boolean> {
     const filter: FilterQuery<OrderRecord> = {
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: scope.tenantId,
       orderNumber,
       ...(excludeOrderId !== undefined ? { _id: { $ne: new Types.ObjectId(excludeOrderId) } } : {}),
     };
@@ -120,10 +124,10 @@ export class MongooseOrdersRepository implements OrderRepository {
     return found !== null;
   }
 
-  public async findPatientById(patientId: string): Promise<PatientReference | null> {
+  public async findPatientById(patientId: string, scope: DataVisibilityScope): Promise<PatientReference | null> {
     const record = await patientModel.findOne({
       _id: patientId,
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: scope.tenantId,
     })
       .select('_id name doctorId clinicId')
       .lean<PatientReferenceRecord | null>()
@@ -141,10 +145,10 @@ export class MongooseOrdersRepository implements OrderRepository {
     };
   }
 
-  public async findDoctorById(doctorId: string): Promise<DoctorReference | null> {
+  public async findDoctorById(doctorId: string, scope: DataVisibilityScope): Promise<DoctorReference | null> {
     const record = await doctorModel.findOne({
       _id: doctorId,
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: scope.tenantId,
     })
       .select('_id name clinicId')
       .lean<DoctorReferenceRecord | null>()
@@ -160,15 +164,40 @@ export class MongooseOrdersRepository implements OrderRepository {
     };
   }
 
-  public async clinicExists(clinicId: string): Promise<boolean> {
-    const clinic = await clinicModel.findOne({ _id: clinicId, tenantId: DEFAULT_TENANT_ID })
+  public async clinicExists(clinicId: string, scope: DataVisibilityScope): Promise<boolean> {
+    const clinic = await clinicModel.findOne({ _id: clinicId, tenantId: scope.tenantId })
       .select('_id')
       .lean()
       .exec();
     return clinic !== null;
   }
 
-  public async getNameReferences(orders: Order[]): Promise<NameReferences> {
+  public async technicianExists(technicianId: string, scope: DataVisibilityScope): Promise<boolean> {
+    const technician = await userModel.findOne({
+      _id: technicianId,
+      tenantId: scope.tenantId,
+    })
+      .select('_id')
+      .lean()
+      .exec();
+    return technician !== null;
+  }
+
+  public async changeRequestExists(
+    changeRequestId: string,
+    scope: DataVisibilityScope,
+  ): Promise<boolean> {
+    const changeRequest = await changeRequestModel.findOne({
+      _id: changeRequestId,
+      tenantId: scope.tenantId,
+    })
+      .select('_id')
+      .lean()
+      .exec();
+    return changeRequest !== null;
+  }
+
+  public async getNameReferences(orders: Order[], scope: DataVisibilityScope): Promise<NameReferences> {
     const patientIds = uniqueObjectIds(orders.map((order) => order.patientId));
     const doctorIds = uniqueObjectIds(orders.map((order) => order.doctorId));
     const clinicIds = uniqueObjectIds(orders.map((order) => order.clinicId));
@@ -179,25 +208,25 @@ export class MongooseOrdersRepository implements OrderRepository {
     const [patients, doctors, clinics, technicians] = await Promise.all([
       patientIds.length === 0
         ? Promise.resolve([] as PatientNameRecord[])
-        : patientModel.find({ _id: { $in: patientIds }, tenantId: DEFAULT_TENANT_ID })
+        : patientModel.find({ _id: { $in: patientIds }, tenantId: scope.tenantId })
           .select('_id name')
           .lean<PatientNameRecord[]>()
           .exec(),
       doctorIds.length === 0
         ? Promise.resolve([] as DoctorNameRecord[])
-        : doctorModel.find({ _id: { $in: doctorIds }, tenantId: DEFAULT_TENANT_ID })
+        : doctorModel.find({ _id: { $in: doctorIds }, tenantId: scope.tenantId })
           .select('_id name')
           .lean<DoctorNameRecord[]>()
           .exec(),
       clinicIds.length === 0
         ? Promise.resolve([] as ClinicNameRecord[])
-        : clinicModel.find({ _id: { $in: clinicIds }, tenantId: DEFAULT_TENANT_ID })
+        : clinicModel.find({ _id: { $in: clinicIds }, tenantId: scope.tenantId })
           .select('_id name')
           .lean<ClinicNameRecord[]>()
           .exec(),
       technicianIds.length === 0
         ? Promise.resolve([] as TechnicianNameRecord[])
-        : userModel.find({ _id: { $in: technicianIds }, tenantId: DEFAULT_TENANT_ID })
+        : userModel.find({ _id: { $in: technicianIds }, tenantId: scope.tenantId })
           .select('_id fullName')
           .lean<TechnicianNameRecord[]>()
           .exec(),
@@ -216,9 +245,9 @@ export class MongooseOrdersRepository implements OrderRepository {
     return scanCenter?.name ?? null;
   }
 
-  public async listSubOrders(orderId: string, _scope?: DataVisibilityScope): Promise<SubOrder[]> {
+  public async listSubOrders(orderId: string, scope: DataVisibilityScope): Promise<SubOrder[]> {
     const records = await subOrderModel.find({
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: scope.tenantId,
       orderId: new Types.ObjectId(orderId),
     })
       .sort({ createdAt: -1 })
@@ -230,11 +259,11 @@ export class MongooseOrdersRepository implements OrderRepository {
   public async findSubOrderById(
     orderId: string,
     subOrderId: string,
-    _scope?: DataVisibilityScope,
+    scope: DataVisibilityScope,
   ): Promise<SubOrder | null> {
     const record = await subOrderModel.findOne({
       _id: subOrderId,
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: scope.tenantId,
       orderId: new Types.ObjectId(orderId),
     })
       .lean<SubOrderRecord | null>()
@@ -245,7 +274,7 @@ export class MongooseOrdersRepository implements OrderRepository {
   public async createSubOrders(
     orderId: string,
     payloads: SubOrderWritePayload[],
-    _scope?: DataVisibilityScope,
+    scope: DataVisibilityScope,
   ): Promise<SubOrder[]> {
     if (payloads.length === 0) {
       return [];
@@ -254,7 +283,7 @@ export class MongooseOrdersRepository implements OrderRepository {
     const created = await subOrderModel.insertMany(
       payloads.map((payload) => ({
         ...this.toSubOrderDocumentPayload(orderId, payload),
-        tenantId: DEFAULT_TENANT_ID,
+        tenantId: scope.tenantId,
       })),
       { ordered: true },
     );
@@ -264,10 +293,10 @@ export class MongooseOrdersRepository implements OrderRepository {
   public async replaceSubOrders(
     orderId: string,
     payloads: SubOrderWritePayload[],
-    scope?: DataVisibilityScope,
+    scope: DataVisibilityScope,
   ): Promise<SubOrder[]> {
     await subOrderModel.deleteMany({
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: scope.tenantId,
       orderId: new Types.ObjectId(orderId),
     }).exec();
 
@@ -278,7 +307,7 @@ export class MongooseOrdersRepository implements OrderRepository {
     orderId: string,
     subOrderId: string,
     payload: SubOrderUpdatePayload,
-    _scope?: DataVisibilityScope,
+    scope: DataVisibilityScope,
   ): Promise<SubOrder | null> {
     const update: Record<string, unknown> = {};
     if (payload.service !== undefined) {
@@ -321,7 +350,7 @@ export class MongooseOrdersRepository implements OrderRepository {
     const updated = await subOrderModel.findOneAndUpdate(
       {
         _id: subOrderId,
-        tenantId: DEFAULT_TENANT_ID,
+        tenantId: scope.tenantId,
         orderId: new Types.ObjectId(orderId),
       },
       update,
@@ -336,27 +365,27 @@ export class MongooseOrdersRepository implements OrderRepository {
   public async deleteSubOrder(
     orderId: string,
     subOrderId: string,
-    _scope?: DataVisibilityScope,
+    scope: DataVisibilityScope,
   ): Promise<boolean> {
     const deleted = await subOrderModel.findOneAndDelete({
       _id: subOrderId,
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: scope.tenantId,
       orderId: new Types.ObjectId(orderId),
     }).exec();
 
     return deleted !== null;
   }
 
-  public async deleteSubOrdersByOrder(orderId: string): Promise<void> {
+  public async deleteSubOrdersByOrder(orderId: string, scope: DataVisibilityScope): Promise<void> {
     await subOrderModel.deleteMany({
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: scope.tenantId,
       orderId: new Types.ObjectId(orderId),
     }).exec();
   }
 
   private async buildOrderListFilter(query: OrderListQuery): Promise<FilterQuery<OrderRecord>> {
     const filter: FilterQuery<OrderRecord> = {
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: query.scope.tenantId,
       ...(query.statuses.length > 0 ? { status: { $in: query.statuses } } : {}),
     };
 
@@ -366,7 +395,7 @@ export class MongooseOrdersRepository implements OrderRepository {
 
     if (query.serviceIds.length > 0) {
       const orderIds = await subOrderModel.distinct('orderId', {
-        tenantId: DEFAULT_TENANT_ID,
+        tenantId: query.scope.tenantId,
         service: { $in: query.serviceIds },
       }).exec();
 
@@ -381,9 +410,9 @@ export class MongooseOrdersRepository implements OrderRepository {
       const escapedSearch = escapeRegExp(query.search);
       const searchRegex = new RegExp(escapedSearch, 'i');
       const [patientIds, doctorIds, clinicIds] = await Promise.all([
-        patientModel.distinct('_id', { tenantId: DEFAULT_TENANT_ID, name: searchRegex }).exec(),
-        doctorModel.distinct('_id', { tenantId: DEFAULT_TENANT_ID, name: searchRegex }).exec(),
-        clinicModel.distinct('_id', { tenantId: DEFAULT_TENANT_ID, name: searchRegex }).exec(),
+        patientModel.distinct('_id', { tenantId: query.scope.tenantId, name: searchRegex }).exec(),
+        doctorModel.distinct('_id', { tenantId: query.scope.tenantId, name: searchRegex }).exec(),
+        clinicModel.distinct('_id', { tenantId: query.scope.tenantId, name: searchRegex }).exec(),
       ]);
 
       filter.$or = [
@@ -397,7 +426,7 @@ export class MongooseOrdersRepository implements OrderRepository {
       ];
     }
 
-    if (query.scope && !query.scope.isAdmin) {
+    if (!query.scope.isAdmin) {
       const ownershipFilter = query.scope.doctorId
         ? { doctorId: query.scope.doctorId }
         : { technicianId: query.scope.userId };
@@ -704,6 +733,7 @@ const doctorModel = DoctorModel as unknown as Model<DoctorReferenceRecord & Doct
 const clinicModel = ClinicModel as unknown as Model<ClinicNameRecord & { tenantId: Types.ObjectId }>;
 const subOrderModel = SubOrderModel as unknown as Model<SubOrderRecord>;
 const userModel = UserModel as unknown as Model<TechnicianNameRecord & { tenantId: Types.ObjectId }>;
+const changeRequestModel = ChangeRequestModel as unknown as Model<{ _id: Types.ObjectId; tenantId: Types.ObjectId }>;
 
 function uniqueObjectIds(ids: string[]): Types.ObjectId[] {
   const unique = new Set(ids);

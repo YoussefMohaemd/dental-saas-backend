@@ -21,7 +21,7 @@ export interface Doctor {
 }
 
 export interface DoctorListQuery {
-  scope?: DataVisibilityScope;
+  scope: DataVisibilityScope;
   search?: string | undefined;
   page: number;
   pageSize: number;

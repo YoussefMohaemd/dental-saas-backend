@@ -22,7 +22,10 @@ export class PatientsController {
     assertValidObjectId(payload.clinicId, 'clinicId');
     assertValidObjectId(payload.doctorId, 'doctorId');
 
-    const created = await this.patientService.createPatient(payload);
+    const created = await this.patientService.createPatient(
+      payload,
+      await getAuthenticatedDataScope(req),
+    );
     sendCreated(res, created, this.buildMeta(req as RequestWithContext));
   };
 

@@ -15,7 +15,7 @@ export interface Clinic {
 }
 
 export interface ClinicListQuery {
-  scope?: DataVisibilityScope;
+  scope: DataVisibilityScope;
   search?: string | undefined;
   page: number;
   pageSize: number;

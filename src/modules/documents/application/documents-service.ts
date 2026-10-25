@@ -10,9 +10,13 @@ import { buildPaginationMeta, type PaginationQuery } from '../../../shared/appli
 import { DOCUMENT_CATEGORIES } from '../../../shared/domain/entities/dental-data-model';
 import { DoctorModel } from '../../../shared/infrastructure/persistence/mongoose/models/doctor.model';
 import { DocumentModel } from '../../../shared/infrastructure/persistence/mongoose/models/document.model';
+import { ClinicModel } from '../../../shared/infrastructure/persistence/mongoose/models/clinic.model';
 import { OrderModel } from '../../../shared/infrastructure/persistence/mongoose/models/order.model';
 import { PatientModel } from '../../../shared/infrastructure/persistence/mongoose/models/patient.model';
+import { SubOrderModel } from '../../../shared/infrastructure/persistence/mongoose/models/sub-order.model';
+import { UserModel } from '../../../shared/infrastructure/persistence/mongoose/models/user.model';
 import { parseEnumList } from '../../../shared/presentation/http/http-utils';
+import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 
 interface DocumentRecord {
   _id: Types.ObjectId;
@@ -92,7 +96,7 @@ export async function listDocuments(input: {
     .exec();
 
   return {
-    items: await mapDocuments(records),
+    items: await mapDocuments(records, input.tenantId),
     totalItems,
   };
 }
@@ -105,7 +109,6 @@ export async function getDocumentById(
   if (tenantId) {
     filter.tenantId = tenantId;
   }
-
   const record = await DocumentModel.findOne(filter).lean<DocumentRecord | null>().exec();
   if (!record) {
     throw new ApplicationError({
@@ -116,7 +119,7 @@ export async function getDocumentById(
     });
   }
 
-  const [dto] = await mapDocuments([record]);
+  const [dto] = await mapDocuments([record], tenantId);
   if (!dto) {
     throw new ApplicationError({
       message: 'Document not found',
@@ -131,8 +134,49 @@ export async function getDocumentById(
 
 export async function createDocument(
   payload: z.infer<typeof createDocumentSchema>,
-  tenantId: Types.ObjectId,
+  scope: DataVisibilityScope,
 ): Promise<DocumentDto> {
+  const tenantId = scope.tenantId;
+  const references: boolean[] = await Promise.all([
+    payload.doctorId
+      ? DoctorModel.exists({ _id: new Types.ObjectId(payload.doctorId), tenantId })
+          .exec()
+          .then((record) => Boolean(record))
+      : Promise.resolve(true),
+    payload.patientId
+      ? PatientModel.exists({ _id: new Types.ObjectId(payload.patientId), tenantId })
+          .exec()
+          .then((record) => Boolean(record))
+      : Promise.resolve(true),
+    payload.clinicId
+      ? ClinicModel.exists({ _id: new Types.ObjectId(payload.clinicId), tenantId })
+          .exec()
+          .then((record) => Boolean(record))
+      : Promise.resolve(true),
+    payload.orderId
+      ? OrderModel.exists({ _id: new Types.ObjectId(payload.orderId), tenantId })
+          .exec()
+          .then((record) => Boolean(record))
+      : Promise.resolve(true),
+    payload.subOrderId
+      ? SubOrderModel.exists({ _id: new Types.ObjectId(payload.subOrderId), tenantId })
+          .exec()
+          .then((record) => Boolean(record))
+      : Promise.resolve(true),
+    UserModel.exists({ _id: new Types.ObjectId(payload.uploadedBy), tenantId })
+      .exec()
+      .then((record) => Boolean(record)),
+  ]);
+
+  if (references.some((reference) => !reference)) {
+    throw new ApplicationError({
+      message: 'Document references must belong to the authenticated tenant',
+      statusCode: 422,
+      code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+      expose: true,
+    });
+  }
+
   const createdId = (
     (await DocumentModel.create({
       tenantId,
@@ -161,7 +205,6 @@ export async function deleteDocument(
   if (tenantId) {
     filter.tenantId = tenantId;
   }
-
   const existingCount = await DocumentModel.countDocuments(filter).exec();
   if (existingCount === 0) {
     throw new ApplicationError({
@@ -177,7 +220,10 @@ export async function deleteDocument(
 
 export { buildPaginationMeta };
 
-async function mapDocuments(records: DocumentRecord[]): Promise<DocumentDto[]> {
+async function mapDocuments(
+  records: DocumentRecord[],
+  tenantId?: Types.ObjectId,
+): Promise<DocumentDto[]> {
   const ids = {
     doctor: new Set<string>(),
     patient: new Set<string>(),
@@ -200,15 +246,24 @@ async function mapDocuments(records: DocumentRecord[]): Promise<DocumentDto[]> {
     Array<{ _id: Types.ObjectId; name: string }>,
     Array<{ _id: Types.ObjectId; orderNumber: string }>,
   ] = await Promise.all([
-    DoctorModel.find({ _id: { $in: [...ids.doctor].map((id) => new Types.ObjectId(id)) } })
+    DoctorModel.find({
+      _id: { $in: [...ids.doctor].map((id) => new Types.ObjectId(id)) },
+      ...(tenantId ? { tenantId } : {}),
+    })
       .select({ _id: 1, name: 1 })
       .lean<Array<{ _id: Types.ObjectId; name: string }>>()
       .exec(),
-    PatientModel.find({ _id: { $in: [...ids.patient].map((id) => new Types.ObjectId(id)) } })
+    PatientModel.find({
+      _id: { $in: [...ids.patient].map((id) => new Types.ObjectId(id)) },
+      ...(tenantId ? { tenantId } : {}),
+    })
       .select({ _id: 1, name: 1 })
       .lean<Array<{ _id: Types.ObjectId; name: string }>>()
       .exec(),
-    OrderModel.find({ _id: { $in: [...ids.order].map((id) => new Types.ObjectId(id)) } })
+    OrderModel.find({
+      _id: { $in: [...ids.order].map((id) => new Types.ObjectId(id)) },
+      ...(tenantId ? { tenantId } : {}),
+    })
       .select({ _id: 1, orderNumber: 1 })
       .lean<Array<{ _id: Types.ObjectId; orderNumber: string }>>()
       .exec(),

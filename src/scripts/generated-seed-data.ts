@@ -119,7 +119,7 @@ const doctor = (index: number) => ({
     'Rana Nabil',
     'Mostafa Samir',
   ][index - 1],
-  gender: ([1, 3, 5, 7, 9].includes(index) ? 'F' : 'M') as 'M' | 'F',
+  gender: [1, 3, 5, 7, 9].includes(index) ? 'F' : 'M',
   specialty: [
     'Prosthodontics',
     'Orthodontics',

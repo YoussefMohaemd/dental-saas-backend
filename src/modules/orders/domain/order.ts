@@ -58,7 +58,7 @@ export interface Order {
 }
 
 export interface OrderListQuery {
-  scope?: DataVisibilityScope;
+  scope: DataVisibilityScope;
   search?: string | undefined;
   page: number;
   pageSize: number;

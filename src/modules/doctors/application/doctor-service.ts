@@ -21,15 +21,15 @@ import { type DataVisibilityScope } from '../../../shared/application/contracts/
 export class DoctorService {
   public constructor(private readonly doctorRepository: DoctorRepository) {}
 
-  public async createDoctor(payload: DoctorWritePayload): Promise<DoctorDto> {
-    await this.ensureClinicExists(payload.clinicId);
-    await this.ensureUniqueEmail(payload.email);
-    await this.ensureUniqueLookupId(payload.lookupId);
-    const doctor = await this.doctorRepository.create(payload);
-    return this.toDoctorDto(doctor);
+  public async createDoctor(payload: DoctorWritePayload, scope: DataVisibilityScope): Promise<DoctorDto> {
+    await this.ensureClinicExists(payload.clinicId, scope);
+    await this.ensureUniqueEmail(payload.email, scope);
+    await this.ensureUniqueLookupId(payload.lookupId, scope);
+    const doctor = await this.doctorRepository.create(payload, scope);
+    return this.toDoctorDto(doctor, scope);
   }
 
-  public async getDoctorById(doctorId: string, scope?: DataVisibilityScope): Promise<DoctorDto> {
+  public async getDoctorById(doctorId: string, scope: DataVisibilityScope): Promise<DoctorDto> {
     const doctor = await this.doctorRepository.findById(doctorId, scope);
     if (doctor === null) {
       throw new DomainError(
@@ -38,7 +38,7 @@ export class DoctorService {
       );
     }
 
-    return this.toDoctorDto(doctor);
+    return this.toDoctorDto(doctor, scope);
   }
 
   public async listDoctors(
@@ -51,7 +51,7 @@ export class DoctorService {
       pageSize: pagination.pageSize,
     });
 
-    const items = await Promise.all(result.items.map((item) => this.toDoctorDto(item)));
+    const items = await Promise.all(result.items.map((item) => this.toDoctorDto(item, query.scope)));
 
     return {
       items,
@@ -62,16 +62,16 @@ export class DoctorService {
   public async updateDoctor(
     doctorId: string,
     payload: DoctorUpdatePayload,
-    scope?: DataVisibilityScope,
+    scope: DataVisibilityScope,
   ): Promise<DoctorDto> {
     if (payload.clinicId !== undefined) {
-      await this.ensureClinicExists(payload.clinicId);
+      await this.ensureClinicExists(payload.clinicId, scope);
     }
     if (payload.email !== undefined) {
-      await this.ensureUniqueEmail(payload.email, doctorId);
+      await this.ensureUniqueEmail(payload.email, scope, doctorId);
     }
     if (payload.lookupId !== undefined && payload.lookupId.length > 0) {
-      await this.ensureUniqueLookupId(payload.lookupId, doctorId);
+      await this.ensureUniqueLookupId(payload.lookupId, scope, doctorId);
     }
 
     const updated = await this.doctorRepository.update(doctorId, payload, scope);
@@ -82,10 +82,10 @@ export class DoctorService {
       );
     }
 
-    return this.toDoctorDto(updated);
+    return this.toDoctorDto(updated, scope);
   }
 
-  public async deleteDoctor(doctorId: string, scope?: DataVisibilityScope): Promise<void> {
+  public async deleteDoctor(doctorId: string, scope: DataVisibilityScope): Promise<void> {
     const existing = await this.doctorRepository.findById(doctorId, scope);
     if (existing === null) {
       throw new DomainError(
@@ -94,7 +94,7 @@ export class DoctorService {
       );
     }
 
-    const hasPatients = await this.doctorRepository.hasPatients(doctorId);
+    const hasPatients = await this.doctorRepository.hasPatients(doctorId, scope);
     if (hasPatients) {
       throw new DomainError(
         'Doctor cannot be deleted while patients are linked',
@@ -105,8 +105,8 @@ export class DoctorService {
     await this.doctorRepository.delete(doctorId, scope);
   }
 
-  private async ensureClinicExists(clinicId: string): Promise<void> {
-    const clinicExists = await this.doctorRepository.clinicExists(clinicId);
+  private async ensureClinicExists(clinicId: string, scope: DataVisibilityScope): Promise<void> {
+    const clinicExists = await this.doctorRepository.clinicExists(clinicId, scope);
     if (!clinicExists) {
       throw new DomainError(
         `Clinic ${clinicId} does not exist`,
@@ -116,8 +116,12 @@ export class DoctorService {
     }
   }
 
-  private async ensureUniqueEmail(email: string, excludeDoctorId?: string): Promise<void> {
-    const exists = await this.doctorRepository.existsByEmail(email, excludeDoctorId);
+  private async ensureUniqueEmail(
+    email: string,
+    scope: DataVisibilityScope,
+    excludeDoctorId?: string,
+  ): Promise<void> {
+    const exists = await this.doctorRepository.existsByEmail(email, scope, excludeDoctorId);
     if (exists) {
       throw new DomainError(
         `Doctor email '${email}' already exists`,
@@ -129,13 +133,14 @@ export class DoctorService {
 
   private async ensureUniqueLookupId(
     lookupId: string | undefined,
+    scope: DataVisibilityScope,
     excludeDoctorId?: string,
   ): Promise<void> {
     if (lookupId === undefined || lookupId.length === 0) {
       return;
     }
 
-    const exists = await this.doctorRepository.existsByLookupId(lookupId, excludeDoctorId);
+    const exists = await this.doctorRepository.existsByLookupId(lookupId, scope, excludeDoctorId);
     if (exists) {
       throw new DomainError(
         `Doctor lookupId '${lookupId}' already exists`,
@@ -145,10 +150,10 @@ export class DoctorService {
     }
   }
 
-  private async toDoctorDto(doctor: Doctor): Promise<DoctorDto> {
+  private async toDoctorDto(doctor: Doctor, scope: DataVisibilityScope): Promise<DoctorDto> {
     const [clinicName, ordersCount] = await Promise.all([
-      this.doctorRepository.findClinicNameById(doctor.clinicId),
-      this.doctorRepository.countOrders(doctor.id),
+      this.doctorRepository.findClinicNameById(doctor.clinicId, scope),
+      this.doctorRepository.countOrders(doctor.id, scope),
     ]);
 
     if (clinicName === null) {

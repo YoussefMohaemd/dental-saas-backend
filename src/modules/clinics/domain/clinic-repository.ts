@@ -7,15 +7,15 @@ export interface ClinicListResult {
 }
 
 export interface ClinicRepository {
-  create(payload: ClinicWritePayload): Promise<Clinic>;
-  findById(clinicId: string, scope?: DataVisibilityScope): Promise<Clinic | null>;
+  create(payload: ClinicWritePayload, scope: DataVisibilityScope): Promise<Clinic>;
+  findById(clinicId: string, scope: DataVisibilityScope): Promise<Clinic | null>;
   list(query: ClinicListQuery): Promise<ClinicListResult>;
-  update(clinicId: string, payload: ClinicUpdatePayload, scope?: DataVisibilityScope): Promise<Clinic | null>;
-  delete(clinicId: string, scope?: DataVisibilityScope): Promise<boolean>;
-  existsByName(name: string, excludeClinicId?: string): Promise<boolean>;
-  hasDoctors(clinicId: string): Promise<boolean>;
-  hasPatients(clinicId: string): Promise<boolean>;
-  countDoctors(clinicId: string): Promise<number>;
-  countPatients(clinicId: string): Promise<number>;
-  countOrders(clinicId: string): Promise<number>;
+  update(clinicId: string, payload: ClinicUpdatePayload, scope: DataVisibilityScope): Promise<Clinic | null>;
+  delete(clinicId: string, scope: DataVisibilityScope): Promise<boolean>;
+  existsByName(name: string, scope: DataVisibilityScope, excludeClinicId?: string): Promise<boolean>;
+  hasDoctors(clinicId: string, scope: DataVisibilityScope): Promise<boolean>;
+  hasPatients(clinicId: string, scope: DataVisibilityScope): Promise<boolean>;
+  countDoctors(clinicId: string, scope: DataVisibilityScope): Promise<number>;
+  countPatients(clinicId: string, scope: DataVisibilityScope): Promise<number>;
+  countOrders(clinicId: string, scope: DataVisibilityScope): Promise<number>;
 }

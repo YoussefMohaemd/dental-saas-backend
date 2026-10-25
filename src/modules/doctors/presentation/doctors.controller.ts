@@ -16,7 +16,10 @@ export class DoctorsController {
     const payload = removeUndefined(createDoctorBodySchema.parse(req.body));
     assertValidObjectId(payload.clinicId, 'clinicId');
 
-    const created = await this.doctorService.createDoctor(payload);
+    const created = await this.doctorService.createDoctor(
+      payload,
+      await getAuthenticatedDataScope(req),
+    );
     sendCreated(res, created, this.buildMeta(req as RequestWithContext));
   };
 

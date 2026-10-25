@@ -1,4 +1,5 @@
-import { type FilterQuery, type Model, type SortOrder, Types } from 'mongoose';
+import { type FilterQuery, type Model, type SortOrder } from 'mongoose';
+import type { Types } from 'mongoose';
 
 import { type Clinic, type ClinicListQuery, type ClinicUpdatePayload, type ClinicWritePayload } from '../domain/clinic';
 import { type ClinicListResult, type ClinicRepository } from '../domain/clinic-repository';
@@ -7,8 +8,6 @@ import { ClinicModel } from '../../../shared/infrastructure/persistence/mongoose
 import { DoctorModel } from '../../../shared/infrastructure/persistence/mongoose/models/doctor.model';
 import { OrderModel } from '../../../shared/infrastructure/persistence/mongoose/models/order.model';
 import { PatientModel } from '../../../shared/infrastructure/persistence/mongoose/models/patient.model';
-
-const DEFAULT_TENANT_ID = new Types.ObjectId('66f100000000000000000001');
 
 const clinicSortFields: Record<ClinicListQuery['sortBy'], string> = {
   name: 'name',
@@ -20,18 +19,18 @@ const clinicSortFields: Record<ClinicListQuery['sortBy'], string> = {
 };
 
 export class MongooseClinicRepository implements ClinicRepository {
-  public async create(payload: ClinicWritePayload): Promise<Clinic> {
+  public async create(payload: ClinicWritePayload, scope: DataVisibilityScope): Promise<Clinic> {
     const created = await clinicModel.create({
       ...payload,
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: scope.tenantId,
     });
     return this.toClinicRecord(created.toObject());
   }
 
-  public async findById(clinicId: string, scope?: DataVisibilityScope): Promise<Clinic | null> {
+  public async findById(clinicId: string, scope: DataVisibilityScope): Promise<Clinic | null> {
     const found = await clinicModel.findOne({
       _id: clinicId,
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: scope.tenantId,
       ...clinicScopeFilter(scope),
     })
       .lean<ClinicRecord | null>()
@@ -41,7 +40,7 @@ export class MongooseClinicRepository implements ClinicRepository {
 
   public async list(query: ClinicListQuery): Promise<ClinicListResult> {
     const filter: FilterQuery<ClinicRecord> = {
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: query.scope.tenantId,
       ...(query.search !== undefined
         ? {
             $or: [
@@ -55,7 +54,7 @@ export class MongooseClinicRepository implements ClinicRepository {
       ...(query.statuses.length > 0 ? { status: { $in: query.statuses } } : {}),
     };
 
-    if (query.scope && !query.scope.isAdmin) {
+    if (!query.scope.isAdmin) {
       filter._id = query.scope.clinicId ?? { $in: [] };
     }
 
@@ -82,10 +81,10 @@ export class MongooseClinicRepository implements ClinicRepository {
   public async update(
     clinicId: string,
     payload: ClinicUpdatePayload,
-    scope?: DataVisibilityScope,
+    scope: DataVisibilityScope,
   ): Promise<Clinic | null> {
     const updated = await clinicModel.findOneAndUpdate(
-      { _id: clinicId, tenantId: DEFAULT_TENANT_ID, ...clinicScopeFilter(scope) },
+      { _id: clinicId, tenantId: scope.tenantId, ...clinicScopeFilter(scope) },
       payload,
       { new: true },
     )
@@ -95,19 +94,23 @@ export class MongooseClinicRepository implements ClinicRepository {
     return updated === null ? null : this.toClinicRecord(updated);
   }
 
-  public async delete(clinicId: string, scope?: DataVisibilityScope): Promise<boolean> {
+  public async delete(clinicId: string, scope: DataVisibilityScope): Promise<boolean> {
     const deleted = await clinicModel.findOneAndDelete({
       _id: clinicId,
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: scope.tenantId,
       ...clinicScopeFilter(scope),
     }).exec();
 
     return deleted !== null;
   }
 
-  public async existsByName(name: string, excludeClinicId?: string): Promise<boolean> {
+  public async existsByName(
+    name: string,
+    scope: DataVisibilityScope,
+    excludeClinicId?: string,
+  ): Promise<boolean> {
     const query = {
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: scope.tenantId,
       name,
       ...(excludeClinicId !== undefined ? { _id: { $ne: excludeClinicId } } : {}),
     };
@@ -115,26 +118,26 @@ export class MongooseClinicRepository implements ClinicRepository {
     return existing !== null;
   }
 
-  public async hasDoctors(clinicId: string): Promise<boolean> {
-    const count = await doctorModel.countDocuments({ tenantId: DEFAULT_TENANT_ID, clinicId }).exec();
+  public async hasDoctors(clinicId: string, scope: DataVisibilityScope): Promise<boolean> {
+    const count = await doctorModel.countDocuments({ tenantId: scope.tenantId, clinicId }).exec();
     return count > 0;
   }
 
-  public async hasPatients(clinicId: string): Promise<boolean> {
-    const count = await patientModel.countDocuments({ tenantId: DEFAULT_TENANT_ID, clinicId }).exec();
+  public async hasPatients(clinicId: string, scope: DataVisibilityScope): Promise<boolean> {
+    const count = await patientModel.countDocuments({ tenantId: scope.tenantId, clinicId }).exec();
     return count > 0;
   }
 
-  public async countDoctors(clinicId: string): Promise<number> {
-    return doctorModel.countDocuments({ tenantId: DEFAULT_TENANT_ID, clinicId }).exec();
+  public async countDoctors(clinicId: string, scope: DataVisibilityScope): Promise<number> {
+    return doctorModel.countDocuments({ tenantId: scope.tenantId, clinicId }).exec();
   }
 
-  public async countPatients(clinicId: string): Promise<number> {
-    return patientModel.countDocuments({ tenantId: DEFAULT_TENANT_ID, clinicId }).exec();
+  public async countPatients(clinicId: string, scope: DataVisibilityScope): Promise<number> {
+    return patientModel.countDocuments({ tenantId: scope.tenantId, clinicId }).exec();
   }
 
-  public async countOrders(clinicId: string): Promise<number> {
-    return orderModel.countDocuments({ tenantId: DEFAULT_TENANT_ID, clinicId }).exec();
+  public async countOrders(clinicId: string, scope: DataVisibilityScope): Promise<number> {
+    return orderModel.countDocuments({ tenantId: scope.tenantId, clinicId }).exec();
   }
 
   private toClinicRecord(document: ClinicRecord): Clinic {
@@ -172,8 +175,8 @@ const doctorModel = DoctorModel as unknown as Model<{ _id: Types.ObjectId; tenan
 const patientModel = PatientModel as unknown as Model<{ _id: Types.ObjectId; tenantId: Types.ObjectId; clinicId: Types.ObjectId }>;
 const orderModel = OrderModel as unknown as Model<{ _id: Types.ObjectId; tenantId: Types.ObjectId; clinicId: Types.ObjectId }>;
 
-function clinicScopeFilter(scope?: DataVisibilityScope): Record<string, unknown> {
-  if (!scope || scope.isAdmin) {
+function clinicScopeFilter(scope: DataVisibilityScope): Record<string, unknown> {
+  if (scope.isAdmin) {
     return {};
   }
 

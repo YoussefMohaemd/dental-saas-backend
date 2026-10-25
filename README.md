@@ -67,9 +67,18 @@ Copy `.env.example` to `.env` and adjust values as needed.
   include explicit role requirements in operation metadata/description.
 - Tenant/user scope for `/api/v1/**` is derived from authenticated JWT claims,
   not from client-supplied tenant/user headers.
+- Tenant-sensitive repositories and reporting/application services use the
+  authenticated tenant scope for CRUD, pagination, relation checks, counts,
+  and related-record name lookups. Document creation also verifies supplied
+  doctor, patient, clinic, order, sub-order, and uploader references belong to
+  the authenticated tenant.
+- Non-admin doctor and clinic visibility remains governed by the existing
+  authenticated data-scope rules; no new role restrictions were introduced.
 - Postman collection (all endpoints): `postman/Dental-SaaS-API.postman_collection.json`
 
 See `docs/README.md` for architecture boundaries and dependency direction.
+See `docs/audit-remediation-report.md` for the verified tenant-isolation
+remediation, validation results, and remaining release concerns.
 
 ## Local Docker reproducibility
 

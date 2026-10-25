@@ -7,15 +7,15 @@ export interface DoctorListResult {
 }
 
 export interface DoctorRepository {
-  create(payload: DoctorWritePayload): Promise<Doctor>;
-  findById(doctorId: string, scope?: DataVisibilityScope): Promise<Doctor | null>;
+  create(payload: DoctorWritePayload, scope: DataVisibilityScope): Promise<Doctor>;
+  findById(doctorId: string, scope: DataVisibilityScope): Promise<Doctor | null>;
   list(query: DoctorListQuery): Promise<DoctorListResult>;
-  update(doctorId: string, payload: DoctorUpdatePayload, scope?: DataVisibilityScope): Promise<Doctor | null>;
-  delete(doctorId: string, scope?: DataVisibilityScope): Promise<boolean>;
-  existsByEmail(email: string, excludeDoctorId?: string): Promise<boolean>;
-  existsByLookupId(lookupId: string, excludeDoctorId?: string): Promise<boolean>;
-  clinicExists(clinicId: string): Promise<boolean>;
-  findClinicNameById(clinicId: string): Promise<string | null>;
-  hasPatients(doctorId: string): Promise<boolean>;
-  countOrders(doctorId: string): Promise<number>;
+  update(doctorId: string, payload: DoctorUpdatePayload, scope: DataVisibilityScope): Promise<Doctor | null>;
+  delete(doctorId: string, scope: DataVisibilityScope): Promise<boolean>;
+  existsByEmail(email: string, scope: DataVisibilityScope, excludeDoctorId?: string): Promise<boolean>;
+  existsByLookupId(lookupId: string, scope: DataVisibilityScope, excludeDoctorId?: string): Promise<boolean>;
+  clinicExists(clinicId: string, scope: DataVisibilityScope): Promise<boolean>;
+  findClinicNameById(clinicId: string, scope: DataVisibilityScope): Promise<string | null>;
+  hasPatients(doctorId: string, scope: DataVisibilityScope): Promise<boolean>;
+  countOrders(doctorId: string, scope: DataVisibilityScope): Promise<number>;
 }

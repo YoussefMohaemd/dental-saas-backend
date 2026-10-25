@@ -28,22 +28,24 @@ export interface NameReferences {
 }
 
 export interface OrderRepository {
-  createOrder(payload: OrderWritePayload): Promise<Order>;
-  findOrderById(orderId: string, scope?: DataVisibilityScope): Promise<Order | null>;
+  createOrder(payload: OrderWritePayload, scope: DataVisibilityScope): Promise<Order>;
+  findOrderById(orderId: string, scope: DataVisibilityScope): Promise<Order | null>;
   listOrders(query: OrderListQuery): Promise<OrderListResult>;
-  updateOrder(orderId: string, payload: OrderUpdatePayload, scope?: DataVisibilityScope): Promise<Order | null>;
-  deleteOrder(orderId: string, scope?: DataVisibilityScope): Promise<boolean>;
-  isOrderNumberTaken(orderNumber: string, excludeOrderId?: string): Promise<boolean>;
-  findPatientById(patientId: string): Promise<PatientReference | null>;
-  findDoctorById(doctorId: string): Promise<DoctorReference | null>;
-  clinicExists(clinicId: string): Promise<boolean>;
-  getNameReferences(orders: Order[]): Promise<NameReferences>;
+  updateOrder(orderId: string, payload: OrderUpdatePayload, scope: DataVisibilityScope): Promise<Order | null>;
+  deleteOrder(orderId: string, scope: DataVisibilityScope): Promise<boolean>;
+  isOrderNumberTaken(orderNumber: string, scope: DataVisibilityScope, excludeOrderId?: string): Promise<boolean>;
+  findPatientById(patientId: string, scope: DataVisibilityScope): Promise<PatientReference | null>;
+  findDoctorById(doctorId: string, scope: DataVisibilityScope): Promise<DoctorReference | null>;
+  clinicExists(clinicId: string, scope: DataVisibilityScope): Promise<boolean>;
+  technicianExists(technicianId: string, scope: DataVisibilityScope): Promise<boolean>;
+  changeRequestExists(changeRequestId: string, scope: DataVisibilityScope): Promise<boolean>;
+  getNameReferences(orders: Order[], scope: DataVisibilityScope): Promise<NameReferences>;
   findScanCenterNameById(scanCenterId: string): string | null;
-  listSubOrders(orderId: string, scope?: DataVisibilityScope): Promise<SubOrder[]>;
-  findSubOrderById(orderId: string, subOrderId: string, scope?: DataVisibilityScope): Promise<SubOrder | null>;
-  createSubOrders(orderId: string, payloads: SubOrderWritePayload[], scope?: DataVisibilityScope): Promise<SubOrder[]>;
-  replaceSubOrders(orderId: string, payloads: SubOrderWritePayload[], scope?: DataVisibilityScope): Promise<SubOrder[]>;
-  updateSubOrder(orderId: string, subOrderId: string, payload: SubOrderUpdatePayload, scope?: DataVisibilityScope): Promise<SubOrder | null>;
-  deleteSubOrder(orderId: string, subOrderId: string, scope?: DataVisibilityScope): Promise<boolean>;
-  deleteSubOrdersByOrder(orderId: string): Promise<void>;
+  listSubOrders(orderId: string, scope: DataVisibilityScope): Promise<SubOrder[]>;
+  findSubOrderById(orderId: string, subOrderId: string, scope: DataVisibilityScope): Promise<SubOrder | null>;
+  createSubOrders(orderId: string, payloads: SubOrderWritePayload[], scope: DataVisibilityScope): Promise<SubOrder[]>;
+  replaceSubOrders(orderId: string, payloads: SubOrderWritePayload[], scope: DataVisibilityScope): Promise<SubOrder[]>;
+  updateSubOrder(orderId: string, subOrderId: string, payload: SubOrderUpdatePayload, scope: DataVisibilityScope): Promise<SubOrder | null>;
+  deleteSubOrder(orderId: string, subOrderId: string, scope: DataVisibilityScope): Promise<boolean>;
+  deleteSubOrdersByOrder(orderId: string, scope: DataVisibilityScope): Promise<void>;
 }

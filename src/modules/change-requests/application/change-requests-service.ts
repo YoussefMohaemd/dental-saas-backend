@@ -88,9 +88,19 @@ export async function listChangeRequests(input: {
     .lean<ChangeRequestRecord[]>()
     .exec();
 
-  const orderMap = await buildMap(OrderModel, records.map((record) => record.orderId), 'orderNumber');
-  const requesterMap = await buildMap(UserModel, records.map((record) => record.requesterId), 'fullName');
-  const patientMap = await buildOrderPatientMap(records.map((record) => record.orderId));
+  const orderMap = await buildMap(
+    OrderModel,
+    records.map((record) => record.orderId),
+    'orderNumber',
+    input.tenantId,
+  );
+  const requesterMap = await buildMap(
+    UserModel,
+    records.map((record) => record.requesterId),
+    'fullName',
+    input.tenantId,
+  );
+  const patientMap = await buildOrderPatientMap(records.map((record) => record.orderId), input.tenantId);
 
   return {
     items: records.map((record) => ({
@@ -130,9 +140,9 @@ export async function getChangeRequest(
   }
 
   const [orderMap, requesterMap, patientMap] = await Promise.all([
-    buildMap(OrderModel, [record.orderId], 'orderNumber'),
-    buildMap(UserModel, [record.requesterId], 'fullName'),
-    buildOrderPatientMap([record.orderId]),
+    buildMap(OrderModel, [record.orderId], 'orderNumber', tenantId),
+    buildMap(UserModel, [record.requesterId], 'fullName', tenantId),
+    buildOrderPatientMap([record.orderId], tenantId),
   ]);
 
   return {
@@ -198,6 +208,7 @@ async function buildMap(
   },
   ids: Types.ObjectId[],
   field: string,
+  tenantId?: Types.ObjectId,
 ): Promise<Map<string, string>> {
   const uniqueIds = [...new Set(ids.map((id) => id.toString()))].map(
     (id) => new Types.ObjectId(id),
@@ -207,7 +218,7 @@ async function buildMap(
   }
 
   const records: Array<{ _id: Types.ObjectId } & Record<string, string>> = await model
-    .find({ _id: { $in: uniqueIds } })
+    .find({ _id: { $in: uniqueIds }, ...(tenantId ? { tenantId } : {}) })
     .select({ _id: 1, [field]: 1 })
     .lean<Array<{ _id: Types.ObjectId } & Record<string, string>>>()
     .exec();
@@ -215,7 +226,10 @@ async function buildMap(
   return new Map(records.map((record) => [record._id.toString(), record[field] ?? '']));
 }
 
-async function buildOrderPatientMap(orderIds: Types.ObjectId[]): Promise<Map<string, string>> {
+async function buildOrderPatientMap(
+  orderIds: Types.ObjectId[],
+  tenantId?: Types.ObjectId,
+): Promise<Map<string, string>> {
   const uniqueOrderIds = [...new Set(orderIds.map((id) => id.toString()))].map(
     (id) => new Types.ObjectId(id),
   );
@@ -223,7 +237,10 @@ async function buildOrderPatientMap(orderIds: Types.ObjectId[]): Promise<Map<str
     return new Map();
   }
 
-  const orders: Array<{ _id: Types.ObjectId; patientId: Types.ObjectId }> = await OrderModel.find({ _id: { $in: uniqueOrderIds } })
+  const orders: Array<{ _id: Types.ObjectId; patientId: Types.ObjectId }> = await OrderModel.find({
+    _id: { $in: uniqueOrderIds },
+    ...(tenantId ? { tenantId } : {}),
+  })
     .select({ _id: 1, patientId: 1 })
     .lean<Array<{ _id: Types.ObjectId; patientId: Types.ObjectId }>>()
     .exec();
@@ -232,7 +249,10 @@ async function buildOrderPatientMap(orderIds: Types.ObjectId[]): Promise<Map<str
     (id) => new Types.ObjectId(id),
   );
 
-  const patients: Array<{ _id: Types.ObjectId; name: string }> = await PatientModel.find({ _id: { $in: patientIds } })
+  const patients: Array<{ _id: Types.ObjectId; name: string }> = await PatientModel.find({
+    _id: { $in: patientIds },
+    ...(tenantId ? { tenantId } : {}),
+  })
     .select({ _id: 1, name: 1 })
     .lean<Array<{ _id: Types.ObjectId; name: string }>>()
     .exec();

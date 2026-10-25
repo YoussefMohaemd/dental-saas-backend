@@ -15,7 +15,10 @@ export class ClinicsController {
 
   public createClinic = async (req: Request, res: Response): Promise<void> => {
     const payload = createClinicBodySchema.parse(req.body);
-    const created = await this.clinicService.createClinic(payload);
+    const created = await this.clinicService.createClinic(
+      payload,
+      await getAuthenticatedDataScope(req),
+    );
     sendCreated(res, created, this.buildMeta(req as RequestWithContext));
   };
 

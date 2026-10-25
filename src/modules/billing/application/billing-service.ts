@@ -143,10 +143,10 @@ export async function listBillingRecords(input: BillingListInput): Promise<{
     .exec();
 
   const [orderById, patientById, doctorById, clinicById] = await Promise.all([
-    buildNamedMap(OrderModel, records.map((record) => record.orderId), 'orderNumber'),
-    buildNamedMap(PatientModel, records.map((record) => record.patientId), 'name'),
-    buildNamedMap(DoctorModel, records.map((record) => record.doctorId), 'name'),
-    buildNamedMap(ClinicModel, records.map((record) => record.clinicId), 'name'),
+    buildNamedMap(OrderModel, records.map((record) => record.orderId), 'orderNumber', input.tenantId),
+    buildNamedMap(PatientModel, records.map((record) => record.patientId), 'name', input.tenantId),
+    buildNamedMap(DoctorModel, records.map((record) => record.doctorId), 'name', input.tenantId),
+    buildNamedMap(ClinicModel, records.map((record) => record.clinicId), 'name', input.tenantId),
   ]);
 
   return {
@@ -177,10 +177,10 @@ export async function getBillingRecord(
   }
 
   const [orderById, patientById, doctorById, clinicById] = await Promise.all([
-    buildNamedMap(OrderModel, [record.orderId], 'orderNumber'),
-    buildNamedMap(PatientModel, [record.patientId], 'name'),
-    buildNamedMap(DoctorModel, [record.doctorId], 'name'),
-    buildNamedMap(ClinicModel, [record.clinicId], 'name'),
+    buildNamedMap(OrderModel, [record.orderId], 'orderNumber', tenantId),
+    buildNamedMap(PatientModel, [record.patientId], 'name', tenantId),
+    buildNamedMap(DoctorModel, [record.doctorId], 'name', tenantId),
+    buildNamedMap(ClinicModel, [record.clinicId], 'name', tenantId),
   ]);
 
   return toBillingDto(record, orderById, patientById, doctorById, clinicById);
@@ -249,6 +249,7 @@ async function buildNamedMap<TDoc extends { _id: Types.ObjectId }>(
   },
   ids: Types.ObjectId[],
   nameField: string,
+  tenantId?: Types.ObjectId,
 ): Promise<Map<string, string>> {
   const uniqueIds = [...new Set(ids.map((id) => id.toString()))].map(
     (id) => new Types.ObjectId(id),
@@ -259,7 +260,7 @@ async function buildNamedMap<TDoc extends { _id: Types.ObjectId }>(
   }
 
   const records: Array<TDoc & Record<string, string>> = await model
-    .find({ _id: { $in: uniqueIds } })
+    .find({ _id: { $in: uniqueIds }, ...(tenantId ? { tenantId } : {}) })
     .select({ _id: 1, [nameField]: 1 })
     .lean<Array<TDoc & Record<string, string>>>()
     .exec();

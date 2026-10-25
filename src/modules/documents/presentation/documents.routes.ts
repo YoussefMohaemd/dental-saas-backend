@@ -6,7 +6,7 @@ import {
   baseListQuerySchema,
   buildRequestMeta,
   ensureObjectId,
-  getAuthenticatedTenantId,
+  getAuthenticatedDataScope,
   parsePaginationQuery,
   parseSort,
 } from '../../../shared/presentation/http/http-utils';
@@ -31,7 +31,7 @@ documentsRouter.get('/documents', async (req, res) => {
   const pagination = parsePaginationQuery(query);
   const sort = parseSort(query, ['name', 'date', 'sizeBytes', 'category', 'type'], 'date');
   const categories = parseDocumentCategoryFilters(query.category);
-  const tenantId = getAuthenticatedTenantId(req);
+  const scope = await getAuthenticatedDataScope(req);
 
   const result = await listDocuments({
     pagination,
@@ -39,7 +39,7 @@ documentsRouter.get('/documents', async (req, res) => {
     categories,
     sortBy: sort.sortBy as 'name' | 'date' | 'sizeBytes' | 'category' | 'type',
     sortDirection: sort.sortDirection,
-    tenantId,
+    tenantId: scope.tenantId,
   });
 
   sendOk(res, result.items, buildRequestMeta(req, buildPaginationMeta(result.totalItems, pagination)));
@@ -48,16 +48,16 @@ documentsRouter.get('/documents', async (req, res) => {
 documentsRouter.get('/documents/:documentId', async (req, res) => {
   const params = z.object({ documentId: z.string() }).parse(req.params);
   const documentId = ensureObjectId(params.documentId, 'document id');
-  const tenantId = getAuthenticatedTenantId(req);
-  const data = await getDocumentById(documentId, tenantId);
+  const scope = await getAuthenticatedDataScope(req);
+  const data = await getDocumentById(documentId, scope.tenantId);
 
   sendOk(res, data, buildRequestMeta(req));
 });
 
 documentsRouter.post('/documents', async (req, res) => {
   const payload = parseCreateDocumentPayload(req.body);
-  const tenantId = getAuthenticatedTenantId(req);
-  const data = await createDocument(payload, tenantId);
+  const scope = await getAuthenticatedDataScope(req);
+  const data = await createDocument(payload, scope);
 
   sendCreated(res, data, buildRequestMeta(req));
 });
@@ -65,8 +65,8 @@ documentsRouter.post('/documents', async (req, res) => {
 documentsRouter.delete('/documents/:documentId', async (req, res) => {
   const params = z.object({ documentId: z.string() }).parse(req.params);
   const documentId = ensureObjectId(params.documentId, 'document id');
-  const tenantId = getAuthenticatedTenantId(req);
-  await deleteDocument(documentId, tenantId);
+  const scope = await getAuthenticatedDataScope(req);
+  await deleteDocument(documentId, scope.tenantId);
 
   sendNoContent(res);
 });

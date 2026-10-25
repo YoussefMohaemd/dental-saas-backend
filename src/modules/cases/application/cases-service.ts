@@ -1,4 +1,4 @@
-import { type FilterQuery, type SortOrder, Types } from 'mongoose';
+import { type FilterQuery, type Model, type SortOrder, Types } from 'mongoose';
 
 import { type CaseDto } from '../../../shared/application/contracts/dental-api-contract';
 import {
@@ -16,6 +16,8 @@ import { CaseModel } from '../../../shared/infrastructure/persistence/mongoose/m
 import { ClinicModel } from '../../../shared/infrastructure/persistence/mongoose/models/clinic.model';
 import { DoctorModel } from '../../../shared/infrastructure/persistence/mongoose/models/doctor.model';
 import { PatientModel } from '../../../shared/infrastructure/persistence/mongoose/models/patient.model';
+
+const caseModel = CaseModel as unknown as Model<CaseRecord>;
 
 interface CaseRecord {
   _id: Types.ObjectId;
@@ -103,7 +105,7 @@ export async function createCase(input: CreateCaseInput): Promise<CaseDto> {
     });
   }
 
-  const duplicate = await CaseModel.exists({
+  const duplicate = await caseModel.exists({
     tenantId: input.tenantId,
     caseNumber: input.caseNumber,
   }).exec();
@@ -116,7 +118,7 @@ export async function createCase(input: CreateCaseInput): Promise<CaseDto> {
     });
   }
 
-  const created = await CaseModel.create({
+  const created = await caseModel.create({
     tenantId: input.tenantId,
     caseNumber: input.caseNumber,
     title: input.title,
@@ -149,13 +151,13 @@ export async function listCases(input: CasesListInput): Promise<CasesListResult>
     filter.$or = [{ caseNumber: searchRegex }, { title: searchRegex }, { notes: searchRegex }];
   }
 
-  const totalItems = await CaseModel.countDocuments(filter);
+  const totalItems = await caseModel.countDocuments(filter);
   const skip = (input.pagination.page - 1) * input.pagination.pageSize;
   const sort: Record<string, SortOrder> = {
     [input.sortBy]: input.sortDirection === 'asc' ? 1 : -1,
   };
 
-  const records: CaseRecord[] = await CaseModel.find(filter)
+  const records: CaseRecord[] = await caseModel.find(filter)
     .sort(sort)
     .skip(skip)
     .limit(input.pagination.pageSize)
@@ -164,15 +166,15 @@ export async function listCases(input: CasesListInput): Promise<CasesListResult>
 
   const ids = collectRelatedIds(records);
   const [patients, doctors, clinics] = await Promise.all([
-    PatientModel.find({ _id: { $in: ids.patientIds } })
+    PatientModel.find({ _id: { $in: ids.patientIds }, tenantId: input.tenantId })
       .select({ _id: 1, name: 1 })
       .lean<Array<{ _id: Types.ObjectId; name: string }>>()
       .exec(),
-    DoctorModel.find({ _id: { $in: ids.doctorIds } })
+    DoctorModel.find({ _id: { $in: ids.doctorIds }, tenantId: input.tenantId })
       .select({ _id: 1, name: 1 })
       .lean<Array<{ _id: Types.ObjectId; name: string }>>()
       .exec(),
-    ClinicModel.find({ _id: { $in: ids.clinicIds } })
+    ClinicModel.find({ _id: { $in: ids.clinicIds }, tenantId: input.tenantId })
       .select({ _id: 1, name: 1 })
       .lean<Array<{ _id: Types.ObjectId; name: string }>>()
       .exec(),
@@ -201,7 +203,7 @@ export async function getCaseById(
   }
   applyScopeFilter(filter, scope);
 
-  const record = await CaseModel.findOne(filter).lean<CaseRecord | null>().exec();
+  const record = await caseModel.findOne(filter).lean<CaseRecord | null>().exec();
   if (!record) {
     throw new ApplicationError({
       message: 'Case not found',
@@ -212,15 +214,15 @@ export async function getCaseById(
   }
 
   const [patient, doctor, clinic] = await Promise.all([
-    PatientModel.findById(record.patientId)
+    PatientModel.findOne({ _id: record.patientId, ...(tenantId ? { tenantId } : {}) })
       .select({ _id: 1, name: 1 })
       .lean<{ _id: Types.ObjectId; name: string } | null>()
       .exec(),
-    DoctorModel.findById(record.doctorId)
+    DoctorModel.findOne({ _id: record.doctorId, ...(tenantId ? { tenantId } : {}) })
       .select({ _id: 1, name: 1 })
       .lean<{ _id: Types.ObjectId; name: string } | null>()
       .exec(),
-    ClinicModel.findById(record.clinicId)
+    ClinicModel.findOne({ _id: record.clinicId, ...(tenantId ? { tenantId } : {}) })
       .select({ _id: 1, name: 1 })
       .lean<{ _id: Types.ObjectId; name: string } | null>()
       .exec(),

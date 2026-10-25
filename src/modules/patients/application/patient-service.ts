@@ -9,19 +9,19 @@ import { type DataVisibilityScope } from '../../../shared/application/contracts/
 export class PatientService {
   public constructor(private readonly patientRepository: PatientRepository) {}
 
-  public async createPatient(payload: PatientWritePayload): Promise<PatientDto> {
-    await this.assertClinicDoctorLink(payload.clinicId, payload.doctorId);
-    const patient = await this.patientRepository.create(payload);
-    return this.toPatientDto(patient);
+  public async createPatient(payload: PatientWritePayload, scope: DataVisibilityScope): Promise<PatientDto> {
+    await this.assertClinicDoctorLink(payload.clinicId, payload.doctorId, scope);
+    const patient = await this.patientRepository.create(payload, scope);
+    return this.toPatientDto(patient, scope);
   }
 
-  public async getPatientById(patientId: string, scope?: DataVisibilityScope): Promise<PatientDto> {
+  public async getPatientById(patientId: string, scope: DataVisibilityScope): Promise<PatientDto> {
     const patient = await this.patientRepository.findById(patientId, scope);
     if (patient === null) {
       throw new DomainError(`Patient ${patientId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
     }
 
-    return this.toPatientDto(patient);
+    return this.toPatientDto(patient, scope);
   }
 
   public async listPatients(
@@ -34,7 +34,7 @@ export class PatientService {
       pageSize: pagination.pageSize,
     });
 
-    const items = await Promise.all(result.items.map((item) => this.toPatientDto(item)));
+    const items = await Promise.all(result.items.map((item) => this.toPatientDto(item, query.scope)));
 
     return {
       items,
@@ -45,7 +45,7 @@ export class PatientService {
   public async updatePatient(
     patientId: string,
     payload: PatientUpdatePayload,
-    scope?: DataVisibilityScope,
+    scope: DataVisibilityScope,
   ): Promise<PatientDto> {
     if (payload.clinicId !== undefined || payload.doctorId !== undefined) {
       const existing = await this.patientRepository.findById(patientId, scope);
@@ -55,7 +55,7 @@ export class PatientService {
 
       const clinicId = payload.clinicId ?? existing.clinicId;
       const doctorId = payload.doctorId ?? existing.doctorId;
-      await this.assertClinicDoctorLink(clinicId, doctorId);
+      await this.assertClinicDoctorLink(clinicId, doctorId, scope);
     }
 
     const updated = await this.patientRepository.update(patientId, payload, scope);
@@ -63,20 +63,24 @@ export class PatientService {
       throw new DomainError(`Patient ${patientId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
     }
 
-    return this.toPatientDto(updated);
+    return this.toPatientDto(updated, scope);
   }
 
-  public async deletePatient(patientId: string, scope?: DataVisibilityScope): Promise<void> {
+  public async deletePatient(patientId: string, scope: DataVisibilityScope): Promise<void> {
     const deleted = await this.patientRepository.delete(patientId, scope);
     if (!deleted) {
       throw new DomainError(`Patient ${patientId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
     }
   }
 
-  private async assertClinicDoctorLink(clinicId: string, doctorId: string): Promise<void> {
+  private async assertClinicDoctorLink(
+    clinicId: string,
+    doctorId: string,
+    scope: DataVisibilityScope,
+  ): Promise<void> {
     const [clinicExists, doctor] = await Promise.all([
-      this.patientRepository.clinicExists(clinicId),
-      this.patientRepository.findDoctorById(doctorId),
+      this.patientRepository.clinicExists(clinicId, scope),
+      this.patientRepository.findDoctorById(doctorId, scope),
     ]);
 
     if (!clinicExists) {
@@ -104,11 +108,11 @@ export class PatientService {
     }
   }
 
-  private async toPatientDto(patient: Patient): Promise<PatientDto> {
+  private async toPatientDto(patient: Patient, scope: DataVisibilityScope): Promise<PatientDto> {
     const [clinicName, doctorName, ordersCount] = await Promise.all([
-      this.patientRepository.findClinicNameById(patient.clinicId),
-      this.patientRepository.findDoctorNameById(patient.doctorId),
-      this.patientRepository.countOrders(patient.id),
+      this.patientRepository.findClinicNameById(patient.clinicId, scope),
+      this.patientRepository.findDoctorNameById(patient.doctorId, scope),
+      this.patientRepository.countOrders(patient.id, scope),
     ]);
 
     if (clinicName === null || doctorName === null) {
