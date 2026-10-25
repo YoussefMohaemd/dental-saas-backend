@@ -46,6 +46,8 @@ Copy `.env.example` to `.env` and adjust values as needed.
   - `POST /api/auth/refresh`
   - `POST /api/auth/logout`
   - `GET /api/auth/me` (protected)
+  - Auth responses (`login`/`refresh`/`me`) now include `user.capabilities`,
+    a server-derived permission list for role-based frontend UX.
   - `POST /api/auth/sessions/revoke` (protected, admin role)
   - No public registration endpoint is exposed
 - User/role provisioning endpoints under `/api/v1`:

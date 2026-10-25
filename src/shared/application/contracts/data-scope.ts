@@ -5,5 +5,10 @@ export interface DataVisibilityScope {
   userId: Types.ObjectId;
   doctorId?: Types.ObjectId;
   clinicId?: Types.ObjectId;
+  roles?: string[];
   isAdmin: boolean;
+  isDoctor?: boolean;
+  isTechnician?: boolean;
+  isStaff?: boolean;
+  isManager?: boolean;
 }

@@ -678,10 +678,16 @@ function buildScopedFilter(
     return filter;
   }
 
-  if (scope.doctorId) {
+  if (scope.isDoctor && scope.doctorId) {
     filter.doctorId = scope.doctorId;
-  } else {
+  } else if (scope.isTechnician) {
     filter.technicianId = scope.userId;
+  } else if (scope.clinicId) {
+    filter.clinicId = scope.clinicId;
+  } else if (scope.isStaff || scope.isManager) {
+    return filter;
+  } else {
+    filter._id = { $in: [] as Types.ObjectId[] };
   }
 
   return filter;

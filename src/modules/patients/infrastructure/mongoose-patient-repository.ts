@@ -54,16 +54,9 @@ export class MongoosePatientRepository implements PatientRepository {
       ...(query.statuses.length > 0 ? { status: { $in: query.statuses } } : {}),
     };
 
-    if (!query.scope.isAdmin) {
-      if (query.scope.doctorId) {
-        filter.doctorId = query.scope.doctorId;
-      } else {
-        const patientIds = await orderModel.distinct("patientId", {
-          tenantId: query.scope.tenantId,
-          technicianId: query.scope.userId,
-        }).exec();
-        filter._id = { $in: patientIds };
-      }
+    const scopedFilter = await patientScopeFilter(query.scope);
+    if (Object.keys(scopedFilter).length > 0) {
+      Object.assign(filter, scopedFilter);
     }
 
     const sortValue: SortOrder = query.sortDirection === 'asc' ? 1 : -1;
@@ -222,8 +215,20 @@ async function patientScopeFilter(scope: DataVisibilityScope): Promise<Record<st
     return {};
   }
 
-  if (scope.doctorId) {
+  if (scope.isDoctor && scope.doctorId) {
     return { doctorId: scope.doctorId };
+  }
+
+  if (!scope.isTechnician) {
+    if (scope.clinicId) {
+      return { clinicId: scope.clinicId };
+    }
+
+    if (scope.isStaff || scope.isManager) {
+      return {};
+    }
+
+    return { _id: { $in: [] as Types.ObjectId[] } };
   }
 
   const patientIds = await orderModel.distinct('patientId', {

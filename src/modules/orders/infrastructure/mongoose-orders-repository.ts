@@ -39,13 +39,7 @@ const orderSortFields: Record<OrderListQuery['sortBy'], string> = {
 };
 
 function orderScopeFilter(scope: DataVisibilityScope): Record<string, unknown> {
-  if (scope.isAdmin) {
-    return {};
-  }
-
-  return scope.doctorId
-    ? { doctorId: scope.doctorId }
-    : { technicianId: scope.userId };
+  return buildOrderOwnershipFilter(scope);
 }
 
 export class MongooseOrdersRepository implements OrderRepository {
@@ -470,10 +464,8 @@ export class MongooseOrdersRepository implements OrderRepository {
       ];
     }
 
-    if (!query.scope.isAdmin) {
-      const ownershipFilter = query.scope.doctorId
-        ? { doctorId: query.scope.doctorId }
-        : { technicianId: query.scope.userId };
+    const ownershipFilter = buildOrderOwnershipFilter(query.scope);
+    if (Object.keys(ownershipFilter).length > 0) {
       filter.$and = [...(filter.$and ?? []), ownershipFilter];
     }
 
@@ -798,6 +790,30 @@ function uniqueObjectIds(ids: string[]): Types.ObjectId[] {
   return [...unique]
     .filter((id) => Types.ObjectId.isValid(id))
     .map((id) => new Types.ObjectId(id));
+}
+
+function buildOrderOwnershipFilter(scope: DataVisibilityScope): Record<string, unknown> {
+  if (scope.isAdmin) {
+    return {};
+  }
+
+  if (scope.isDoctor && scope.doctorId) {
+    return { doctorId: scope.doctorId };
+  }
+
+  if (scope.isTechnician) {
+    return { technicianId: scope.userId };
+  }
+
+  if (scope.clinicId) {
+    return { clinicId: scope.clinicId };
+  }
+
+  if (scope.isStaff || scope.isManager) {
+    return {};
+  }
+
+  return { _id: { $in: [] as Types.ObjectId[] } };
 }
 
 function toDate(value: Date | string): Date {

@@ -7,6 +7,7 @@ import {
 } from '../../../shared/application/errors/application-error';
 import { AuthSessionModel } from '../../../shared/infrastructure/persistence/mongoose/models/auth-session.model';
 import { UserModel } from '../../../shared/infrastructure/persistence/mongoose/models/user.model';
+import { resolveRoleCapabilities, type DentalCapability } from './authorization-policy';
 import { PasswordHasher } from './password-hasher';
 import { type AuthTokenClaims, TokenService } from './token-service';
 
@@ -29,6 +30,7 @@ interface AuthenticatedUser {
   fullName: string;
   email: string;
   roles: string[];
+  capabilities: DentalCapability[];
   clinicId?: string;
   avatarUrl?: string;
 }
@@ -202,13 +204,7 @@ export class AuthService {
     return {
       accessToken: tokenPair.accessToken,
       refreshToken: tokenPair.refreshToken,
-      user: {
-        userId: user._id.toString(),
-        tenantId: user.tenantId.toString(),
-        fullName: user.fullName,
-        email: user.email,
-        roles: user.roles,
-      },
+      user: this.toAuthenticatedUser(user),
     };
   }
 
@@ -310,13 +306,7 @@ export class AuthService {
     return {
       accessToken: tokenPair.accessToken,
       refreshToken: tokenPair.refreshToken,
-      user: {
-        userId: user._id.toString(),
-        tenantId: user.tenantId.toString(),
-        fullName: user.fullName,
-        email: user.email,
-        roles: user.roles,
-      },
+      user: this.toAuthenticatedUser(user),
     };
   }
 
@@ -344,6 +334,7 @@ export class AuthService {
       fullName: user.fullName,
       email: user.email,
       roles: user.roles,
+      capabilities: resolveRoleCapabilities(user.roles),
       ...(user.clinicId ? { clinicId: user.clinicId.toString() } : {}),
       ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
     };

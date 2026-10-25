@@ -175,15 +175,24 @@ export interface AuthenticatedDataScope {
   userId: Types.ObjectId;
   clinicId?: Types.ObjectId;
   doctorId?: Types.ObjectId;
+  roles: string[];
   isAdmin: boolean;
+  isDoctor: boolean;
+  isTechnician: boolean;
+  isStaff: boolean;
+  isManager: boolean;
 }
 
 export async function getAuthenticatedDataScope(req: Request): Promise<AuthenticatedDataScope> {
   const principal = getAuthenticatedPrincipal(req);
   const tenantId = parsePrincipalObjectId(principal.tenantId, 'tenant');
   const userId = parsePrincipalObjectId(principal.userId, 'user');
-  const roles = principal.roles.map((role) => role.trim().toLowerCase());
+  const roles = normalizeRoleAliases(principal.roles);
   const isAdmin = roles.includes('admin');
+  const isDoctor = roles.includes('doctor');
+  const isTechnician = roles.includes('technician');
+  const isStaff = roles.includes('staff');
+  const isManager = roles.includes('manager');
 
   const user = await UserModel.findOne({ _id: userId, tenantId })
     .select({ email: 1, clinicId: 1 })
@@ -200,7 +209,7 @@ export async function getAuthenticatedDataScope(req: Request): Promise<Authentic
   }
 
   const doctor =
-    !isAdmin && roles.includes('doctor') && user.email
+    !isAdmin && isDoctor && user.email
       ? await DoctorModel.findOne({ tenantId, email: user.email })
           .select({ _id: 1 })
           .lean<{ _id: Types.ObjectId } | null>()
@@ -210,10 +219,44 @@ export async function getAuthenticatedDataScope(req: Request): Promise<Authentic
   return {
     tenantId,
     userId,
+    roles,
     ...(user.clinicId ? { clinicId: user.clinicId } : {}),
     ...(doctor ? { doctorId: doctor._id } : {}),
     isAdmin,
+    isDoctor,
+    isTechnician,
+    isStaff,
+    isManager,
   };
+}
+
+function normalizeRoleAliases(roles: readonly string[]): string[] {
+  return Array.from(new Set(roles.map((role) => normalizeRoleAlias(role))));
+}
+
+function normalizeRoleAlias(role: string): string {
+  const normalized = role.trim().toLowerCase();
+  if (normalized.includes('admin')) {
+    return 'admin';
+  }
+
+  if (normalized.includes('staff')) {
+    return 'staff';
+  }
+
+  if (normalized.includes('manager')) {
+    return 'manager';
+  }
+
+  if (normalized.includes('doctor')) {
+    return 'doctor';
+  }
+
+  if (normalized.includes('technician') || normalized.includes('tech')) {
+    return 'technician';
+  }
+
+  return normalized;
 }
 
 function parseStringList(value: unknown): string[] | undefined {
