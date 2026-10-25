@@ -1,10 +1,14 @@
-import { ENTITY_ACTIVITY_STATUSES, type EntityActivityStatus } from '../../../shared/domain/entities/dental-data-model';
+import {
+  ENTITY_ACTIVITY_STATUSES,
+  type EntityActivityStatus,
+} from '../../../shared/domain/entities/dental-data-model';
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 
 export interface Doctor {
   id: string;
   lookupId?: string | undefined;
   name: string;
+  gender?: 'M' | 'F';
   specialty: string;
   clinicId: string;
   email: string;
@@ -30,6 +34,7 @@ export interface DoctorListQuery {
 export interface DoctorWritePayload {
   lookupId?: string | undefined;
   name: string;
+  gender?: 'M' | 'F';
   specialty: string;
   clinicId: string;
   email: string;
@@ -42,6 +47,7 @@ export interface DoctorWritePayload {
 export interface DoctorUpdatePayload {
   lookupId?: string | undefined;
   name?: string | undefined;
+  gender?: 'M' | 'F' | undefined;
   specialty?: string | undefined;
   clinicId?: string | undefined;
   email?: string | undefined;

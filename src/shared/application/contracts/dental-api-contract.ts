@@ -28,12 +28,7 @@ export type RestorativeType =
 export type SubOrderStatus = 'done' | 'in-progress' | 'pending' | 'blocked';
 export type CaseStatus = 'Open' | 'In Progress' | 'Review' | 'Closed';
 export type EntityActivityStatus = 'Active' | 'Inactive';
-export type ChangeRequestStatus =
-  | 'Pending'
-  | 'In Review'
-  | 'Approved'
-  | 'Rejected'
-  | 'Completed';
+export type ChangeRequestStatus = 'Pending' | 'In Review' | 'Approved' | 'Rejected' | 'Completed';
 export type BillingStatus = 'Pending' | 'Invoiced' | 'Paid' | 'Overdue' | 'Cancelled';
 export type ScanCenterStatus = 'Operational' | 'Maintenance';
 export type NotificationType = 'order' | 'workflow' | 'file' | 'billing' | 'system' | 'request';
@@ -160,6 +155,7 @@ export interface DoctorDto {
   id: string;
   lookupId?: string;
   name: string;
+  gender: 'M' | 'F';
   specialty: string;
   clinicId: string;
   clinicName: string;

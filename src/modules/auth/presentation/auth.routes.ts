@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import {
   getCurrentUserController,
+  changePasswordController,
   loginController,
   logoutController,
   refreshController,
@@ -16,6 +17,7 @@ authRouter.post('/auth/refresh', refreshController);
 authRouter.post('/auth/logout', logoutController);
 
 authRouter.get('/auth/me', requireAuthenticated, getCurrentUserController);
+authRouter.post('/auth/password', requireAuthenticated, changePasswordController);
 authRouter.post(
   '/auth/sessions/revoke',
   requireAuthenticated,

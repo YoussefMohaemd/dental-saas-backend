@@ -11,6 +11,11 @@ const doctorSchema = new Schema(
       trim: true,
     },
     name: requiredTrimmedString(),
+    gender: {
+      type: String,
+      enum: ['M', 'F'],
+      default: 'M',
+    },
     specialty: requiredTrimmedString(),
     clinicId: objectIdRef('Clinic'),
     email: {
@@ -45,16 +50,5 @@ doctorSchema.index({ tenantId: 1, clinicId: 1, status: 1 });
 doctorSchema.index({ tenantId: 1, lookupId: 1 }, { unique: true, sparse: true });
 doctorSchema.index({ tenantId: 1, email: 1 }, { unique: true });
 
-export const DoctorModel: Model<any> = (models.Doctor as Model<any> | undefined) ?? model('Doctor', doctorSchema);
-
-
-
-
-
-
-
-
-
-
-
-
+export const DoctorModel: Model<any> =
+  (models.Doctor as Model<any> | undefined) ?? model('Doctor', doctorSchema);

@@ -4,7 +4,12 @@ import { ClinicModel } from '../../../shared/infrastructure/persistence/mongoose
 import { DoctorModel } from '../../../shared/infrastructure/persistence/mongoose/models/doctor.model';
 import { OrderModel } from '../../../shared/infrastructure/persistence/mongoose/models/order.model';
 import { PatientModel } from '../../../shared/infrastructure/persistence/mongoose/models/patient.model';
-import { type Doctor, type DoctorListQuery, type DoctorUpdatePayload, type DoctorWritePayload } from '../domain/doctor';
+import {
+  type Doctor,
+  type DoctorListQuery,
+  type DoctorUpdatePayload,
+  type DoctorWritePayload,
+} from '../domain/doctor';
 import { type DoctorListResult, type DoctorRepository } from '../domain/doctor-repository';
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 
@@ -29,11 +34,12 @@ export class MongooseDoctorRepository implements DoctorRepository {
   }
 
   public async findById(doctorId: string, scope?: DataVisibilityScope): Promise<Doctor | null> {
-    const found = await doctorModel.findOne({
-      _id: doctorId,
-      tenantId: DEFAULT_TENANT_ID,
-      ...doctorScopeFilter(scope),
-    })
+    const found = await doctorModel
+      .findOne({
+        _id: doctorId,
+        tenantId: DEFAULT_TENANT_ID,
+        ...doctorScopeFilter(scope),
+      })
       .lean<DoctorRecord | null>()
       .exec();
     return found === null ? null : this.toDoctorRecord(found);
@@ -65,7 +71,8 @@ export class MongooseDoctorRepository implements DoctorRepository {
     const skip = (query.page - 1) * query.pageSize;
 
     const [items, totalItems] = await Promise.all([
-      doctorModel.find(filter)
+      doctorModel
+        .find(filter)
         .sort({ [sortBy]: sortValue })
         .skip(skip)
         .limit(query.pageSize)
@@ -85,11 +92,12 @@ export class MongooseDoctorRepository implements DoctorRepository {
     payload: DoctorUpdatePayload,
     scope?: DataVisibilityScope,
   ): Promise<Doctor | null> {
-    const updated = await doctorModel.findOneAndUpdate(
-      { _id: doctorId, tenantId: DEFAULT_TENANT_ID, ...doctorScopeFilter(scope) },
-      payload,
-      { new: true },
-    )
+    const updated = await doctorModel
+      .findOneAndUpdate(
+        { _id: doctorId, tenantId: DEFAULT_TENANT_ID, ...doctorScopeFilter(scope) },
+        payload,
+        { new: true },
+      )
       .lean<DoctorRecord | null>()
       .exec();
 
@@ -97,11 +105,13 @@ export class MongooseDoctorRepository implements DoctorRepository {
   }
 
   public async delete(doctorId: string, scope?: DataVisibilityScope): Promise<boolean> {
-    const deleted = await doctorModel.findOneAndDelete({
-      _id: doctorId,
-      tenantId: DEFAULT_TENANT_ID,
-      ...doctorScopeFilter(scope),
-    }).exec();
+    const deleted = await doctorModel
+      .findOneAndDelete({
+        _id: doctorId,
+        tenantId: DEFAULT_TENANT_ID,
+        ...doctorScopeFilter(scope),
+      })
+      .exec();
 
     return deleted !== null;
   }
@@ -127,10 +137,11 @@ export class MongooseDoctorRepository implements DoctorRepository {
   }
 
   public async clinicExists(clinicId: string): Promise<boolean> {
-    const existing = await clinicModel.findOne({
-      _id: clinicId,
-      tenantId: DEFAULT_TENANT_ID,
-    })
+    const existing = await clinicModel
+      .findOne({
+        _id: clinicId,
+        tenantId: DEFAULT_TENANT_ID,
+      })
       .select('_id')
       .lean()
       .exec();
@@ -139,10 +150,11 @@ export class MongooseDoctorRepository implements DoctorRepository {
   }
 
   public async findClinicNameById(clinicId: string): Promise<string | null> {
-    const clinic = await clinicModel.findOne({
-      _id: clinicId,
-      tenantId: DEFAULT_TENANT_ID,
-    })
+    const clinic = await clinicModel
+      .findOne({
+        _id: clinicId,
+        tenantId: DEFAULT_TENANT_ID,
+      })
       .select('name')
       .lean()
       .exec();
@@ -151,7 +163,9 @@ export class MongooseDoctorRepository implements DoctorRepository {
   }
 
   public async hasPatients(doctorId: string): Promise<boolean> {
-    const count = await patientModel.countDocuments({ tenantId: DEFAULT_TENANT_ID, doctorId }).exec();
+    const count = await patientModel
+      .countDocuments({ tenantId: DEFAULT_TENANT_ID, doctorId })
+      .exec();
     return count > 0;
   }
 
@@ -164,6 +178,7 @@ export class MongooseDoctorRepository implements DoctorRepository {
       id: document._id.toString(),
       ...(document.lookupId !== undefined ? { lookupId: document.lookupId } : {}),
       name: document.name,
+      gender: document.gender ?? 'M',
       specialty: document.specialty,
       clinicId: document.clinicId.toString(),
       email: document.email,
@@ -181,6 +196,7 @@ interface DoctorRecord {
   _id: Types.ObjectId;
   lookupId?: string;
   name: string;
+  gender?: 'M' | 'F';
   specialty: string;
   clinicId: Types.ObjectId;
   email: string;
@@ -193,9 +209,21 @@ interface DoctorRecord {
 }
 
 const doctorModel = DoctorModel as unknown as Model<DoctorRecord>;
-const clinicModel = ClinicModel as unknown as Model<{ _id: Types.ObjectId; tenantId: Types.ObjectId; name: string }>;
-const patientModel = PatientModel as unknown as Model<{ _id: Types.ObjectId; tenantId: Types.ObjectId; doctorId: Types.ObjectId }>;
-const orderModel = OrderModel as unknown as Model<{ _id: Types.ObjectId; tenantId: Types.ObjectId; doctorId: Types.ObjectId }>;
+const clinicModel = ClinicModel as unknown as Model<{
+  _id: Types.ObjectId;
+  tenantId: Types.ObjectId;
+  name: string;
+}>;
+const patientModel = PatientModel as unknown as Model<{
+  _id: Types.ObjectId;
+  tenantId: Types.ObjectId;
+  doctorId: Types.ObjectId;
+}>;
+const orderModel = OrderModel as unknown as Model<{
+  _id: Types.ObjectId;
+  tenantId: Types.ObjectId;
+  doctorId: Types.ObjectId;
+}>;
 
 function doctorScopeFilter(scope?: DataVisibilityScope): Record<string, unknown> {
   if (!scope || scope.isAdmin) {

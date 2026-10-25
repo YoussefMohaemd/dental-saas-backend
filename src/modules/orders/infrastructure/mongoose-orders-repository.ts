@@ -471,7 +471,11 @@ export class MongooseOrdersRepository implements OrderRepository {
       doc.notes = payload.notes;
     }
     if ('archiveDate' in payload && payload.archiveDate !== undefined) {
-      doc.archiveDate = payload.archiveDate;
+      if (payload.archiveDate === null) {
+        doc.$unset = { archiveDate: 1 };
+      } else {
+        doc.archiveDate = payload.archiveDate;
+      }
     }
     if ('receivedAt' in payload && payload.receivedAt !== undefined) {
       doc.receivedAt = payload.receivedAt;

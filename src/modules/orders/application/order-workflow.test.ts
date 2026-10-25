@@ -32,33 +32,14 @@ describe('order workflow transitions', () => {
     }
   });
 
-  it('rejects invalid jumps with allowed status details', () => {
-    try {
-      assertOrderStatusTransition('New', 'Production');
-      expect.fail('Expected transition to throw');
-    } catch (error) {
-      expect(error).toBeInstanceOf(DomainError);
-      const domainError = error as DomainError;
-      expect(domainError.code).toBe(DOMAIN_ERROR_CODES.BUSINESS_RULE_VIOLATION);
-      expect(Array.isArray(domainError.details?.allowedNextStatuses)).toBe(true);
-      expect(domainError.details?.allowedNextStatuses).toContain('Review');
-    }
+  it('allows direct jumps between non-identical workflow statuses', () => {
+    expect(() => assertOrderStatusTransition('New', 'Production')).not.toThrow();
+    expect(() => assertOrderStatusTransition('Review', 'Completed')).not.toThrow();
+    expect(() => assertOrderStatusTransition('Completed', 'Production')).not.toThrow();
   });
 
-  it('rejects transitions out of terminal statuses', () => {
-    for (const [from, to] of [
-      ['Completed', 'Cancelled'],
-      ['Cancelled', 'New'],
-    ] as const) {
-      try {
-        assertOrderStatusTransition(from, to);
-        expect.fail(`Expected transition ${from} -> ${to} to throw`);
-      } catch (error) {
-        expect(error).toBeInstanceOf(DomainError);
-        expect((error as DomainError).code).toBe(
-          DOMAIN_ERROR_CODES.BUSINESS_RULE_VIOLATION,
-        );
-      }
-    }
+  it('allows moving orders out of terminal statuses', () => {
+    expect(() => assertOrderStatusTransition('Completed', 'Cancelled')).not.toThrow();
+    expect(() => assertOrderStatusTransition('Cancelled', 'New')).not.toThrow();
   });
 });

@@ -18,6 +18,12 @@ const loginSchema = z.object({
 }).strict();
 
 const refreshCookieSchema = z.string().min(1);
+const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1).max(128),
+    newPassword: z.string().min(8).max(128),
+  })
+  .strict();
 
 const refreshCookieOptions: CookieOptions = {
   httpOnly: env.AUTH_REFRESH_COOKIE_HTTP_ONLY,
@@ -81,15 +87,41 @@ export async function logoutController(req: Request, res: Response, next: NextFu
   }
 }
 
-export function getCurrentUserController(req: Request, res: Response): void {
-  const authenticatedRequest = req as AuthenticatedRequest;
-  const principal = authenticatedRequest.context.principal;
+export async function getCurrentUserController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const authenticatedRequest = req as AuthenticatedRequest;
+    const principal = authenticatedRequest.context.principal;
+    sendOk(
+      res,
+      await authService.getCurrentUser(principal.userId, principal.tenantId),
+    );
+  } catch (error) {
+    next(error);
+  }
+}
 
-  sendOk(res, {
-    userId: principal.userId,
-    tenantId: principal.tenantId,
-    roles: principal.roles,
-  });
+export async function changePasswordController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const authenticatedRequest = req as AuthenticatedRequest;
+    const principal = authenticatedRequest.context.principal;
+    const payload = changePasswordSchema.parse(req.body);
+    await authService.changePassword({
+      ...payload,
+      userId: principal.userId,
+      tenantId: principal.tenantId,
+    });
+    sendNoContent(res);
+  } catch (error) {
+    next(error);
+  }
 }
 
 export async function revokeSessionsController(

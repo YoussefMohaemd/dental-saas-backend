@@ -1,7 +1,10 @@
 import mongoose from 'mongoose';
 
 import { env } from '../../../config/env';
-import { APPLICATION_ERROR_CODES, ApplicationError } from '../../../shared/application/errors/application-error';
+import {
+  APPLICATION_ERROR_CODES,
+  ApplicationError,
+} from '../../../shared/application/errors/application-error';
 import { AuthSessionModel } from '../../../shared/infrastructure/persistence/mongoose/models/auth-session.model';
 import { UserModel } from '../../../shared/infrastructure/persistence/mongoose/models/user.model';
 import { PasswordHasher } from './password-hasher';
@@ -26,6 +29,8 @@ interface AuthenticatedUser {
   fullName: string;
   email: string;
   roles: string[];
+  clinicId?: string;
+  avatarUrl?: string;
 }
 
 export interface AuthTokensResponse {
@@ -45,6 +50,8 @@ interface UserWithAuth {
   passwordHash?: string;
   status: string;
   tokenVersion: number;
+  clinicId?: mongoose.Types.ObjectId;
+  avatarUrl?: string;
 }
 
 interface AuthSessionRecord {
@@ -65,12 +72,60 @@ const userModel = UserModel as mongoose.Model<UserWithAuth>;
 const authSessionModel = AuthSessionModel as mongoose.Model<AuthSessionRecord>;
 
 export class AuthService {
+  public async getCurrentUser(userId: string, tenantId: string): Promise<AuthenticatedUser> {
+    const user = await userModel
+      .findOne({ _id: userId, tenantId, status: 'active' })
+      .lean<UserWithAuth>()
+      .exec();
+
+    if (!user) {
+      throw this.createUnauthorizedError('User no longer exists');
+    }
+
+    return this.toAuthenticatedUser(user);
+  }
+
+  public async changePassword(input: {
+    userId: string;
+    tenantId: string;
+    currentPassword: string;
+    newPassword: string;
+  }): Promise<void> {
+    const user = await userModel
+      .findOne({
+        _id: input.userId,
+        tenantId: input.tenantId,
+        status: 'active',
+      })
+      .select('+passwordHash')
+      .lean<UserWithAuth>()
+      .exec();
+
+    if (!user?.passwordHash) {
+      throw this.createUnauthorizedError('User no longer exists');
+    }
+
+    const currentPasswordMatches = await passwordHasher.verify(
+      user.passwordHash,
+      input.currentPassword,
+    );
+    if (!currentPasswordMatches) {
+      throw this.createUnauthorizedError('Current password is incorrect');
+    }
+
+    const passwordHash = await passwordHasher.hash(input.newPassword);
+    await userModel
+      .updateOne({ _id: user._id, tenantId: user.tenantId }, { $set: { passwordHash } })
+      .exec();
+  }
+
   public async login(input: LoginInput): Promise<AuthTokensResponse> {
     const normalizedEmail = input.email.trim().toLowerCase();
-    const user = await userModel.findOne({
-      tenantId: input.tenantId,
-      email: normalizedEmail,
-    })
+    const user = await userModel
+      .findOne({
+        tenantId: input.tenantId,
+        email: normalizedEmail,
+      })
       .select('+passwordHash')
       .lean<UserWithAuth>()
       .exec();
@@ -90,21 +145,28 @@ export class AuthService {
 
     await userModel.updateOne({ _id: user._id }, { $set: { lastLoginAt: new Date() } }).exec();
 
-    return this.issueSessionTokens(user, { ipAddress: input.ipAddress, userAgent: input.userAgent });
+    return this.issueSessionTokens(user, {
+      ipAddress: input.ipAddress,
+      userAgent: input.userAgent,
+    });
   }
 
-  public async refresh(refreshToken: string, sessionContext: SessionContext): Promise<AuthTokensResponse> {
+  public async refresh(
+    refreshToken: string,
+    sessionContext: SessionContext,
+  ): Promise<AuthTokensResponse> {
     const refreshClaims = tokenService.verifyRefreshToken(refreshToken);
     const user = await this.getActiveUser(refreshClaims.sub, refreshClaims.tid);
     this.ensureTokenVersion(user, refreshClaims.tv);
 
-    const session = await authSessionModel.findOne({
-      _id: refreshClaims.sid,
-      userId: user._id,
-      tenantId: user.tenantId,
-      revokedAt: { $exists: false },
-      expiresAt: { $gt: new Date() },
-    })
+    const session = await authSessionModel
+      .findOne({
+        _id: refreshClaims.sid,
+        userId: user._id,
+        tenantId: user.tenantId,
+        revokedAt: { $exists: false },
+        expiresAt: { $gt: new Date() },
+      })
       .select('+refreshTokenHash')
       .exec();
 
@@ -154,19 +216,21 @@ export class AuthService {
     try {
       const refreshClaims = tokenService.verifyRefreshToken(refreshToken);
 
-      await authSessionModel.updateOne(
-        {
-          _id: refreshClaims.sid,
-          currentTokenId: refreshClaims.jti,
-          revokedAt: { $exists: false },
-        },
-        {
-          $set: {
-            revokedAt: new Date(),
+      await authSessionModel
+        .updateOne(
+          {
+            _id: refreshClaims.sid,
+            currentTokenId: refreshClaims.jti,
+            revokedAt: { $exists: false },
           },
-          $unset: { replacedByTokenId: '' },
-        },
-      ).exec();
+          {
+            $set: {
+              revokedAt: new Date(),
+            },
+            $unset: { replacedByTokenId: '' },
+          },
+        )
+        .exec();
     } catch {
       return;
     }
@@ -174,37 +238,74 @@ export class AuthService {
 
   public async revokeAllUserSessions(userId: string, tenantId: string): Promise<void> {
     const now = new Date();
-    const updateResult = await userModel.updateOne(
-      { _id: userId, tenantId, status: 'active' },
-      { $inc: { tokenVersion: 1 } },
-    ).exec();
+    const updateResult = await userModel
+      .updateOne({ _id: userId, tenantId, status: 'active' }, { $inc: { tokenVersion: 1 } })
+      .exec();
 
     if (updateResult.matchedCount === 0) {
       throw this.createUnauthorizedError('User no longer exists');
     }
 
-    await authSessionModel.updateMany(
-      { userId, tenantId, revokedAt: { $exists: false } },
-      { $set: { revokedAt: now } },
-    ).exec();
+    await authSessionModel
+      .updateMany({ userId, tenantId, revokedAt: { $exists: false } }, { $set: { revokedAt: now } })
+      .exec();
   }
 
-  private async issueSessionTokens(user: UserWithAuth, context: SessionContext): Promise<AuthTokensResponse> {
-    const sessionId = new mongoose.Types.ObjectId().toString();
+  private async issueSessionTokens(
+    user: UserWithAuth,
+    context: SessionContext,
+  ): Promise<AuthTokensResponse> {
+    const now = new Date();
+    await authSessionModel
+      .deleteMany({
+        tenantId: user.tenantId,
+        $or: [{ revokedAt: { $exists: true } }, { expiresAt: { $lte: now } }],
+      })
+      .exec();
+
+    const sessionQuery = {
+      userId: user._id,
+      tenantId: user.tenantId,
+      revokedAt: { $exists: false },
+      expiresAt: { $gt: now },
+      ...(context.userAgent
+        ? { userAgent: context.userAgent }
+        : { $or: [{ userAgent: { $exists: false } }, { userAgent: null }] }),
+    };
+    const existingSession = await authSessionModel
+      .findOne(sessionQuery)
+      .select('+refreshTokenHash')
+      .exec();
+    const sessionId = existingSession?._id.toString() ?? new mongoose.Types.ObjectId().toString();
     const tokenPair = tokenService.signTokenPair(this.toClaims(user, sessionId));
     const refreshTokenHash = await passwordHasher.hash(tokenPair.refreshToken);
 
-    await authSessionModel.create({
-      _id: sessionId,
-      userId: user._id,
-      tenantId: user.tenantId,
-      currentTokenId: tokenPair.refreshTokenId,
-      refreshTokenHash,
-      userAgent: context.userAgent,
-      ipAddress: context.ipAddress,
-      expiresAt: new Date(Date.now() + env.AUTH_REFRESH_TOKEN_TTL_SECONDS * 1000),
-      lastUsedAt: new Date(),
-    });
+    if (existingSession) {
+      existingSession.currentTokenId = tokenPair.refreshTokenId;
+      existingSession.refreshTokenHash = refreshTokenHash;
+      if (context.userAgent) {
+        existingSession.userAgent = context.userAgent;
+      }
+      if (context.ipAddress) {
+        existingSession.ipAddress = context.ipAddress;
+      }
+      existingSession.expiresAt = new Date(Date.now() + env.AUTH_REFRESH_TOKEN_TTL_SECONDS * 1000);
+      existingSession.lastUsedAt = now;
+      existingSession.set({ replacedByTokenId: undefined });
+      await existingSession.save();
+    } else {
+      await authSessionModel.create({
+        _id: sessionId,
+        userId: user._id,
+        tenantId: user.tenantId,
+        currentTokenId: tokenPair.refreshTokenId,
+        refreshTokenHash,
+        userAgent: context.userAgent,
+        ipAddress: context.ipAddress,
+        expiresAt: new Date(Date.now() + env.AUTH_REFRESH_TOKEN_TTL_SECONDS * 1000),
+        lastUsedAt: now,
+      });
+    }
 
     return {
       accessToken: tokenPair.accessToken,
@@ -220,11 +321,12 @@ export class AuthService {
   }
 
   private async getActiveUser(userId: string, tenantId: string): Promise<UserWithAuth> {
-    const user = await userModel.findOne({
-      _id: userId,
-      tenantId,
-      status: 'active',
-    })
+    const user = await userModel
+      .findOne({
+        _id: userId,
+        tenantId,
+        status: 'active',
+      })
       .lean<UserWithAuth>()
       .exec();
 
@@ -233,6 +335,18 @@ export class AuthService {
     }
 
     return user;
+  }
+
+  private toAuthenticatedUser(user: UserWithAuth): AuthenticatedUser {
+    return {
+      userId: user._id.toString(),
+      tenantId: user.tenantId.toString(),
+      fullName: user.fullName,
+      email: user.email,
+      roles: user.roles,
+      ...(user.clinicId ? { clinicId: user.clinicId.toString() } : {}),
+      ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
+    };
   }
 
   private toClaims(user: UserWithAuth, sessionId: string): AuthTokenClaims {

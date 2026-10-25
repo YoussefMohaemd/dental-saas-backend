@@ -129,7 +129,7 @@ export const updateOrderBodySchema = z
     isLocked: z.boolean().optional(),
     hasNotes: z.boolean().optional(),
     notes: z.string().optional(),
-    archiveDate: z.coerce.date().optional(),
+    archiveDate: z.coerce.date().nullable().optional(),
     receivedAt: z.coerce.date().optional(),
     sentAt: z.coerce.date().optional(),
     chargedAt: z.coerce.date().optional(),

@@ -1,9 +1,21 @@
-import { buildPaginationMeta, type PaginatedResult, type PaginationQuery } from '../../../shared/application/contracts/pagination';
+import {
+  buildPaginationMeta,
+  type PaginatedResult,
+  type PaginationQuery,
+} from '../../../shared/application/contracts/pagination';
 import { type DoctorDto } from '../../../shared/application/contracts/dental-api-contract';
 import { DOMAIN_ERROR_CODES, DomainError } from '../../../shared/domain/errors/domain-error';
-import { type Doctor, type DoctorListQuery, type DoctorUpdatePayload, type DoctorWritePayload } from '../domain/doctor';
+import {
+  type Doctor,
+  type DoctorListQuery,
+  type DoctorUpdatePayload,
+  type DoctorWritePayload,
+} from '../domain/doctor';
 import { type DoctorRepository } from '../domain/doctor-repository';
-import { APPLICATION_ERROR_CODES, ApplicationError } from '../../../shared/application/errors/application-error';
+import {
+  APPLICATION_ERROR_CODES,
+  ApplicationError,
+} from '../../../shared/application/errors/application-error';
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 
 export class DoctorService {
@@ -20,7 +32,10 @@ export class DoctorService {
   public async getDoctorById(doctorId: string, scope?: DataVisibilityScope): Promise<DoctorDto> {
     const doctor = await this.doctorRepository.findById(doctorId, scope);
     if (doctor === null) {
-      throw new DomainError(`Doctor ${doctorId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
+      throw new DomainError(
+        `Doctor ${doctorId} was not found`,
+        DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND,
+      );
     }
 
     return this.toDoctorDto(doctor);
@@ -61,7 +76,10 @@ export class DoctorService {
 
     const updated = await this.doctorRepository.update(doctorId, payload, scope);
     if (updated === null) {
-      throw new DomainError(`Doctor ${doctorId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
+      throw new DomainError(
+        `Doctor ${doctorId} was not found`,
+        DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND,
+      );
     }
 
     return this.toDoctorDto(updated);
@@ -70,7 +88,10 @@ export class DoctorService {
   public async deleteDoctor(doctorId: string, scope?: DataVisibilityScope): Promise<void> {
     const existing = await this.doctorRepository.findById(doctorId, scope);
     if (existing === null) {
-      throw new DomainError(`Doctor ${doctorId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
+      throw new DomainError(
+        `Doctor ${doctorId} was not found`,
+        DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND,
+      );
     }
 
     const hasPatients = await this.doctorRepository.hasPatients(doctorId);
@@ -106,7 +127,10 @@ export class DoctorService {
     }
   }
 
-  private async ensureUniqueLookupId(lookupId: string | undefined, excludeDoctorId?: string): Promise<void> {
+  private async ensureUniqueLookupId(
+    lookupId: string | undefined,
+    excludeDoctorId?: string,
+  ): Promise<void> {
     if (lookupId === undefined || lookupId.length === 0) {
       return;
     }
@@ -139,6 +163,7 @@ export class DoctorService {
       id: doctor.id,
       ...(doctor.lookupId !== undefined ? { lookupId: doctor.lookupId } : {}),
       name: doctor.name,
+      gender: doctor.gender ?? 'M',
       specialty: doctor.specialty,
       clinicId: doctor.clinicId,
       clinicName,
@@ -152,7 +177,9 @@ export class DoctorService {
   }
 }
 
-export function ensureNonEmptyDoctorUpdate<TPayload extends Record<string, unknown>>(payload: TPayload): void {
+export function ensureNonEmptyDoctorUpdate<TPayload extends Record<string, unknown>>(
+  payload: TPayload,
+): void {
   if (Object.keys(payload).length === 0) {
     throw new ApplicationError({
       message: 'At least one field must be provided for update',

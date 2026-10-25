@@ -5,7 +5,10 @@ import {
   APPLICATION_ERROR_CODES,
   ApplicationError,
 } from '../../../shared/application/errors/application-error';
-import { type PaginationMeta, type PaginationQuery } from '../../../shared/application/contracts/pagination';
+import {
+  type PaginationMeta,
+  type PaginationQuery,
+} from '../../../shared/application/contracts/pagination';
 import { buildPaginationMeta } from '../../../shared/application/contracts/pagination';
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 import { CASE_STATUSES } from '../../../shared/domain/entities/dental-data-model';
@@ -45,6 +48,91 @@ interface CasesListResult {
   pagination: PaginationMeta;
 }
 
+export interface CreateCaseInput {
+  caseNumber: string;
+  title: string;
+  patientId: string;
+  doctorId: string;
+  clinicId: string;
+  status: CaseDto['status'];
+  priority: CaseDto['priority'];
+  notes: string;
+  tenantId: Types.ObjectId;
+}
+
+export async function createCase(input: CreateCaseInput): Promise<CaseDto> {
+  const [patient, doctor, clinic] = await Promise.all([
+    PatientModel.findOne({ _id: input.patientId, tenantId: input.tenantId })
+      .select({ _id: 1, name: 1, clinicId: 1, doctorId: 1 })
+      .lean<{
+        _id: Types.ObjectId;
+        name: string;
+        clinicId: Types.ObjectId;
+        doctorId: Types.ObjectId;
+      } | null>()
+      .exec(),
+    DoctorModel.findOne({ _id: input.doctorId, tenantId: input.tenantId })
+      .select({ _id: 1, name: 1, clinicId: 1 })
+      .lean<{ _id: Types.ObjectId; name: string; clinicId: Types.ObjectId } | null>()
+      .exec(),
+    ClinicModel.findOne({ _id: input.clinicId, tenantId: input.tenantId })
+      .select({ _id: 1, name: 1 })
+      .lean<{ _id: Types.ObjectId; name: string } | null>()
+      .exec(),
+  ]);
+
+  if (!patient || !doctor || !clinic) {
+    throw new ApplicationError({
+      message: 'Patient, doctor, and clinic must be valid existing records',
+      statusCode: 422,
+      code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+      expose: true,
+    });
+  }
+
+  if (
+    patient.clinicId.toString() !== input.clinicId ||
+    patient.doctorId.toString() !== input.doctorId ||
+    doctor.clinicId.toString() !== input.clinicId
+  ) {
+    throw new ApplicationError({
+      message: 'Patient, doctor, and clinic must belong to the same care team',
+      statusCode: 422,
+      code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+      expose: true,
+    });
+  }
+
+  const duplicate = await CaseModel.exists({
+    tenantId: input.tenantId,
+    caseNumber: input.caseNumber,
+  }).exec();
+  if (duplicate) {
+    throw new ApplicationError({
+      message: `Case number '${input.caseNumber}' already exists`,
+      statusCode: 409,
+      code: APPLICATION_ERROR_CODES.CONFLICT,
+      expose: true,
+    });
+  }
+
+  const created = await CaseModel.create({
+    tenantId: input.tenantId,
+    caseNumber: input.caseNumber,
+    title: input.title,
+    patientId: input.patientId,
+    doctorId: input.doctorId,
+    clinicId: input.clinicId,
+    status: input.status,
+    priority: input.priority,
+    ordersCount: 0,
+    filesCount: 0,
+    notes: input.notes,
+  });
+
+  return getCaseById(created._id, input.tenantId);
+}
+
 export async function listCases(input: CasesListInput): Promise<CasesListResult> {
   const filter: FilterQuery<CaseRecord> = {};
   if (input.tenantId) {
@@ -58,16 +146,14 @@ export async function listCases(input: CasesListInput): Promise<CasesListResult>
 
   if (input.search) {
     const searchRegex = new RegExp(escapeRegex(input.search), 'i');
-    filter.$or = [
-      { caseNumber: searchRegex },
-      { title: searchRegex },
-      { notes: searchRegex },
-    ];
+    filter.$or = [{ caseNumber: searchRegex }, { title: searchRegex }, { notes: searchRegex }];
   }
 
   const totalItems = await CaseModel.countDocuments(filter);
   const skip = (input.pagination.page - 1) * input.pagination.pageSize;
-  const sort: Record<string, SortOrder> = { [input.sortBy]: input.sortDirection === 'asc' ? 1 : -1 };
+  const sort: Record<string, SortOrder> = {
+    [input.sortBy]: input.sortDirection === 'asc' ? 1 : -1,
+  };
 
   const records: CaseRecord[] = await CaseModel.find(filter)
     .sort(sort)
@@ -78,9 +164,18 @@ export async function listCases(input: CasesListInput): Promise<CasesListResult>
 
   const ids = collectRelatedIds(records);
   const [patients, doctors, clinics] = await Promise.all([
-    PatientModel.find({ _id: { $in: ids.patientIds } }).select({ _id: 1, name: 1 }).lean<Array<{ _id: Types.ObjectId; name: string }>>().exec(),
-    DoctorModel.find({ _id: { $in: ids.doctorIds } }).select({ _id: 1, name: 1 }).lean<Array<{ _id: Types.ObjectId; name: string }>>().exec(),
-    ClinicModel.find({ _id: { $in: ids.clinicIds } }).select({ _id: 1, name: 1 }).lean<Array<{ _id: Types.ObjectId; name: string }>>().exec(),
+    PatientModel.find({ _id: { $in: ids.patientIds } })
+      .select({ _id: 1, name: 1 })
+      .lean<Array<{ _id: Types.ObjectId; name: string }>>()
+      .exec(),
+    DoctorModel.find({ _id: { $in: ids.doctorIds } })
+      .select({ _id: 1, name: 1 })
+      .lean<Array<{ _id: Types.ObjectId; name: string }>>()
+      .exec(),
+    ClinicModel.find({ _id: { $in: ids.clinicIds } })
+      .select({ _id: 1, name: 1 })
+      .lean<Array<{ _id: Types.ObjectId; name: string }>>()
+      .exec(),
   ]);
 
   const patientById = createNameMap(patients);
@@ -117,9 +212,18 @@ export async function getCaseById(
   }
 
   const [patient, doctor, clinic] = await Promise.all([
-    PatientModel.findById(record.patientId).select({ _id: 1, name: 1 }).lean<{ _id: Types.ObjectId; name: string } | null>().exec(),
-    DoctorModel.findById(record.doctorId).select({ _id: 1, name: 1 }).lean<{ _id: Types.ObjectId; name: string } | null>().exec(),
-    ClinicModel.findById(record.clinicId).select({ _id: 1, name: 1 }).lean<{ _id: Types.ObjectId; name: string } | null>().exec(),
+    PatientModel.findById(record.patientId)
+      .select({ _id: 1, name: 1 })
+      .lean<{ _id: Types.ObjectId; name: string } | null>()
+      .exec(),
+    DoctorModel.findById(record.doctorId)
+      .select({ _id: 1, name: 1 })
+      .lean<{ _id: Types.ObjectId; name: string } | null>()
+      .exec(),
+    ClinicModel.findById(record.clinicId)
+      .select({ _id: 1, name: 1 })
+      .lean<{ _id: Types.ObjectId; name: string } | null>()
+      .exec(),
   ]);
 
   return toCaseDto(
@@ -130,10 +234,7 @@ export async function getCaseById(
   );
 }
 
-function applyScopeFilter(
-  filter: FilterQuery<CaseRecord>,
-  scope?: DataVisibilityScope,
-): void {
+function applyScopeFilter(filter: FilterQuery<CaseRecord>, scope?: DataVisibilityScope): void {
   if (!scope || scope.isAdmin) {
     return;
   }
@@ -157,9 +258,7 @@ export function parseCaseStatusFilters(value: unknown): CaseDto['status'][] | un
       : Array.isArray(value)
         ? value.filter((entry): entry is string => typeof entry === 'string')
         : [];
-  const statuses = rawStatuses
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
+  const statuses = rawStatuses.map((entry) => entry.trim()).filter((entry) => entry.length > 0);
 
   if (statuses.length === 0) {
     return undefined;

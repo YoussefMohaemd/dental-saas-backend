@@ -63,24 +63,18 @@ export class OrdersService {
       await this.ensureUniqueOrderNumber(payload.orderNumber, orderId);
     }
 
-    const requiresExistingOrder =
-      payload.status !== undefined ||
-      payload.patientId !== undefined ||
-      payload.doctorId !== undefined ||
-      payload.clinicId !== undefined;
-    const existing = requiresExistingOrder
-      ? await this.orderRepository.findOrderById(orderId, scope)
-      : null;
-
-    if (requiresExistingOrder && existing === null) {
+    const existing = await this.orderRepository.findOrderById(orderId, scope);
+    if (existing === null) {
       throw new DomainError(`Order ${orderId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
     }
 
-    if (existing !== null && payload.status !== undefined) {
+    this.assertOrderWritable(existing, payload);
+
+    if (payload.status !== undefined) {
       assertOrderStatusTransition(existing.status, payload.status);
     }
 
-    if (existing !== null && (payload.patientId !== undefined || payload.doctorId !== undefined || payload.clinicId !== undefined)) {
+    if (payload.patientId !== undefined || payload.doctorId !== undefined || payload.clinicId !== undefined) {
       await this.ensureOrderRelations(
         payload.patientId ?? existing.patientId,
         payload.doctorId ?? existing.doctorId,
@@ -97,6 +91,12 @@ export class OrdersService {
   }
 
   public async deleteOrder(orderId: string, scope?: DataVisibilityScope): Promise<void> {
+    const existing = await this.orderRepository.findOrderById(orderId, scope);
+    if (existing === null) {
+      throw new DomainError(`Order ${orderId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
+    }
+    this.assertOrderWritable(existing);
+
     const deleted = await this.orderRepository.deleteOrder(orderId, scope);
     if (!deleted) {
       throw new DomainError(`Order ${orderId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
@@ -116,7 +116,7 @@ export class OrdersService {
     payloads: SubOrderWritePayload[],
     scope?: DataVisibilityScope,
   ): Promise<SubOrderDto[]> {
-    await this.ensureOrderExists(orderId, scope);
+    await this.ensureOrderWritable(orderId, scope);
     payloads.forEach((payload) => this.assertSubOrderProgress(payload));
     const created = await this.orderRepository.createSubOrders(orderId, payloads, scope);
     return created.map((subOrder) => this.toSubOrderDto(subOrder));
@@ -127,7 +127,7 @@ export class OrdersService {
     payloads: SubOrderWritePayload[],
     scope?: DataVisibilityScope,
   ): Promise<SubOrderDto[]> {
-    await this.ensureOrderExists(orderId, scope);
+    await this.ensureOrderWritable(orderId, scope);
     payloads.forEach((payload) => this.assertSubOrderProgress(payload));
     const replaced = await this.orderRepository.replaceSubOrders(orderId, payloads, scope);
     return replaced.map((subOrder) => this.toSubOrderDto(subOrder));
@@ -139,7 +139,7 @@ export class OrdersService {
     payload: SubOrderUpdatePayload,
     scope?: DataVisibilityScope,
   ): Promise<SubOrderDto> {
-    await this.ensureOrderExists(orderId, scope);
+    await this.ensureOrderWritable(orderId, scope);
     this.assertSubOrderProgress(payload);
     const updated = await this.orderRepository.updateSubOrder(orderId, subOrderId, payload, scope);
     if (updated === null) {
@@ -174,7 +174,7 @@ export class OrdersService {
     subOrderId: string,
     scope?: DataVisibilityScope,
   ): Promise<void> {
-    await this.ensureOrderExists(orderId, scope);
+    await this.ensureOrderWritable(orderId, scope);
     const deleted = await this.orderRepository.deleteSubOrder(orderId, subOrderId, scope);
     if (!deleted) {
       throw new DomainError(
@@ -189,6 +189,34 @@ export class OrdersService {
     if (order === null) {
       throw new DomainError(`Order ${orderId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
     }
+  }
+
+  private async ensureOrderWritable(orderId: string, scope?: DataVisibilityScope): Promise<void> {
+    const order = await this.orderRepository.findOrderById(orderId, scope);
+    if (order === null) {
+      throw new DomainError(`Order ${orderId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
+    }
+    this.assertOrderWritable(order);
+  }
+
+  private assertOrderWritable(
+    order: Order,
+    payload?: OrderUpdatePayload,
+  ): void {
+    if (!order.isLocked) return;
+
+    const payloadKeys = payload
+      ? Object.keys(payload).filter((key) => payload[key as keyof OrderUpdatePayload] !== undefined)
+      : [];
+    const isUnlockOnly =
+      payloadKeys.length === 1 &&
+      payload?.isLocked === false;
+    if (isUnlockOnly) return;
+
+    throw new DomainError(
+      'Locked orders cannot be modified. Unlock the order first.',
+      DOMAIN_ERROR_CODES.BUSINESS_RULE_VIOLATION,
+    );
   }
 
   private async ensureUniqueOrderNumber(orderNumber: string, excludeOrderId?: string): Promise<void> {

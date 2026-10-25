@@ -25,6 +25,7 @@ interface DoctorSeed {
   id: string;
   lookupId?: string;
   name: string;
+  gender?: 'M' | 'F';
   specialty: string;
   clinicId: string;
   email: string;
@@ -91,6 +92,14 @@ interface SubOrderSeed {
   priority: string;
   dueDate: string;
   notes?: string;
+  creationData?: {
+    serviceId: string;
+    serviceDetails: Record<string, string>;
+    serviceForm: Record<string, string>;
+    selectedTeeth: number[];
+    scanRequirements: string[];
+    fileReferences: string[];
+  };
 }
 
 interface CaseSeed {
@@ -167,12 +176,7 @@ const fixedPlatformAdminAliasId = toObjectId('66f100000000000000000007');
 
 const passwordHasher = new PasswordHasher();
 
-const seedDataDirectory = resolve(
-  __dirname,
-  '..',
-  '..',
-  'seed-data',
-);
+const seedDataDirectory = resolve(__dirname, '..', '..', 'seed-data');
 
 function readSeedDataFile<T>(fileName: string): T {
   const filePath = resolve(seedDataDirectory, fileName);
@@ -220,24 +224,20 @@ function sizeToBytes(value: string): number {
   const amount = Number(match[1]);
   const unit = match[2];
   const multiplier =
-    unit === 'GB'
-      ? 1024 * 1024 * 1024
-      : unit === 'MB'
-        ? 1024 * 1024
-        : unit === 'KB'
-          ? 1024
-          : 1;
+    unit === 'GB' ? 1024 * 1024 * 1024 : unit === 'MB' ? 1024 * 1024 : unit === 'KB' ? 1024 : 1;
 
   return Math.round(amount * multiplier);
 }
 
 function emailLocalPartFromName(name: string): string {
-  return name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '.')
-    .replace(/^\.+|\.+$/g, '')
-    .slice(0, 48) || 'user';
+  return (
+    name
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '.')
+      .replace(/^\.+|\.+$/g, '')
+      .slice(0, 48) || 'user'
+  );
 }
 
 function buildUniqueEmail(baseLocalPart: string, usedEmails: Set<string>): string {
@@ -290,17 +290,33 @@ const seedDevelopmentData = async (): Promise<void> => {
     'Connected to MongoDB for development seeding (Angular data import)',
   );
 
-  const clinicIdMap = new Map(clinicsSource.map((item) => [item.id, objectIdFromSeed('clinic', item.id)]));
-  const doctorIdMap = new Map(doctorsSource.map((item) => [item.id, objectIdFromSeed('doctor', item.id)]));
-  const patientIdMap = new Map(patientsSource.map((item) => [item.id, objectIdFromSeed('patient', item.id)]));
-  const orderIdMap = new Map(ordersSource.map((item) => [item.id, objectIdFromSeed('order', item.id)]));
-  const subOrderIdMap = new Map(subOrdersSource.map((item) => [item.id, objectIdFromSeed('sub-order', item.id)]));
-  const caseIdMap = new Map(casesSource.map((item) => [item.id, objectIdFromSeed('case', item.id)]));
-  const billingIdMap = new Map(billingSource.map((item) => [item.id, objectIdFromSeed('billing', item.id)]));
+  const clinicIdMap = new Map(
+    clinicsSource.map((item) => [item.id, objectIdFromSeed('clinic', item.id)]),
+  );
+  const doctorIdMap = new Map(
+    doctorsSource.map((item) => [item.id, objectIdFromSeed('doctor', item.id)]),
+  );
+  const patientIdMap = new Map(
+    patientsSource.map((item) => [item.id, objectIdFromSeed('patient', item.id)]),
+  );
+  const orderIdMap = new Map(
+    ordersSource.map((item) => [item.id, objectIdFromSeed('order', item.id)]),
+  );
+  const subOrderIdMap = new Map(
+    subOrdersSource.map((item) => [item.id, objectIdFromSeed('sub-order', item.id)]),
+  );
+  const caseIdMap = new Map(
+    casesSource.map((item) => [item.id, objectIdFromSeed('case', item.id)]),
+  );
+  const billingIdMap = new Map(
+    billingSource.map((item) => [item.id, objectIdFromSeed('billing', item.id)]),
+  );
   const changeRequestIdMap = new Map(
     changeRequestsSource.map((item) => [item.id, objectIdFromSeed('change-request', item.id)]),
   );
-  const documentIdMap = new Map(documentsSource.map((item) => [item.id, objectIdFromSeed('document', item.id)]));
+  const documentIdMap = new Map(
+    documentsSource.map((item) => [item.id, objectIdFromSeed('document', item.id)]),
+  );
   const notificationIdMap = new Map(
     notificationsSource.map((item) => [item.id, objectIdFromSeed('notification', item.id)]),
   );
@@ -326,9 +342,10 @@ const seedDevelopmentData = async (): Promise<void> => {
     }
 
     const normalizedEmail = params.email?.toLowerCase().trim();
-    const email = normalizedEmail && normalizedEmail.length > 0
-      ? normalizedEmail
-      : buildUniqueEmail(emailLocalPartFromName(params.fullName), usedEmails);
+    const email =
+      normalizedEmail && normalizedEmail.length > 0
+        ? normalizedEmail
+        : buildUniqueEmail(emailLocalPartFromName(params.fullName), usedEmails);
     usedEmails.add(email);
 
     usersByKey.set(params.key, params.id);
@@ -516,6 +533,7 @@ const seedDevelopmentData = async (): Promise<void> => {
     priority: subOrder.priority,
     dueDate: requiredDate(subOrder.dueDate, `subOrder.dueDate (${subOrder.id})`),
     notes: subOrder.notes ?? '',
+    ...(subOrder.creationData !== undefined ? { creationData: subOrder.creationData } : {}),
   }));
 
   const casesDocs = casesSource.map((entry) => ({
@@ -542,9 +560,10 @@ const seedDevelopmentData = async (): Promise<void> => {
       if (!orderDocId || !sourceOrder) {
         return null;
       }
-      const normalizedInvoiceNumber = record.invoiceNumber && record.invoiceNumber.trim().length > 0
-        ? record.invoiceNumber.trim()
-        : `INV-AUTO-${record.orderId.toUpperCase()}`;
+      const normalizedInvoiceNumber =
+        record.invoiceNumber && record.invoiceNumber.trim().length > 0
+          ? record.invoiceNumber.trim()
+          : `INV-AUTO-${record.orderId.toUpperCase()}`;
 
       return {
         _id: billingIdMap.get(record.id),
@@ -556,7 +575,9 @@ const seedDevelopmentData = async (): Promise<void> => {
         amount: record.amount,
         status: record.status,
         invoiceNumber: normalizedInvoiceNumber,
-        ...(optionalDate(record.invoiceDate) ? { invoiceDate: optionalDate(record.invoiceDate) } : {}),
+        ...(optionalDate(record.invoiceDate)
+          ? { invoiceDate: optionalDate(record.invoiceDate) }
+          : {}),
         dueDate: requiredDate(record.dueDate, `billing.dueDate (${record.id})`),
         ...(optionalDate(record.paidDate) ? { paidDate: optionalDate(record.paidDate) } : {}),
         vouchers: record.vouchers ?? 0,
@@ -588,7 +609,9 @@ const seedDevelopmentData = async (): Promise<void> => {
     })
     .filter((item): item is NonNullable<typeof item> => item !== null);
 
-  const doctorIdByName = new Map(doctorsSource.map((doctor) => [doctor.name, doctorIdMap.get(doctor.id)]));
+  const doctorIdByName = new Map(
+    doctorsSource.map((doctor) => [doctor.name, doctorIdMap.get(doctor.id)]),
+  );
   const documentsDocs = documentsSource.map((document) => ({
     _id: documentIdMap.get(document.id),
     tenantId: fixedTenantId,
@@ -613,7 +636,6 @@ const seedDevelopmentData = async (): Promise<void> => {
     relatedType: notification.relatedType,
     createdAt: optionalDate(notification.createdAt),
   }));
-
 
   await Promise.all([
     notifications.deleteMany({ tenantId: fixedTenantId }),

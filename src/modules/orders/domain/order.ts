@@ -131,7 +131,7 @@ export interface OrderUpdatePayload {
   isLocked?: boolean | undefined;
   hasNotes?: boolean | undefined;
   notes?: string | undefined;
-  archiveDate?: Date | undefined;
+  archiveDate?: Date | null | undefined;
   receivedAt?: Date | undefined;
   sentAt?: Date | undefined;
   chargedAt?: Date | undefined;
