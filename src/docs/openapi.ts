@@ -494,6 +494,12 @@ const endpoints: EndpointSpec[] = [
     ],
   },
   { method: 'get', path: '/api/v1/reports/team-performance', tag: 'reports', summary: 'Get team performance report' },
+  {
+    method: 'get',
+    path: '/api/v1/reports/sub-orders',
+    tag: 'reports',
+    summary: 'Get tenant-scoped sub-order throughput report',
+  },
 
   { method: 'get', path: '/api/v1/documents', tag: 'documents', summary: 'List documents' },
   {
@@ -542,6 +548,19 @@ const endpoints: EndpointSpec[] = [
     path: '/api/v1/settings/reference-data',
     tag: 'settings',
     summary: 'Get reference datasets for settings-dependent views',
+  },
+  {
+    method: 'get',
+    path: '/api/v1/settings/preferences',
+    tag: 'settings',
+    summary: 'Get the authenticated user preferences',
+  },
+  {
+    method: 'patch',
+    path: '/api/v1/settings/preferences',
+    tag: 'settings',
+    summary: 'Update the authenticated user preferences',
+    requestBody: genericBody(),
   },
 ];
 

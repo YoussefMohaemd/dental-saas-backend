@@ -1,6 +1,5 @@
 import { type FilterQuery, type Model, type SortOrder, Types } from 'mongoose';
 
-import { InMemorySettingsStore } from '../../settings/infrastructure/settings-store';
 import { ClinicModel } from '../../../shared/infrastructure/persistence/mongoose/models/clinic.model';
 import { ChangeRequestModel } from '../../../shared/infrastructure/persistence/mongoose/models/change-request.model';
 import { DoctorModel } from '../../../shared/infrastructure/persistence/mongoose/models/doctor.model';
@@ -8,6 +7,7 @@ import { OrderModel } from '../../../shared/infrastructure/persistence/mongoose/
 import { PatientModel } from '../../../shared/infrastructure/persistence/mongoose/models/patient.model';
 import { SubOrderModel } from '../../../shared/infrastructure/persistence/mongoose/models/sub-order.model';
 import { UserModel } from '../../../shared/infrastructure/persistence/mongoose/models/user.model';
+import { ScanCenterModel } from '../../../shared/infrastructure/persistence/mongoose/models/scan-center.model';
 import { type Order, type OrderCreationData, type OrderListQuery, type OrderUpdatePayload, type OrderWritePayload } from '../domain/order';
 import {
   type DoctorReference,
@@ -16,10 +16,15 @@ import {
   type OrderRepository,
   type PatientReference,
 } from '../domain/orders-repository';
-import { type SubOrder, type SubOrderUpdatePayload, type SubOrderWritePayload } from '../domain/sub-order';
+import {
+  type SubOrder,
+  type SubOrderActivityItem,
+  type SubOrderFormItem,
+  type SubOrderScanItem,
+  type SubOrderUpdatePayload,
+  type SubOrderWritePayload,
+} from '../domain/sub-order';
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
-
-const settingsStore = new InMemorySettingsStore();
 
 const orderSortFields: Record<OrderListQuery['sortBy'], string> = {
   orderNumber: 'orderNumber',
@@ -125,9 +130,19 @@ export class MongooseOrdersRepository implements OrderRepository {
   }
 
   public async findPatientById(patientId: string, scope: DataVisibilityScope): Promise<PatientReference | null> {
-    const record = await patientModel.findOne({
+    const patientFilter: FilterQuery<PatientReferenceRecord> = {
       _id: patientId,
       tenantId: scope.tenantId,
+    };
+    if (scope.doctorId) {
+      patientFilter.doctorId = scope.doctorId;
+    }
+    if (scope.clinicId) {
+      patientFilter.clinicId = scope.clinicId;
+    }
+
+    const record = await patientModel.findOne({
+      ...patientFilter,
     })
       .select('_id name doctorId clinicId')
       .lean<PatientReferenceRecord | null>()
@@ -146,9 +161,14 @@ export class MongooseOrdersRepository implements OrderRepository {
   }
 
   public async findDoctorById(doctorId: string, scope: DataVisibilityScope): Promise<DoctorReference | null> {
+    if (scope.doctorId && scope.doctorId.toString() !== doctorId) {
+      return null;
+    }
+
     const record = await doctorModel.findOne({
       _id: doctorId,
       tenantId: scope.tenantId,
+      ...(scope.clinicId ? { clinicId: scope.clinicId } : {}),
     })
       .select('_id name clinicId')
       .lean<DoctorReferenceRecord | null>()
@@ -165,7 +185,14 @@ export class MongooseOrdersRepository implements OrderRepository {
   }
 
   public async clinicExists(clinicId: string, scope: DataVisibilityScope): Promise<boolean> {
-    const clinic = await clinicModel.findOne({ _id: clinicId, tenantId: scope.tenantId })
+    if (scope.clinicId && scope.clinicId.toString() !== clinicId) {
+      return false;
+    }
+
+    const clinic = await clinicModel.findOne({
+      _id: clinicId,
+      tenantId: scope.tenantId,
+    })
       .select('_id')
       .lean()
       .exec();
@@ -204,8 +231,11 @@ export class MongooseOrdersRepository implements OrderRepository {
     const technicianIds = uniqueObjectIds(
       orders.map((order) => order.technicianId).filter((value): value is string => value !== undefined),
     );
+    const scanCenterIds = orders
+      .map((order) => order.scanCenterId)
+      .filter((value): value is string => value !== undefined);
 
-    const [patients, doctors, clinics, technicians] = await Promise.all([
+    const [patients, doctors, clinics, technicians, scanCenters] = await Promise.all([
       patientIds.length === 0
         ? Promise.resolve([] as PatientNameRecord[])
         : patientModel.find({ _id: { $in: patientIds }, tenantId: scope.tenantId })
@@ -230,6 +260,15 @@ export class MongooseOrdersRepository implements OrderRepository {
           .select('_id fullName')
           .lean<TechnicianNameRecord[]>()
           .exec(),
+      scanCenterIds.length === 0
+        ? Promise.resolve([] as ScanCenterNameRecord[])
+        : ScanCenterModel.find({
+            tenantId: scope.tenantId,
+            externalId: { $in: scanCenterIds },
+          })
+          .select('externalId name')
+          .lean<ScanCenterNameRecord[]>()
+          .exec(),
     ]);
 
     return {
@@ -237,12 +276,8 @@ export class MongooseOrdersRepository implements OrderRepository {
       doctorById: new Map(doctors.map((item) => [item._id.toString(), item.name])),
       clinicById: new Map(clinics.map((item) => [item._id.toString(), item.name])),
       technicianById: new Map(technicians.map((item) => [item._id.toString(), item.fullName])),
+      scanCenterById: new Map(scanCenters.map((item) => [item.externalId, item.name])),
     };
-  }
-
-  public findScanCenterNameById(scanCenterId: string): string | null {
-    const scanCenter = settingsStore.getSnapshot().scanCenters.find((item) => item.id === scanCenterId);
-    return scanCenter?.name ?? null;
   }
 
   public async listSubOrders(orderId: string, scope: DataVisibilityScope): Promise<SubOrder[]> {
@@ -345,6 +380,15 @@ export class MongooseOrdersRepository implements OrderRepository {
     }
     if (payload.creationData !== undefined) {
       update.creationData = normalizeSubOrderCreationData(payload.creationData);
+    }
+    if (payload.forms !== undefined) {
+      update.forms = payload.forms;
+    }
+    if (payload.scans !== undefined) {
+      update.scans = payload.scans;
+    }
+    if (payload.activity !== undefined) {
+      update.activity = payload.activity;
     }
 
     const updated = await subOrderModel.findOneAndUpdate(
@@ -551,6 +595,9 @@ export class MongooseOrdersRepository implements OrderRepository {
       ...(payload.creationData !== undefined
         ? { creationData: normalizeSubOrderCreationData(payload.creationData) }
         : {}),
+      ...(payload.forms !== undefined ? { forms: payload.forms } : {}),
+      ...(payload.scans !== undefined ? { scans: payload.scans } : {}),
+      ...(payload.activity !== undefined ? { activity: payload.activity } : {}),
     };
   }
 
@@ -609,6 +656,9 @@ export class MongooseOrdersRepository implements OrderRepository {
       ...(document.creationData !== undefined
         ? { creationData: normalizeSubOrderCreationData(document.creationData) }
         : {}),
+      ...(document.forms !== undefined ? { forms: normalizeSubOrderForms(document.forms) } : {}),
+      ...(document.scans !== undefined ? { scans: document.scans } : {}),
+      ...(document.activity !== undefined ? { activity: document.activity } : {}),
       createdAt: document.createdAt,
       updatedAt: document.updatedAt,
     };
@@ -690,6 +740,9 @@ interface SubOrderRecord {
     scanRequirements: string[];
     fileReferences: string[];
   } | undefined;
+  forms?: SubOrderFormItem[] | undefined;
+  scans?: SubOrderScanItem[] | undefined;
+  activity?: SubOrderActivityItem[] | undefined;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -725,6 +778,11 @@ interface ClinicNameRecord {
 interface TechnicianNameRecord {
   _id: Types.ObjectId;
   fullName: string;
+}
+
+interface ScanCenterNameRecord {
+  externalId: string;
+  name: string;
 }
 
 const orderModel = OrderModel as unknown as Model<OrderRecord>;
@@ -817,6 +875,22 @@ function normalizeSubOrderCreationData(input: {
     scanRequirements: input.scanRequirements,
     fileReferences: input.fileReferences,
   };
+}
+
+function normalizeSubOrderForms(forms: SubOrderFormItem[]): SubOrderFormItem[] {
+  return forms.map((form) => {
+    if (form.value === undefined) {
+      return form;
+    }
+
+    return {
+      ...form,
+      value: {
+        ...form.value,
+        values: mapOfStringsToRecord(form.value.values),
+      },
+    };
+  });
 }
 
 function mapOfStringsToRecord(

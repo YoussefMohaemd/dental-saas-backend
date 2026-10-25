@@ -11,8 +11,8 @@ const usersController = new UsersController(
   new UserService(new MongooseUserRepository()),
 );
 
-usersRouter.get('/users', requireAuthenticated, usersController.listUsers);
-usersRouter.get('/users/:userId', requireAuthenticated, usersController.getUserById);
+usersRouter.get('/users', requireAuthenticated, requireAnyRole(['admin', 'staff']), usersController.listUsers);
+usersRouter.get('/users/:userId', requireAuthenticated, requireAnyRole(['admin', 'staff']), usersController.getUserById);
 usersRouter.post('/users', requireAuthenticated, requireAnyRole(['admin']), usersController.createUser);
 usersRouter.patch(
   '/users/:userId/role-status',

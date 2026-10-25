@@ -1,5 +1,6 @@
 import { Router } from 'express';
 
+import { requireAnyRole } from '../../auth/presentation/auth.middleware';
 import { DoctorService } from '../application/doctor-service';
 import { MongooseDoctorRepository } from '../infrastructure/mongoose-doctor-repository';
 import { DoctorsController } from './doctors.controller';
@@ -11,10 +12,9 @@ const doctorsController = new DoctorsController(
 );
 
 doctorsRouter.get('/doctors', doctorsController.listDoctors);
-doctorsRouter.post('/doctors', doctorsController.createDoctor);
+doctorsRouter.post('/doctors', requireAnyRole(['admin', 'staff']), doctorsController.createDoctor);
 doctorsRouter.get('/doctors/:doctorId', doctorsController.getDoctorById);
-doctorsRouter.patch('/doctors/:doctorId', doctorsController.updateDoctor);
-doctorsRouter.delete('/doctors/:doctorId', doctorsController.deleteDoctor);
+doctorsRouter.patch('/doctors/:doctorId', requireAnyRole(['admin', 'staff']), doctorsController.updateDoctor);
+doctorsRouter.delete('/doctors/:doctorId', requireAnyRole(['admin', 'staff']), doctorsController.deleteDoctor);
 
 export { doctorsRouter };
-

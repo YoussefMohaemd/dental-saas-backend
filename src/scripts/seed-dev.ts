@@ -166,6 +166,11 @@ interface NotificationSeed {
 
 interface ScanCenterSeed {
   id: string;
+  name?: string;
+  location?: string;
+  operator?: string;
+  devices?: number;
+  status?: 'Operational' | 'Maintenance';
 }
 
 const toObjectId = (value: string): mongoose.Types.ObjectId => new mongoose.Types.ObjectId(value);
@@ -175,6 +180,33 @@ const fixedTechnicianUserId = toObjectId('66f100000000000000000006');
 const fixedPlatformAdminAliasId = toObjectId('66f100000000000000000007');
 
 const passwordHasher = new PasswordHasher();
+
+const defaultScanCenterDetails: Record<
+  string,
+  Omit<Required<ScanCenterSeed>, 'id'>
+> = {
+  'scan-center-1': {
+    name: 'Cairo Digital Scanning',
+    location: 'Cairo Lab Campus',
+    operator: 'Karim Fathy',
+    devices: 6,
+    status: 'Operational',
+  },
+  'scan-center-2': {
+    name: 'Nile 3D Imaging',
+    location: 'Giza Production Hub',
+    operator: 'Salma Adel',
+    devices: 4,
+    status: 'Operational',
+  },
+  'scan-center-3': {
+    name: 'Delta Scan Center',
+    location: 'Mansoura Clinic Network',
+    operator: 'Hassan Mahmoud',
+    devices: 3,
+    status: 'Maintenance',
+  },
+};
 
 const seedDataDirectory = resolve(__dirname, '..', '..', 'seed-data');
 
@@ -280,6 +312,7 @@ const seedDevelopmentData = async (): Promise<void> => {
     changeRequests,
     documents,
     notifications,
+    scanCenters,
   } = registerPersistenceModels();
 
   const defaultPasswordHash = await passwordHasher.hash('ChangeMe123!');
@@ -637,6 +670,26 @@ const seedDevelopmentData = async (): Promise<void> => {
     createdAt: optionalDate(notification.createdAt),
   }));
 
+  const scanCentersDocs = scanCentersSource.map((scanCenter) => {
+    const defaults = defaultScanCenterDetails[scanCenter.id] ?? {
+      name: scanCenter.id,
+      location: 'Unassigned',
+      operator: 'Unassigned',
+      devices: 0,
+      status: 'Maintenance' as const,
+    };
+
+    return {
+      tenantId: fixedTenantId,
+      externalId: scanCenter.id,
+      name: scanCenter.name ?? defaults.name,
+      location: scanCenter.location ?? defaults.location,
+      operator: scanCenter.operator ?? defaults.operator,
+      devices: scanCenter.devices ?? defaults.devices,
+      status: scanCenter.status ?? defaults.status,
+    };
+  });
+
   await Promise.all([
     notifications.deleteMany({ tenantId: fixedTenantId }),
     documents.deleteMany({ tenantId: fixedTenantId }),
@@ -648,6 +701,7 @@ const seedDevelopmentData = async (): Promise<void> => {
     patients.deleteMany({ tenantId: fixedTenantId }),
     doctors.deleteMany({ tenantId: fixedTenantId }),
     clinics.deleteMany({ tenantId: fixedTenantId }),
+    scanCenters.deleteMany({ tenantId: fixedTenantId }),
     users.deleteMany({ tenantId: fixedTenantId }),
   ]);
 
@@ -663,6 +717,7 @@ const seedDevelopmentData = async (): Promise<void> => {
     changeRequests.insertMany(changeRequestsDocs),
     documents.insertMany(documentsDocs),
     notifications.insertMany(notificationsDocs),
+    scanCenters.insertMany(scanCentersDocs),
   ]);
 
   logger.info(

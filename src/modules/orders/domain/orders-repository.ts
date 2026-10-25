@@ -25,6 +25,7 @@ export interface NameReferences {
   doctorById: Map<string, string>;
   clinicById: Map<string, string>;
   technicianById: Map<string, string>;
+  scanCenterById: Map<string, string>;
 }
 
 export interface OrderRepository {
@@ -40,7 +41,6 @@ export interface OrderRepository {
   technicianExists(technicianId: string, scope: DataVisibilityScope): Promise<boolean>;
   changeRequestExists(changeRequestId: string, scope: DataVisibilityScope): Promise<boolean>;
   getNameReferences(orders: Order[], scope: DataVisibilityScope): Promise<NameReferences>;
-  findScanCenterNameById(scanCenterId: string): string | null;
   listSubOrders(orderId: string, scope: DataVisibilityScope): Promise<SubOrder[]>;
   findSubOrderById(orderId: string, subOrderId: string, scope: DataVisibilityScope): Promise<SubOrder | null>;
   createSubOrders(orderId: string, payloads: SubOrderWritePayload[], scope: DataVisibilityScope): Promise<SubOrder[]>;

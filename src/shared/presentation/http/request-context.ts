@@ -23,7 +23,10 @@ export type AuthenticatedRequest = RequestWithContext & {
 
 export function requestContextMiddleware(req: Request, _res: Response, next: NextFunction): void {
   const requestIdHeader = req.header('x-request-id');
-  const requestId = requestIdHeader && requestIdHeader.length > 0 ? requestIdHeader : undefined;
+  const requestId =
+    requestIdHeader && /^[A-Za-z0-9._:-]{1,128}$/.test(requestIdHeader)
+      ? requestIdHeader
+      : undefined;
 
   const requestWithContext = req as RequestWithContext;
   requestWithContext.context = {

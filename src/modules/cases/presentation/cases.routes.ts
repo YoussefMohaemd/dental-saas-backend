@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 
+import { requireAnyRole } from '../../auth/presentation/auth.middleware';
 import { sendOk } from '../../../shared/presentation/http/api-response';
 import {
   baseListQuerySchema,
@@ -36,7 +37,7 @@ const createCaseBodySchema = z
   })
   .strict();
 
-casesRouter.post('/cases', async (req, res) => {
+casesRouter.post('/cases', requireAnyRole(['admin', 'staff', 'doctor', 'technician']), async (req, res) => {
   const payload = createCaseBodySchema.parse(req.body);
   const scope = await getAuthenticatedDataScope(req);
   const created = await createCase({

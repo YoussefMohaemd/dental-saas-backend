@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 
+import { requireAnyRole } from '../../auth/presentation/auth.middleware';
 import { sendCreated, sendNoContent, sendOk } from '../../../shared/presentation/http/api-response';
 import {
   baseListQuerySchema,
@@ -54,7 +55,7 @@ documentsRouter.get('/documents/:documentId', async (req, res) => {
   sendOk(res, data, buildRequestMeta(req));
 });
 
-documentsRouter.post('/documents', async (req, res) => {
+documentsRouter.post('/documents', requireAnyRole(['admin', 'staff', 'doctor', 'technician']), async (req, res) => {
   const payload = parseCreateDocumentPayload(req.body);
   const scope = await getAuthenticatedDataScope(req);
   const data = await createDocument(payload, scope);
@@ -62,7 +63,7 @@ documentsRouter.post('/documents', async (req, res) => {
   sendCreated(res, data, buildRequestMeta(req));
 });
 
-documentsRouter.delete('/documents/:documentId', async (req, res) => {
+documentsRouter.delete('/documents/:documentId', requireAnyRole(['admin', 'staff', 'doctor', 'technician']), async (req, res) => {
   const params = z.object({ documentId: z.string() }).parse(req.params);
   const documentId = ensureObjectId(params.documentId, 'document id');
   const scope = await getAuthenticatedDataScope(req);

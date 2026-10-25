@@ -31,7 +31,6 @@ interface DocumentRecord {
   clinicId?: Types.ObjectId;
   orderId?: Types.ObjectId;
   subOrderId?: Types.ObjectId;
-  uploadedBy: Types.ObjectId;
 }
 
 const optionalObjectIdString = z
@@ -50,7 +49,6 @@ const createDocumentSchema = z.object({
   clinicId: optionalObjectIdString,
   orderId: optionalObjectIdString,
   subOrderId: optionalObjectIdString,
-  uploadedBy: z.string().regex(/^[a-f\d]{24}$/i, 'Expected ObjectId string'),
 }).strict();
 
 export function parseDocumentCategoryFilters(value: unknown): DocumentDto['category'][] | undefined {
@@ -163,7 +161,7 @@ export async function createDocument(
           .exec()
           .then((record) => Boolean(record))
       : Promise.resolve(true),
-    UserModel.exists({ _id: new Types.ObjectId(payload.uploadedBy), tenantId })
+    UserModel.exists({ _id: scope.userId, tenantId })
       .exec()
       .then((record) => Boolean(record)),
   ]);
@@ -190,7 +188,7 @@ export async function createDocument(
       clinicId: payload.clinicId ? new Types.ObjectId(payload.clinicId) : undefined,
       orderId: payload.orderId ? new Types.ObjectId(payload.orderId) : undefined,
       subOrderId: payload.subOrderId ? new Types.ObjectId(payload.subOrderId) : undefined,
-      uploadedBy: new Types.ObjectId(payload.uploadedBy),
+      uploadedBy: scope.userId,
     })) as { _id: Types.ObjectId }
   )._id;
 

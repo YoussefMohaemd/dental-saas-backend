@@ -6,70 +6,64 @@ import {
   ApplicationError,
 } from '../../../shared/application/errors/application-error';
 import {
+  buildRequestMeta,
   createPaginationMeta,
+  getAuthenticatedDataScope,
   parsePaginationQuery,
   parseSort,
-  buildRequestMeta,
 } from '../../../shared/presentation/http/http-utils';
 import { sendOk } from '../../../shared/presentation/http/api-response';
-import { InMemorySettingsStore } from '../../settings/infrastructure/settings-store';
+import { MongooseScanCenterRepository } from '../infrastructure/mongoose-scan-center-repository';
 
 const scanCentersRouter = Router();
-const settingsStore = new InMemorySettingsStore();
+const scanCenterRepository = new MongooseScanCenterRepository();
 
 const scanCentersListSchema = z.object({
   search: z.string().trim().min(1).optional(),
   page: z.coerce.number().int().min(1).optional(),
   pageSize: z.coerce.number().int().min(1).optional(),
-  sortBy: z.enum(['name', 'location', 'operator', 'devices', 'activeOrders', 'completedToday', 'status']).optional(),
+  sortBy: z.enum(['name', 'location', 'operator', 'devices', 'status']).optional(),
   sortDirection: z.enum(['asc', 'desc']).optional(),
   status: z.string().optional(),
 });
 
-scanCentersRouter.get('/scan-centers', (req, res) => {
+scanCentersRouter.get('/scan-centers', async (req, res) => {
   const query = scanCentersListSchema.parse(req.query);
   const pagination = parsePaginationQuery(query);
-  const sort = parseSort(query, ['name', 'location', 'operator', 'devices', 'activeOrders', 'completedToday', 'status'], 'name');
+  const sort = parseSort(
+    query,
+    ['name', 'location', 'operator', 'devices', 'status'],
+    'name',
+  );
   const statuses = query.status
     ?.split(',')
     .map((item) => item.trim())
     .filter((item) => item.length > 0);
+  const result = await scanCenterRepository.list(
+    {
+      ...(query.search ? { search: query.search } : {}),
+      ...(statuses ? { statuses } : {}),
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+      sortBy: sort.sortBy as 'name' | 'location' | 'operator' | 'devices' | 'status',
+      sortDirection: sort.sortDirection,
+    },
+    await getAuthenticatedDataScope(req),
+  );
 
-  let items = settingsStore.getSnapshot().scanCenters;
-
-  if (statuses && statuses.length > 0) {
-    items = items.filter((item) => statuses.includes(item.status));
-  }
-
-  if (query.search) {
-    const normalizedSearch = query.search.toLowerCase();
-    items = items.filter((item) =>
-      [item.name, item.location, item.operator, item.status]
-        .join(' ')
-        .toLowerCase()
-        .includes(normalizedSearch),
-    );
-  }
-
-  items = [...items].sort((left, right) => {
-    const leftValue = getSortableFieldValue(left, sort.sortBy);
-    const rightValue = getSortableFieldValue(right, sort.sortBy);
-    return compareValues(leftValue, rightValue, sort.sortDirection);
-  });
-
-  const totalItems = items.length;
-  const startIndex = (pagination.page - 1) * pagination.pageSize;
-  const pagedItems = items.slice(startIndex, startIndex + pagination.pageSize);
-  const paginationMeta = createPaginationMeta(totalItems, pagination);
-
-  sendOk(res, pagedItems, buildRequestMeta(req, paginationMeta));
+  sendOk(
+    res,
+    result.items,
+    buildRequestMeta(req, createPaginationMeta(result.totalItems, pagination)),
+  );
 });
 
-scanCentersRouter.get('/scan-centers/:scanCenterId', (req, res) => {
+scanCentersRouter.get('/scan-centers/:scanCenterId', async (req, res) => {
   const params = z.object({ scanCenterId: z.string().trim().min(1) }).parse(req.params);
-  const scanCenter = settingsStore
-    .getSnapshot()
-    .scanCenters.find((item) => item.id === params.scanCenterId);
+  const scanCenter = await scanCenterRepository.findById(
+    params.scanCenterId,
+    await getAuthenticatedDataScope(req),
+  );
 
   if (!scanCenter) {
     throw new ApplicationError({
@@ -82,50 +76,5 @@ scanCentersRouter.get('/scan-centers/:scanCenterId', (req, res) => {
 
   sendOk(res, scanCenter, buildRequestMeta(req));
 });
-
-function compareValues(
-  left: string | number,
-  right: string | number,
-  direction: 'asc' | 'desc',
-): number {
-  const multiplier = direction === 'asc' ? 1 : -1;
-  if (typeof left === 'number' && typeof right === 'number') {
-    return (left - right) * multiplier;
-  }
-
-  return String(left).localeCompare(String(right)) * multiplier;
-}
-
-function getSortableFieldValue(
-  item: {
-    name: string;
-    location: string;
-    operator: string;
-    devices: number;
-    activeOrders: number;
-    completedToday: number;
-    status: string;
-  },
-  sortBy: string,
-): string | number {
-  switch (sortBy) {
-    case 'name':
-      return item.name;
-    case 'location':
-      return item.location;
-    case 'operator':
-      return item.operator;
-    case 'devices':
-      return item.devices;
-    case 'activeOrders':
-      return item.activeOrders;
-    case 'completedToday':
-      return item.completedToday;
-    case 'status':
-      return item.status;
-    default:
-      return item.name;
-  }
-}
 
 export { scanCentersRouter };

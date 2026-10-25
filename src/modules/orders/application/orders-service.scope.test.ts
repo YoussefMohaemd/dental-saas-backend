@@ -93,6 +93,7 @@ class RecordingOrdersRepository implements OrderRepository {
       doctorById: new Map([['66f100000000000000000011', 'Doctor']]),
       clinicById: new Map([['66f100000000000000000012', 'Clinic']]),
       technicianById: new Map<string, string>(),
+      scanCenterById: new Map<string, string>(),
     };
   }
 

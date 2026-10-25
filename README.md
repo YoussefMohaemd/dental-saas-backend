@@ -63,6 +63,9 @@ Copy `.env.example` to `.env` and adjust values as needed.
 - Spec includes all implemented endpoint groups: auth, users, clinics, doctors,
   patients, orders/sub-orders, cases, billing, change-requests, scan-centers,
   reports, documents, notifications, settings, and health.
+- Reporting includes `GET /api/v1/reports/sub-orders`, a tenant-scoped
+  operational report for sub-order status, service throughput, overdue work,
+  and priority breakdowns.
 - Auth-protected routes declare `bearerAuth` (JWT) and admin-only operations
   include explicit role requirements in operation metadata/description.
 - Tenant/user scope for `/api/v1/**` is derived from authenticated JWT claims,

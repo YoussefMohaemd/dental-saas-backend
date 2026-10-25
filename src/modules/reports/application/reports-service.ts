@@ -5,8 +5,9 @@ import { BillingRecordModel } from '../../../shared/infrastructure/persistence/m
 import { DoctorModel } from '../../../shared/infrastructure/persistence/mongoose/models/doctor.model';
 import { OrderModel } from '../../../shared/infrastructure/persistence/mongoose/models/order.model';
 import { PatientModel } from '../../../shared/infrastructure/persistence/mongoose/models/patient.model';
+import { ScanCenterModel } from '../../../shared/infrastructure/persistence/mongoose/models/scan-center.model';
+import { SubOrderModel } from '../../../shared/infrastructure/persistence/mongoose/models/sub-order.model';
 import { UserModel } from '../../../shared/infrastructure/persistence/mongoose/models/user.model';
-import { InMemorySettingsStore } from '../../settings/infrastructure/settings-store';
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 
 interface OrderProjection {
@@ -27,8 +28,6 @@ interface OrderProjection {
   status: string;
   technicianId?: Types.ObjectId;
 }
-
-const settingsStore = new InMemorySettingsStore();
 
 export async function getDashboardVolume(
   tenantId?: Types.ObjectId,
@@ -179,12 +178,26 @@ export async function getOrdersRangeReport(input: {
     .lean<OrderProjection[]>()
     .exec();
 
-  const settingsSnapshot = settingsStore.getSnapshot();
-  const scanCenterMap = new Map(
-    settingsSnapshot.scanCenters.map((scanCenter) => [scanCenter.id, scanCenter]),
+  const scanCenterRecords = await ScanCenterModel.find({
+    ...(input.tenantId ? { tenantId: input.tenantId } : {}),
+    externalId: { $in: records.map((record) => record.scanCenterId).filter(Boolean) },
+  })
+    .select({ externalId: 1, name: 1, operator: 1 })
+    .lean<Array<{ externalId: string; name: string; operator: string }>>()
+    .exec();
+  const scanCenterMap = new Map(scanCenterRecords.map((scanCenter) => [scanCenter.externalId, scanCenter]));
+  const patientMap = await buildNameMap(
+    PatientModel,
+    records.map((record) => record.patientId),
+    'name',
+    input.tenantId,
   );
-  const patientMap = await buildNameMap(PatientModel, records.map((record) => record.patientId), 'name');
-  const doctorMap = await buildNameMap(DoctorModel, records.map((record) => record.doctorId), 'name');
+  const doctorMap = await buildNameMap(
+    DoctorModel,
+    records.map((record) => record.doctorId),
+    'name',
+    input.tenantId,
+  );
 
   let items = records.map((record) => {
     const scanCenterKey = record.scanCenterId?.toString();
@@ -234,7 +247,12 @@ export async function getOrdersRangeReport(input: {
   };
 }
 
-export function getQuarterlyTargets(year: number, quarter?: 1 | 2 | 3 | 4): {
+export async function getQuarterlyTargets(
+  year: number,
+  quarter?: 1 | 2 | 3 | 4,
+  tenantId?: Types.ObjectId,
+  scope?: DataVisibilityScope,
+): Promise<{
   year: number;
   quarters: Array<{
     quarter: 1 | 2 | 3 | 4;
@@ -244,11 +262,64 @@ export function getQuarterlyTargets(year: number, quarter?: 1 | 2 | 3 | 4): {
     ordersCompleted: number;
     completionRate: number;
   }>;
-} {
-  const records = settingsStore
-    .getSnapshot()
-    .quarterlyTargets.filter((item) => item.year === year && (quarter ? item.quarter === quarter : true))
-    .sort((left, right) => left.quarter - right.quarter);
+}> {
+  const filter = buildScopedFilter(tenantId, scope);
+  const [orders, billingRecords] = await Promise.all([
+    OrderModel.find({
+      ...filter,
+      receivedAt: {
+        $gte: new Date(Date.UTC(year, 0, 1)),
+        $lt: new Date(Date.UTC(year + 1, 0, 1)),
+      },
+    })
+      .select({ receivedAt: 1, status: 1 })
+      .lean<Array<{ receivedAt: Date; status: string }>>()
+      .exec(),
+    BillingRecordModel.find({
+      ...filter,
+      $or: [
+        {
+          invoiceDate: {
+            $gte: new Date(Date.UTC(year, 0, 1)),
+            $lt: new Date(Date.UTC(year + 1, 0, 1)),
+          },
+        },
+        {
+          invoiceDate: { $exists: false },
+          dueDate: {
+            $gte: new Date(Date.UTC(year, 0, 1)),
+            $lt: new Date(Date.UTC(year + 1, 0, 1)),
+          },
+        },
+      ],
+    })
+      .select({ amount: 1, invoiceDate: 1, dueDate: 1 })
+      .lean<Array<{ amount: number; invoiceDate?: Date; dueDate: Date }>>()
+      .exec(),
+  ]);
+  const records = [1, 2, 3, 4]
+    .map((quarterNumber) => {
+      const quarterStartMonth = (quarterNumber - 1) * 3;
+      const start = new Date(Date.UTC(year, quarterStartMonth, 1));
+      const end = new Date(Date.UTC(year, quarterStartMonth + 3, 1));
+      const quarterOrders = orders.filter(
+        (order) => order.receivedAt >= start && order.receivedAt < end,
+      );
+      const revenue = billingRecords
+        .filter((record) => {
+          const sourceDate = record.invoiceDate ?? record.dueDate;
+          return sourceDate >= start && sourceDate < end;
+        })
+        .reduce((total, record) => total + (Number(record.amount) || 0), 0);
+      return {
+        quarter: quarterNumber as 1 | 2 | 3 | 4,
+        targetRevenue: 0,
+        achievedRevenue: Number(revenue.toFixed(2)),
+        ordersTarget: 0,
+        ordersCompleted: quarterOrders.filter((order) => order.status === 'Completed').length,
+      };
+    })
+    .filter((record) => quarter === undefined || record.quarter === quarter);
 
   return {
     year,
@@ -258,7 +329,9 @@ export function getQuarterlyTargets(year: number, quarter?: 1 | 2 | 3 | 4): {
       achievedRevenue: record.achievedRevenue,
       ordersTarget: record.ordersTarget,
       ordersCompleted: record.ordersCompleted,
-      completionRate: Number(((record.ordersCompleted / Math.max(1, record.ordersTarget)) * 100).toFixed(1)),
+      completionRate: record.ordersTarget === 0
+        ? 0
+        : Number(((record.ordersCompleted / record.ordersTarget) * 100).toFixed(1)),
     })),
   };
 }
@@ -268,7 +341,7 @@ export async function getTeamPerformance(
   scope?: DataVisibilityScope,
 ): Promise<{
   records: Array<{
-    userId: number;
+    userId: string;
     type: string;
     fullName: string;
     completedOrders: number;
@@ -278,7 +351,6 @@ export async function getTeamPerformance(
     status: 'Active' | 'On Leave';
   }>;
 }> {
-  const baseMembers = settingsStore.getSnapshot().teamMembers;
   const filter = buildScopedFilter(tenantId, scope);
   const orders: Array<{
     technicianId?: Types.ObjectId;
@@ -292,7 +364,16 @@ export async function getTeamPerformance(
     .lean<Array<{ technicianId?: Types.ObjectId; status: string; amount: number; dueDate: Date; sentAt?: Date; receivedAt: Date }>>()
     .exec();
 
-  const userMap = await buildNameMap(UserModel, orders.map((order) => order.technicianId).filter(Boolean) as Types.ObjectId[], 'fullName');
+  const technicianIds = orders
+    .map((order) => order.technicianId)
+    .filter((value): value is Types.ObjectId => value !== undefined);
+  const technicians = await UserModel.find({
+    ...(tenantId ? { tenantId } : {}),
+    _id: { $in: technicianIds },
+  })
+    .select({ _id: 1, fullName: 1, roles: 1, status: 1 })
+    .lean<Array<{ _id: Types.ObjectId; fullName: string; roles: string[]; status: string }>>()
+    .exec();
   const byTechnician = new Map<
     string,
     { completedOrders: number; revenueCollected: number; onTimeCompleted: number; totalWithSentAt: number; totalTurnaround: number }
@@ -332,20 +413,23 @@ export async function getTeamPerformance(
     byTechnician.set(technicianId, aggregate);
   }
 
-  const technicianMetrics = [...byTechnician.entries()].map(([technicianId, aggregate]) => ({
-    technicianId,
-    aggregate,
-    fullName: userMap.get(technicianId),
-  }));
-
-  const records = baseMembers.map((member, index) => {
-    const metrics = technicianMetrics[index];
-    const aggregate = metrics?.aggregate;
+  const records = technicians.map((member): {
+    userId: string;
+    type: string;
+    fullName: string;
+    completedOrders: number;
+    revenueCollected: number;
+    avgTurnaroundDays: number;
+    onTimeRate: number;
+    status: 'Active' | 'On Leave';
+  } => {
+    const metrics = byTechnician.get(member._id.toString());
+    const aggregate = metrics;
 
     return {
-      userId: member.userId,
-      type: member.type,
-      fullName: metrics?.fullName ?? member.fullName,
+      userId: member._id.toString(),
+      type: member.roles[0] ?? 'technician',
+      fullName: member.fullName,
       completedOrders: aggregate?.completedOrders ?? 0,
       revenueCollected: aggregate ? Number(aggregate.revenueCollected.toFixed(2)) : 0,
       avgTurnaroundDays: aggregate
@@ -354,11 +438,135 @@ export async function getTeamPerformance(
       onTimeRate: aggregate
         ? Number(((aggregate.onTimeCompleted / Math.max(1, aggregate.totalWithSentAt)) * 100).toFixed(1))
         : 0,
-      status: member.status,
+      status: member.status === 'active' ? 'Active' : 'On Leave',
     };
   });
 
   return { records };
+}
+
+export async function getSubOrderReport(input: {
+  from?: Date | undefined;
+  to?: Date | undefined;
+  statuses?: Array<'done' | 'in-progress' | 'pending' | 'blocked'> | undefined;
+  service?: string | undefined;
+  tenantId?: Types.ObjectId;
+  scope?: DataVisibilityScope;
+}): Promise<{
+  summary: {
+    total: number;
+    completed: number;
+    inProgress: number;
+    pending: number;
+    blocked: number;
+    overdue: number;
+    completionRate: number;
+  };
+  byService: Array<{
+    service: string;
+    total: number;
+    completed: number;
+    inProgress: number;
+    pending: number;
+    blocked: number;
+    overdue: number;
+    completionRate: number;
+  }>;
+  byPriority: Array<{
+    priority: string;
+    total: number;
+    completed: number;
+    overdue: number;
+  }>;
+}> {
+  const orderFilter = buildScopedFilter(input.tenantId, input.scope);
+  const orders = await OrderModel.find(orderFilter)
+    .select({ _id: 1 })
+    .lean<Array<{ _id: Types.ObjectId }>>()
+    .exec();
+  const subOrderFilter: Record<string, unknown> = {
+    ...(input.tenantId ? { tenantId: input.tenantId } : {}),
+    orderId: { $in: orders.map((order) => order._id) },
+  };
+
+  if (input.from !== undefined || input.to !== undefined) {
+    subOrderFilter.dueDate = {
+      ...(input.from !== undefined ? { $gte: input.from } : {}),
+      ...(input.to !== undefined ? { $lte: input.to } : {}),
+    };
+  }
+  if (input.statuses !== undefined && input.statuses.length > 0) {
+    subOrderFilter.status = { $in: input.statuses };
+  }
+  if (input.service !== undefined && input.service.trim().length > 0) {
+    subOrderFilter.service = new RegExp(escapeRegExp(input.service.trim()), 'i');
+  }
+
+  const records = await SubOrderModel.find(subOrderFilter)
+    .select({ service: 1, status: 1, priority: 1, dueDate: 1 })
+    .lean<Array<{
+      service: string;
+      status: 'done' | 'in-progress' | 'pending' | 'blocked';
+      priority: string;
+      dueDate: Date;
+    }>>()
+    .exec();
+  const now = new Date();
+  const isOverdue = (record: { status: string; dueDate: Date }) =>
+    record.status !== 'done' && record.dueDate < now;
+
+  const summary = {
+    total: records.length,
+    completed: records.filter((record) => record.status === 'done').length,
+    inProgress: records.filter((record) => record.status === 'in-progress').length,
+    pending: records.filter((record) => record.status === 'pending').length,
+    blocked: records.filter((record) => record.status === 'blocked').length,
+    overdue: records.filter(isOverdue).length,
+    completionRate: 0,
+  };
+  summary.completionRate = summary.total === 0
+    ? 0
+    : Number(((summary.completed / summary.total) * 100).toFixed(1));
+
+  const serviceGroups = new Map<string, typeof summary & { service: string }>();
+  const priorityGroups = new Map<string, { priority: string; total: number; completed: number; overdue: number }>();
+  for (const record of records) {
+    const serviceGroup = serviceGroups.get(record.service) ?? {
+      service: record.service,
+      total: 0,
+      completed: 0,
+      inProgress: 0,
+      pending: 0,
+      blocked: 0,
+      overdue: 0,
+      completionRate: 0,
+    };
+    serviceGroup.total += 1;
+    if (record.status === 'done') serviceGroup.completed += 1;
+    if (record.status === 'in-progress') serviceGroup.inProgress += 1;
+    if (record.status === 'pending') serviceGroup.pending += 1;
+    if (record.status === 'blocked') serviceGroup.blocked += 1;
+    if (isOverdue(record)) serviceGroup.overdue += 1;
+    serviceGroup.completionRate = Number(((serviceGroup.completed / serviceGroup.total) * 100).toFixed(1));
+    serviceGroups.set(record.service, serviceGroup);
+
+    const priorityGroup = priorityGroups.get(record.priority) ?? {
+      priority: record.priority,
+      total: 0,
+      completed: 0,
+      overdue: 0,
+    };
+    priorityGroup.total += 1;
+    if (record.status === 'done') priorityGroup.completed += 1;
+    if (isOverdue(record)) priorityGroup.overdue += 1;
+    priorityGroups.set(record.priority, priorityGroup);
+  }
+
+  return {
+    summary,
+    byService: [...serviceGroups.values()].sort((left, right) => right.total - left.total),
+    byPriority: [...priorityGroups.values()].sort((left, right) => right.total - left.total),
+  };
 }
 
 export async function getReportingSeedData(
@@ -377,13 +585,24 @@ export async function getReportingSeedData(
   employeeNames: string[];
 }> {
   const filter = buildScopedFilter(tenantId, scope);
-  const [orders, doctors, patients] = await Promise.all([
+  const [orders, doctors, patients, scanCenters, users] = await Promise.all([
     OrderModel.find(filter)
       .select({ restoration: 1, amount: 1, receivedAt: 1 })
       .lean<Array<{ restoration: string; amount: number; receivedAt: Date }>>()
       .exec(),
     DoctorModel.find(filter).select({ name: 1 }).lean<Array<{ name: string }>>().exec(),
     PatientModel.find(filter).select({ name: 1 }).lean<Array<{ name: string }>>().exec(),
+    ScanCenterModel.find(tenantId ? { tenantId } : {})
+      .select({ name: 1, operator: 1 })
+      .lean<Array<{ name: string; operator: string }>>()
+      .exec(),
+    UserModel.find({
+      ...(tenantId ? { tenantId } : {}),
+      status: 'active',
+    })
+      .select({ fullName: 1, roles: 1 })
+      .lean<Array<{ fullName: string; roles: string[] }>>()
+      .exec(),
   ]);
 
   const nowYear = new Date().getUTCFullYear();
@@ -418,11 +637,10 @@ export async function getReportingSeedData(
     basePrice: Math.round(service.totalAmount / Math.max(1, service.count)),
   }));
 
-  const settingsSnapshot = settingsStore.getSnapshot();
-  const scanCenters = settingsSnapshot.scanCenters.map((scanCenter) => scanCenter.name);
-  const operators = settingsSnapshot.scanCenters.map((scanCenter) => scanCenter.operator);
-  const employeeTypes = [...new Set(settingsSnapshot.teamMembers.map((member) => member.type))];
-  const employeeNames = settingsSnapshot.teamMembers.map((member) => member.fullName);
+  const scanCenterNames = scanCenters.map((scanCenter) => scanCenter.name);
+  const operators = [...new Set(scanCenters.map((scanCenter) => scanCenter.operator))];
+  const employeeTypes = [...new Set(users.flatMap((user) => user.roles))];
+  const employeeNames = users.map((user) => user.fullName);
 
   const doctorNames = doctors
     .map((doctor) => doctor.name?.trim())
@@ -439,7 +657,7 @@ export async function getReportingSeedData(
     startYear,
     endYear,
     services,
-    scanCenters,
+    scanCenters: scanCenterNames,
     doctors: doctorNames,
     patientsFirstNames,
     patientsLastNames,
@@ -467,6 +685,10 @@ function buildScopedFilter(
   }
 
   return filter;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function toServiceKey(value: string): string {
@@ -616,6 +838,7 @@ async function buildNameMap(
   },
   ids: Array<Types.ObjectId | string>,
   field: string,
+  tenantId?: Types.ObjectId,
 ): Promise<Map<string, string>> {
   const uniqueIds = [...new Set(ids.map((id) => id.toString()))]
     .filter((id) => Types.ObjectId.isValid(id))
@@ -626,7 +849,10 @@ async function buildNameMap(
   }
 
   const records: Array<{ _id: Types.ObjectId } & Record<string, string>> = await model
-    .find({ _id: { $in: uniqueIds } })
+    .find({
+      _id: { $in: uniqueIds },
+      ...(tenantId ? { tenantId } : {}),
+    })
     .select({ _id: 1, [field]: 1 })
     .lean<Array<{ _id: Types.ObjectId } & Record<string, string>>>()
     .exec();

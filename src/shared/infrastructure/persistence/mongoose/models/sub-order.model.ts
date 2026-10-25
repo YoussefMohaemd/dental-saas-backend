@@ -32,6 +32,81 @@ const subOrderCreationSchema = new Schema(
   { _id: false },
 );
 
+const subOrderFormValueSchema = new Schema(
+  {
+    values: {
+      type: Map,
+      of: String,
+      default: {},
+    },
+    context: {
+      type: Schema.Types.Mixed,
+      default: {},
+    },
+    updatedAt: {
+      type: String,
+      required: true,
+    },
+  },
+  { _id: false },
+);
+
+const subOrderFormSchema = new Schema(
+  {
+    id: { type: String, required: true },
+    label: { type: String, required: true },
+    required: { type: Boolean, required: true },
+    status: {
+      type: String,
+      enum: ['complete', 'incomplete', 'optional'],
+      required: true,
+    },
+    value: subOrderFormValueSchema,
+  },
+  { _id: false },
+);
+
+const subOrderScanFileSchema = new Schema(
+  {
+    id: { type: String, required: true },
+    name: { type: String, required: true },
+    sizeBytes: { type: Number, required: true },
+    sizeLabel: { type: String, required: true },
+    type: { type: String, required: true },
+    lastModified: { type: Number, required: true },
+    selectedAt: { type: String, required: true },
+  },
+  { _id: false },
+);
+
+const subOrderScanSchema = new Schema(
+  {
+    id: { type: String, required: true },
+    label: { type: String, required: true },
+    format: { type: String, required: true },
+    status: {
+      type: String,
+      enum: ['uploaded', 'missing', 'optional', 'selected-local'],
+      required: true,
+    },
+    localFiles: {
+      type: [subOrderScanFileSchema],
+      default: undefined,
+    },
+    updatedAt: { type: String },
+  },
+  { _id: false },
+);
+
+const subOrderActivitySchema = new Schema(
+  {
+    time: { type: String, required: true },
+    user: { type: String, required: true },
+    text: { type: String, required: true },
+  },
+  { _id: false },
+);
+
 const subOrderSchema = new Schema(
   {
     tenantId: objectIdRef('Tenant'),
@@ -90,6 +165,18 @@ const subOrderSchema = new Schema(
       default: '',
     },
     creationData: subOrderCreationSchema,
+    forms: {
+      type: [subOrderFormSchema],
+      default: undefined,
+    },
+    scans: {
+      type: [subOrderScanSchema],
+      default: undefined,
+    },
+    activity: {
+      type: [subOrderActivitySchema],
+      default: undefined,
+    },
   },
   {
     ...baseSchemaOptions,
@@ -101,7 +188,6 @@ subOrderSchema.index({ tenantId: 1, orderId: 1, status: 1 });
 subOrderSchema.index({ tenantId: 1, priority: 1, dueDate: 1 });
 
 export const SubOrderModel: Model<any> = (models.SubOrder as Model<any> | undefined) ?? model('SubOrder', subOrderSchema);
-
 
 
 

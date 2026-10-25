@@ -8,8 +8,10 @@ import { DocumentModel } from './document.model';
 import { NotificationModel } from './notification.model';
 import { OrderModel } from './order.model';
 import { PatientModel } from './patient.model';
+import { ScanCenterModel } from './scan-center.model';
 import { SubOrderModel } from './sub-order.model';
 import { UserModel } from './user.model';
+import { UserPreferencesModel } from './user-preferences.model';
 
 const persistenceModels = {
   users: UserModel,
@@ -24,6 +26,8 @@ const persistenceModels = {
   cases: CaseModel,
   billingRecords: BillingRecordModel,
   changeRequests: ChangeRequestModel,
+  scanCenters: ScanCenterModel,
+  userPreferences: UserPreferencesModel,
 } as const;
 
 export const registerPersistenceModels = () => persistenceModels;
@@ -40,8 +44,8 @@ export {
   NotificationModel,
   OrderModel,
   PatientModel,
+  ScanCenterModel,
   SubOrderModel,
   UserModel,
+  UserPreferencesModel,
 };
-
-

@@ -43,6 +43,57 @@ const subOrderCreationDataSchema = z.object({
   fileReferences: z.array(stringField).default([]),
 }).strict();
 
+const subOrderFormItemSchema = z.object({
+  id: stringField,
+  label: stringField,
+  required: z.boolean(),
+  status: z.enum(['complete', 'incomplete', 'optional']),
+  value: z.object({
+    values: z.record(z.string(), z.string()),
+    context: z.object({
+      orderId: stringField,
+      orderNumber: stringField,
+      subOrderId: stringField,
+      service: stringField,
+      patientName: z.string(),
+      doctorName: z.string(),
+      clinicName: z.string(),
+      selectedTeeth: z.array(z.coerce.number().int().min(1).max(99)),
+      caseNotes: z.string(),
+    }).strict(),
+    updatedAt: z.string().datetime(),
+  }).strict().optional(),
+}).strict();
+
+const subOrderScanItemSchema = z.object({
+  id: stringField,
+  label: stringField,
+  format: stringField,
+  status: z.enum(['uploaded', 'missing', 'optional', 'selected-local']),
+  localFiles: z.array(z.object({
+    id: stringField,
+    name: stringField,
+    sizeBytes: z.coerce.number().int().min(0),
+    sizeLabel: stringField,
+    type: z.string(),
+    lastModified: z.coerce.number().min(0),
+    selectedAt: z.string().datetime(),
+  }).strict()).optional(),
+  updatedAt: z.string().datetime().optional(),
+}).strict();
+
+const subOrderActivityItemSchema = z.object({
+  time: stringField,
+  user: stringField,
+  text: stringField,
+}).strict();
+
+const subOrderDetailFields = {
+  forms: z.array(subOrderFormItemSchema).optional(),
+  scans: z.array(subOrderScanItemSchema).optional(),
+  activity: z.array(subOrderActivityItemSchema).optional(),
+};
+
 const orderCreationDataSchema = z.object({
   services: z.array(subOrderCreationDataSchema).default([]),
   communication: z.object({
@@ -154,6 +205,7 @@ export const createSubOrderBodySchema = z.object({
   dueDate: z.coerce.date(),
   notes: z.string().default(''),
   creationData: subOrderCreationDataSchema.optional(),
+  ...subOrderDetailFields,
 }).strict();
 
 export const createSubOrdersBodySchema = z.array(createSubOrderBodySchema);
@@ -172,5 +224,6 @@ export const updateSubOrderBodySchema = z
     dueDate: z.coerce.date().optional(),
     notes: z.string().optional(),
     creationData: subOrderCreationDataSchema.optional(),
+    ...subOrderDetailFields,
   })
   .strict();

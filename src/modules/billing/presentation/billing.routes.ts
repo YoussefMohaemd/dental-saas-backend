@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 
+import { requireAnyRole } from '../../auth/presentation/auth.middleware';
 import { sendOk } from '../../../shared/presentation/http/api-response';
 import {
   baseListQuerySchema,
@@ -63,7 +64,7 @@ billingRouter.get('/billing/:recordId', async (req, res) => {
   sendOk(res, data, buildRequestMeta(req));
 });
 
-billingRouter.patch('/billing/:recordId', async (req, res) => {
+billingRouter.patch('/billing/:recordId', requireAnyRole(['admin', 'staff']), async (req, res) => {
   const params = z.object({ recordId: z.string() }).parse(req.params);
   const billingId = ensureObjectId(params.recordId, 'billing record id');
   const payload = parseBillingPatchPayload(req.body);

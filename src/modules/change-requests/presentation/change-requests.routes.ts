@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 
+import { requireAnyRole } from '../../auth/presentation/auth.middleware';
 import { sendOk } from '../../../shared/presentation/http/api-response';
 import {
   baseListQuerySchema,
@@ -61,7 +62,7 @@ changeRequestsRouter.get('/change-requests/:requestId', async (req, res) => {
   sendOk(res, data, buildRequestMeta(req));
 });
 
-changeRequestsRouter.patch('/change-requests/:requestId/status', async (req, res) => {
+changeRequestsRouter.patch('/change-requests/:requestId/status', requireAnyRole(['admin', 'staff', 'doctor']), async (req, res) => {
   const params = z.object({ requestId: z.string() }).parse(req.params);
   const changeRequestId = ensureObjectId(params.requestId, 'change request id');
   const payload = parseDecisionPayload(req.body);

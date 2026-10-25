@@ -376,7 +376,7 @@ export class OrdersService {
       scanCenterName:
         order.scanCenterId === undefined
           ? ''
-          : (this.orderRepository.findScanCenterNameById(order.scanCenterId) ?? ''),
+          : (references.scanCenterById.get(order.scanCenterId) ?? ''),
       status: order.status,
       priority: order.priority,
       restoration: order.restoration,
@@ -433,6 +433,9 @@ export class OrdersService {
       ...(subOrder.creationData !== undefined
         ? { creationData: this.toSubOrderCreationDataDto(subOrder.creationData) }
         : {}),
+      ...(subOrder.forms !== undefined ? { forms: subOrder.forms } : {}),
+      ...(subOrder.scans !== undefined ? { scans: subOrder.scans } : {}),
+      ...(subOrder.activity !== undefined ? { activity: subOrder.activity } : {}),
     };
   }
 

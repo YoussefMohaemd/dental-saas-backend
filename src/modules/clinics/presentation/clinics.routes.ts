@@ -1,5 +1,6 @@
 import { Router } from 'express';
 
+import { requireAnyRole } from '../../auth/presentation/auth.middleware';
 import { ClinicService } from '../application/clinic-service';
 import { MongooseClinicRepository } from '../infrastructure/mongoose-clinic-repository';
 import { ClinicsController } from './clinics.controller';
@@ -11,10 +12,9 @@ const clinicsController = new ClinicsController(
 );
 
 clinicsRouter.get('/clinics', clinicsController.listClinics);
-clinicsRouter.post('/clinics', clinicsController.createClinic);
+clinicsRouter.post('/clinics', requireAnyRole(['admin', 'staff']), clinicsController.createClinic);
 clinicsRouter.get('/clinics/:clinicId', clinicsController.getClinicById);
-clinicsRouter.patch('/clinics/:clinicId', clinicsController.updateClinic);
-clinicsRouter.delete('/clinics/:clinicId', clinicsController.deleteClinic);
+clinicsRouter.patch('/clinics/:clinicId', requireAnyRole(['admin', 'staff']), clinicsController.updateClinic);
+clinicsRouter.delete('/clinics/:clinicId', requireAnyRole(['admin', 'staff']), clinicsController.deleteClinic);
 
 export { clinicsRouter };
-
