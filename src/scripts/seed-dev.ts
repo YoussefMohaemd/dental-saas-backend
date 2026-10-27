@@ -175,9 +175,14 @@ interface ScanCenterSeed {
 
 const toObjectId = (value: string): mongoose.Types.ObjectId => new mongoose.Types.ObjectId(value);
 const fixedTenantId = toObjectId('66f100000000000000000001');
+const fixedSecondaryTenantId = toObjectId('66f100000000000000000101');
 const fixedAdminUserId = toObjectId('66f100000000000000000005');
 const fixedTechnicianUserId = toObjectId('66f100000000000000000006');
 const fixedPlatformAdminAliasId = toObjectId('66f100000000000000000007');
+const fixedStaffUserId = toObjectId('66f100000000000000000008');
+const fixedManagerUserId = toObjectId('66f100000000000000000009');
+const fixedSecondaryAdminUserId = toObjectId('66f100000000000000000105');
+const fixedSecondaryDoctorUserId = toObjectId('66f100000000000000000106');
 
 const passwordHasher = new PasswordHasher();
 
@@ -426,6 +431,26 @@ const seedDevelopmentData = async (): Promise<void> => {
     passwordHash: defaultPasswordHash,
     ...(defaultClinicId ? { clinicId: defaultClinicId } : {}),
   });
+  registerUser({
+    key: 'dev-staff',
+    id: fixedStaffUserId,
+    fullName: 'Operations Staff',
+    email: 'dev-staff@example.test',
+    roles: ['staff'],
+    status: 'active',
+    passwordHash: defaultPasswordHash,
+    ...(defaultClinicId ? { clinicId: defaultClinicId } : {}),
+  });
+  registerUser({
+    key: 'dev-manager',
+    id: fixedManagerUserId,
+    fullName: 'Lab Manager',
+    email: 'dev-manager@example.test',
+    roles: ['manager'],
+    status: 'active',
+    passwordHash: defaultPasswordHash,
+    ...(defaultClinicId ? { clinicId: defaultClinicId } : {}),
+  });
 
   const doctorUserByName = new Map<string, Types.ObjectId>();
   for (const doctor of doctorsSource) {
@@ -645,30 +670,64 @@ const seedDevelopmentData = async (): Promise<void> => {
   const doctorIdByName = new Map(
     doctorsSource.map((doctor) => [doctor.name, doctorIdMap.get(doctor.id)]),
   );
-  const documentsDocs = documentsSource.map((document) => ({
-    _id: documentIdMap.get(document.id),
-    tenantId: fixedTenantId,
-    name: document.name,
-    category: document.category,
-    type: document.type,
-    sizeBytes: sizeToBytes(document.size),
-    date: requiredDate(document.date, `document.date (${document.id})`),
-    doctorId: document.doctor ? doctorIdByName.get(document.doctor) : undefined,
-    uploadedBy: fixedTechnicianUserId,
-  }));
+  const subOrderByOrderId = new Map(
+    subOrdersSource.map((subOrder) => [subOrder.orderId, subOrderIdMap.get(subOrder.id)]),
+  );
+  const uploaders = [
+    fixedAdminUserId,
+    fixedTechnicianUserId,
+    fixedStaffUserId,
+    fixedManagerUserId,
+    ...doctorUserByName.values(),
+    ...technicianUserByName.values(),
+  ];
+  const notificationRecipients = uploaders;
 
-  const notificationsDocs = notificationsSource.map((notification) => ({
-    _id: notificationIdMap.get(notification.id),
-    tenantId: fixedTenantId,
-    recipientId: fixedAdminUserId,
-    type: notification.type,
-    title: notification.title,
-    message: notification.message,
-    read: notification.read,
-    relatedId: notification.relatedId ? orderIdMap.get(notification.relatedId) : undefined,
-    relatedType: notification.relatedType,
-    createdAt: optionalDate(notification.createdAt),
-  }));
+  const documentsDocs = documentsSource.map((document, index) => {
+    const sourceOrder = ordersSource.length > 0
+      ? ordersSource[index % ordersSource.length]
+      : undefined;
+    const uploaderId = uploaders[index % uploaders.length] ?? fixedAdminUserId;
+
+    return {
+      _id: documentIdMap.get(document.id),
+      tenantId: fixedTenantId,
+      name: document.name,
+      category: document.category,
+      type: document.type,
+      sizeBytes: sizeToBytes(document.size),
+      date: requiredDate(document.date, `document.date (${document.id})`),
+      doctorId: document.doctor
+        ? doctorIdByName.get(document.doctor)
+        : sourceOrder
+          ? doctorIdMap.get(sourceOrder.doctorId)
+          : undefined,
+      patientId: sourceOrder ? patientIdMap.get(sourceOrder.patientId) : undefined,
+      clinicId: sourceOrder ? clinicIdMap.get(sourceOrder.clinicId) : undefined,
+      orderId: sourceOrder ? orderIdMap.get(sourceOrder.id) : undefined,
+      subOrderId: sourceOrder ? subOrderByOrderId.get(sourceOrder.id) : undefined,
+      uploadedBy: uploaderId,
+    };
+  });
+
+  const notificationsDocs = notificationsSource.map((notification, index) => {
+    const recipientId =
+      notificationRecipients[index % notificationRecipients.length] ??
+      fixedAdminUserId;
+
+    return {
+      _id: notificationIdMap.get(notification.id),
+      tenantId: fixedTenantId,
+      recipientId,
+      type: notification.type,
+      title: notification.title,
+      message: notification.message,
+      read: notification.read,
+      relatedId: notification.relatedId ? orderIdMap.get(notification.relatedId) : undefined,
+      relatedType: notification.relatedType,
+      createdAt: optionalDate(notification.createdAt),
+    };
+  });
 
   const scanCentersDocs = scanCentersSource.map((scanCenter) => {
     const defaults = defaultScanCenterDetails[scanCenter.id] ?? {
@@ -690,51 +749,287 @@ const seedDevelopmentData = async (): Promise<void> => {
     };
   });
 
+  const fallbackOrder = ordersSource[0];
+  const fallbackCase = casesSource[0];
+  const fallbackSubOrder = subOrdersSource[0];
+  const fallbackBilling = billingSource[0];
+  const fallbackChangeRequest = changeRequestsSource[0];
+  const fallbackDocument = documentsSource[0];
+  const fallbackNotification = notificationsSource[0];
+
+  const secondaryClinicId = objectIdFromSeed('tenant-2-clinic', 'clinic-1');
+  const secondaryDoctorId = objectIdFromSeed('tenant-2-doctor', 'doctor-1');
+  const secondaryPatientId = objectIdFromSeed('tenant-2-patient', 'patient-1');
+  const secondaryOrderId = objectIdFromSeed('tenant-2-order', 'order-1');
+  const secondarySubOrderId = objectIdFromSeed('tenant-2-sub-order', 'sub-order-1');
+  const secondaryCaseId = objectIdFromSeed('tenant-2-case', 'case-1');
+  const secondaryBillingId = objectIdFromSeed('tenant-2-billing', 'billing-1');
+  const secondaryChangeRequestId = objectIdFromSeed('tenant-2-change-request', 'change-request-1');
+  const secondaryDocumentId = objectIdFromSeed('tenant-2-document', 'document-1');
+  const secondaryNotificationId = objectIdFromSeed('tenant-2-notification', 'notification-1');
+  const secondaryScanCenterExternalId = 'scan-center-tenant-2-1';
+
+  const secondaryTenantUsersDocs: Array<Record<string, unknown>> = [
+    {
+      _id: fixedSecondaryAdminUserId,
+      tenantId: fixedSecondaryTenantId,
+      fullName: 'Tenant 2 Admin',
+      email: 'dev-admin-tenant2@example.test',
+      roles: ['admin'],
+      clinicId: secondaryClinicId,
+      status: 'active',
+      tokenVersion: 0,
+      passwordHash: defaultPasswordHash,
+    },
+    {
+      _id: fixedSecondaryDoctorUserId,
+      tenantId: fixedSecondaryTenantId,
+      fullName: 'Tenant 2 Doctor',
+      email: 'dev-doctor-tenant2@example.test',
+      roles: ['doctor'],
+      clinicId: secondaryClinicId,
+      status: 'active',
+      tokenVersion: 0,
+      passwordHash: defaultPasswordHash,
+    },
+  ];
+
+  const secondaryTenantClinicsDocs: Array<Record<string, unknown>> = [
+    {
+      _id: secondaryClinicId,
+      tenantId: fixedSecondaryTenantId,
+      name: 'North Delta Dental Clinic',
+      address: '12 Tenant Two Street',
+      city: 'Alexandria',
+      phone: '+20 10 7000 0001',
+      email: 'tenant2-clinic@example.test',
+      status: 'Active',
+      accountManager: 'Tenant 2 Manager',
+    },
+  ];
+
+  const secondaryTenantDoctorsDocs: Array<Record<string, unknown>> = [
+    {
+      _id: secondaryDoctorId,
+      tenantId: fixedSecondaryTenantId,
+      lookupId: 'T2-DR-001',
+      name: 'Tenant 2 Doctor',
+      specialty: 'Prosthodontics',
+      clinicId: secondaryClinicId,
+      email: 'dev-doctor-tenant2@example.test',
+      phone: '+20 11 7000 0001',
+      status: 'Active',
+      joinedDate: requiredDate('2025-01-10', 'tenant2.doctor.joinedDate'),
+      avatar: '',
+    },
+  ];
+
+  const secondaryTenantPatientsDocs: Array<Record<string, unknown>> = [
+    {
+      _id: secondaryPatientId,
+      tenantId: fixedSecondaryTenantId,
+      name: 'Tenant 2 Patient',
+      dob: requiredDate('1993-03-15', 'tenant2.patient.dob'),
+      gender: 'F',
+      phone: '+20 12 7000 0001',
+      email: 'tenant2-patient@example.test',
+      clinicId: secondaryClinicId,
+      doctorId: secondaryDoctorId,
+      status: 'Active',
+      lastVisit: requiredDate('2026-09-20', 'tenant2.patient.lastVisit'),
+    },
+  ];
+
+  const secondaryTenantOrdersDocs: Array<Record<string, unknown>> = [
+    {
+      _id: secondaryOrderId,
+      tenantId: fixedSecondaryTenantId,
+      orderNumber: 'T2-DL-000001',
+      patientId: secondaryPatientId,
+      doctorId: secondaryDoctorId,
+      clinicId: secondaryClinicId,
+      scanCenterId: secondaryScanCenterExternalId,
+      status: fallbackOrder?.status ?? 'New',
+      priority: fallbackOrder?.priority ?? 'Normal',
+      restoration: fallbackOrder?.restoration ?? 'Crown',
+      arch: fallbackOrder?.arch ?? 'Maxilla',
+      format: fallbackOrder?.format ?? 'STL',
+      shade: fallbackOrder?.shade ?? 'A2',
+      units: 2,
+      amount: 820,
+      billed: false,
+      billTo: 'Doctor',
+      vouchers: 0,
+      isLocked: false,
+      hasNotes: true,
+      notes: 'Seeded tenant-2 order for tenant isolation verification',
+      receivedAt: requiredDate('2026-10-10T10:00:00.000Z', 'tenant2.order.receivedAt'),
+      dueDate: requiredDate('2026-10-20T10:00:00.000Z', 'tenant2.order.dueDate'),
+      csTask: fallbackOrder?.csTask ?? undefined,
+      technicianId: undefined,
+    },
+  ];
+
+  const secondaryTenantSubOrdersDocs: Array<Record<string, unknown>> = [
+    {
+      _id: secondarySubOrderId,
+      tenantId: fixedSecondaryTenantId,
+      orderId: secondaryOrderId,
+      service: fallbackSubOrder?.service ?? 'Digital Design',
+      icon: fallbackSubOrder?.icon ?? '',
+      status: fallbackSubOrder?.status ?? 'pending',
+      formsComplete: 1,
+      formsTotal: 2,
+      scansComplete: 1,
+      scansTotal: 1,
+      teeth: fallbackSubOrder?.teeth ?? [11, 12],
+      priority: fallbackSubOrder?.priority ?? 'Normal',
+      dueDate: requiredDate('2026-10-18T10:00:00.000Z', 'tenant2.subOrder.dueDate'),
+      notes: 'Tenant-2 seeded sub-order',
+    },
+  ];
+
+  const secondaryTenantCasesDocs: Array<Record<string, unknown>> = [
+    {
+      _id: secondaryCaseId,
+      tenantId: fixedSecondaryTenantId,
+      caseNumber: 'T2-CASE-001',
+      title: 'Tenant 2 Crown Case',
+      patientId: secondaryPatientId,
+      doctorId: secondaryDoctorId,
+      clinicId: secondaryClinicId,
+      status: fallbackCase?.status ?? 'Open',
+      priority: fallbackCase?.priority ?? 'Normal',
+      ordersCount: 1,
+      filesCount: 1,
+      notes: 'Tenant-2 seeded case',
+      createdAt: optionalDate('2026-10-10T10:00:00.000Z'),
+      updatedAt: optionalDate('2026-10-12T10:00:00.000Z'),
+    },
+  ];
+
+  const secondaryTenantBillingDocs: Array<Record<string, unknown>> = [
+    {
+      _id: secondaryBillingId,
+      tenantId: fixedSecondaryTenantId,
+      orderId: secondaryOrderId,
+      patientId: secondaryPatientId,
+      doctorId: secondaryDoctorId,
+      clinicId: secondaryClinicId,
+      amount: 820,
+      status: fallbackBilling?.status ?? 'Pending',
+      invoiceNumber: 'T2-INV-0001',
+      dueDate: requiredDate('2026-11-01T00:00:00.000Z', 'tenant2.billing.dueDate'),
+      vouchers: 0,
+      notes: 'Tenant-2 seeded billing record',
+    },
+  ];
+
+  const secondaryTenantChangeRequestsDocs: Array<Record<string, unknown>> = [
+    {
+      _id: secondaryChangeRequestId,
+      tenantId: fixedSecondaryTenantId,
+      requestNumber: 'T2-CR-0001',
+      orderId: secondaryOrderId,
+      requesterId: fixedSecondaryDoctorUserId,
+      status: fallbackChangeRequest?.status ?? 'Pending',
+      priority: fallbackChangeRequest?.priority ?? 'High',
+      description: 'Adjust proximal contact and occlusal anatomy.',
+      createdAt: optionalDate('2026-10-11T10:00:00.000Z'),
+      updatedAt: optionalDate('2026-10-11T10:00:00.000Z'),
+    },
+  ];
+
+  const secondaryTenantDocumentsDocs: Array<Record<string, unknown>> = [
+    {
+      _id: secondaryDocumentId,
+      tenantId: fixedSecondaryTenantId,
+      name: 'Tenant-2-Design-Notes.pdf',
+      category: fallbackDocument?.category ?? 'Prescription',
+      type: fallbackDocument?.type ?? 'PDF',
+      sizeBytes: 153600,
+      date: requiredDate('2026-10-11T10:00:00.000Z', 'tenant2.document.date'),
+      doctorId: secondaryDoctorId,
+      patientId: secondaryPatientId,
+      clinicId: secondaryClinicId,
+      orderId: secondaryOrderId,
+      subOrderId: secondarySubOrderId,
+      uploadedBy: fixedSecondaryAdminUserId,
+    },
+  ];
+
+  const secondaryTenantNotificationsDocs: Array<Record<string, unknown>> = [
+    {
+      _id: secondaryNotificationId,
+      tenantId: fixedSecondaryTenantId,
+      recipientId: fixedSecondaryAdminUserId,
+      type: fallbackNotification?.type ?? 'System',
+      title: 'Tenant 2 change request received',
+      message: 'A new change request was submitted for order T2-DL-000001.',
+      read: false,
+      relatedId: secondaryOrderId,
+      relatedType: 'order',
+      createdAt: optionalDate('2026-10-11T10:05:00.000Z'),
+    },
+  ];
+
+  const secondaryTenantScanCentersDocs: Array<Record<string, unknown>> = [
+    {
+      tenantId: fixedSecondaryTenantId,
+      externalId: secondaryScanCenterExternalId,
+      name: 'Tenant 2 Digital Scan Center',
+      location: 'Alexandria North Hub',
+      operator: 'Tenant 2 Operator',
+      devices: 2,
+      status: 'Operational',
+    },
+  ];
+
   await Promise.all([
-    notifications.deleteMany({ tenantId: fixedTenantId }),
-    documents.deleteMany({ tenantId: fixedTenantId }),
-    changeRequests.deleteMany({ tenantId: fixedTenantId }),
-    billingRecords.deleteMany({ tenantId: fixedTenantId }),
-    cases.deleteMany({ tenantId: fixedTenantId }),
-    subOrders.deleteMany({ tenantId: fixedTenantId }),
-    orders.deleteMany({ tenantId: fixedTenantId }),
-    patients.deleteMany({ tenantId: fixedTenantId }),
-    doctors.deleteMany({ tenantId: fixedTenantId }),
-    clinics.deleteMany({ tenantId: fixedTenantId }),
-    scanCenters.deleteMany({ tenantId: fixedTenantId }),
-    users.deleteMany({ tenantId: fixedTenantId }),
+    notifications.deleteMany({ tenantId: { $in: [fixedTenantId, fixedSecondaryTenantId] } }),
+    documents.deleteMany({ tenantId: { $in: [fixedTenantId, fixedSecondaryTenantId] } }),
+    changeRequests.deleteMany({ tenantId: { $in: [fixedTenantId, fixedSecondaryTenantId] } }),
+    billingRecords.deleteMany({ tenantId: { $in: [fixedTenantId, fixedSecondaryTenantId] } }),
+    cases.deleteMany({ tenantId: { $in: [fixedTenantId, fixedSecondaryTenantId] } }),
+    subOrders.deleteMany({ tenantId: { $in: [fixedTenantId, fixedSecondaryTenantId] } }),
+    orders.deleteMany({ tenantId: { $in: [fixedTenantId, fixedSecondaryTenantId] } }),
+    patients.deleteMany({ tenantId: { $in: [fixedTenantId, fixedSecondaryTenantId] } }),
+    doctors.deleteMany({ tenantId: { $in: [fixedTenantId, fixedSecondaryTenantId] } }),
+    clinics.deleteMany({ tenantId: { $in: [fixedTenantId, fixedSecondaryTenantId] } }),
+    scanCenters.deleteMany({ tenantId: { $in: [fixedTenantId, fixedSecondaryTenantId] } }),
+    users.deleteMany({ tenantId: { $in: [fixedTenantId, fixedSecondaryTenantId] } }),
   ]);
 
   await Promise.all([
-    users.insertMany(userDocs),
-    clinics.insertMany(clinicsDocs),
-    doctors.insertMany(doctorsDocs),
-    patients.insertMany(patientsDocs),
-    orders.insertMany(ordersDocs),
-    subOrders.insertMany(subOrdersDocs),
-    cases.insertMany(casesDocs),
-    billingRecords.insertMany(billingDocs),
-    changeRequests.insertMany(changeRequestsDocs),
-    documents.insertMany(documentsDocs),
-    notifications.insertMany(notificationsDocs),
-    scanCenters.insertMany(scanCentersDocs),
+    users.insertMany([...userDocs, ...secondaryTenantUsersDocs]),
+    clinics.insertMany([...clinicsDocs, ...secondaryTenantClinicsDocs]),
+    doctors.insertMany([...doctorsDocs, ...secondaryTenantDoctorsDocs]),
+    patients.insertMany([...patientsDocs, ...secondaryTenantPatientsDocs]),
+    orders.insertMany([...ordersDocs, ...secondaryTenantOrdersDocs]),
+    subOrders.insertMany([...subOrdersDocs, ...secondaryTenantSubOrdersDocs]),
+    cases.insertMany([...casesDocs, ...secondaryTenantCasesDocs]),
+    billingRecords.insertMany([...billingDocs, ...secondaryTenantBillingDocs]),
+    changeRequests.insertMany([...changeRequestsDocs, ...secondaryTenantChangeRequestsDocs]),
+    documents.insertMany([...documentsDocs, ...secondaryTenantDocumentsDocs]),
+    notifications.insertMany([...notificationsDocs, ...secondaryTenantNotificationsDocs]),
+    scanCenters.insertMany([...scanCentersDocs, ...secondaryTenantScanCentersDocs]),
   ]);
 
   logger.info(
     {
       imported: {
-        users: userDocs.length,
-        clinics: clinicsDocs.length,
-        doctors: doctorsDocs.length,
-        patients: patientsDocs.length,
-        orders: ordersDocs.length,
-        subOrders: subOrdersDocs.length,
-        cases: casesDocs.length,
-        billingRecords: billingDocs.length,
-        changeRequests: changeRequestsDocs.length,
-        documents: documentsDocs.length,
-        notifications: notificationsDocs.length,
-        scanCenters: scanCentersSource.length,
+        users: userDocs.length + secondaryTenantUsersDocs.length,
+        clinics: clinicsDocs.length + secondaryTenantClinicsDocs.length,
+        doctors: doctorsDocs.length + secondaryTenantDoctorsDocs.length,
+        patients: patientsDocs.length + secondaryTenantPatientsDocs.length,
+        orders: ordersDocs.length + secondaryTenantOrdersDocs.length,
+        subOrders: subOrdersDocs.length + secondaryTenantSubOrdersDocs.length,
+        cases: casesDocs.length + secondaryTenantCasesDocs.length,
+        billingRecords: billingDocs.length + secondaryTenantBillingDocs.length,
+        changeRequests: changeRequestsDocs.length + secondaryTenantChangeRequestsDocs.length,
+        documents: documentsDocs.length + secondaryTenantDocumentsDocs.length,
+        notifications: notificationsDocs.length + secondaryTenantNotificationsDocs.length,
+        scanCenters: scanCentersDocs.length + secondaryTenantScanCentersDocs.length,
       },
     },
     'Development seed completed from Angular data files',

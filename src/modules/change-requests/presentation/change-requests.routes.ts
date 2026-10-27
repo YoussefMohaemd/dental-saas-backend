@@ -7,7 +7,7 @@ import {
   baseListQuerySchema,
   buildRequestMeta,
   ensureObjectId,
-  getAuthenticatedTenantId,
+  getAuthenticatedDataScope,
   parsePaginationQuery,
   parseSort,
 } from '../../../shared/presentation/http/http-utils';
@@ -28,7 +28,7 @@ const changeRequestsListQuerySchema = baseListQuerySchema.extend({
   priority: z.union([z.string(), z.array(z.string())]).optional(),
 });
 
-changeRequestsRouter.get('/change-requests', async (req, res) => {
+changeRequestsRouter.get('/change-requests', requireAnyRole(['admin', 'staff', 'manager', 'doctor', 'technician']), async (req, res) => {
   const query = changeRequestsListQuerySchema.parse(req.query);
   const pagination = parsePaginationQuery(query);
   const sort = parseSort(
@@ -38,7 +38,7 @@ changeRequestsRouter.get('/change-requests', async (req, res) => {
   );
   const statuses = parseChangeRequestStatuses(query.status);
   const priorities = parseChangeRequestPriorities(query.priority);
-  const tenantId = getAuthenticatedTenantId(req);
+  const scope = await getAuthenticatedDataScope(req);
 
   const result = await listChangeRequests({
     pagination,
@@ -47,17 +47,18 @@ changeRequestsRouter.get('/change-requests', async (req, res) => {
     priorities,
     sortBy: sort.sortBy as 'createdAt' | 'updatedAt' | 'priority' | 'status' | 'requestNumber',
     sortDirection: sort.sortDirection,
-    tenantId,
+    tenantId: scope.tenantId,
+    scope,
   });
 
   sendOk(res, result.items, buildRequestMeta(req, buildPaginationMeta(result.totalItems, pagination)));
 });
 
-changeRequestsRouter.get('/change-requests/:requestId', async (req, res) => {
+changeRequestsRouter.get('/change-requests/:requestId', requireAnyRole(['admin', 'staff', 'manager', 'doctor', 'technician']), async (req, res) => {
   const params = z.object({ requestId: z.string() }).parse(req.params);
   const changeRequestId = ensureObjectId(params.requestId, 'change request id');
-  const tenantId = getAuthenticatedTenantId(req);
-  const data = await getChangeRequest(changeRequestId, tenantId);
+  const scope = await getAuthenticatedDataScope(req);
+  const data = await getChangeRequest(changeRequestId, scope.tenantId, scope);
 
   sendOk(res, data, buildRequestMeta(req));
 });
@@ -66,8 +67,8 @@ changeRequestsRouter.patch('/change-requests/:requestId/status', requireAnyRole(
   const params = z.object({ requestId: z.string() }).parse(req.params);
   const changeRequestId = ensureObjectId(params.requestId, 'change request id');
   const payload = parseDecisionPayload(req.body);
-  const tenantId = getAuthenticatedTenantId(req);
-  const data = await decideChangeRequest(changeRequestId, payload, tenantId);
+  const scope = await getAuthenticatedDataScope(req);
+  const data = await decideChangeRequest(changeRequestId, payload, scope.tenantId, scope);
 
   sendOk(res, data, buildRequestMeta(req));
 });

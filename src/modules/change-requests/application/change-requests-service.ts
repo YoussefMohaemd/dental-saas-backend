@@ -15,6 +15,7 @@ import { ChangeRequestModel } from '../../../shared/infrastructure/persistence/m
 import { OrderModel } from '../../../shared/infrastructure/persistence/mongoose/models/order.model';
 import { PatientModel } from '../../../shared/infrastructure/persistence/mongoose/models/patient.model';
 import { UserModel } from '../../../shared/infrastructure/persistence/mongoose/models/user.model';
+import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 import { parseEnumList } from '../../../shared/presentation/http/http-utils';
 
 interface ChangeRequestRecord {
@@ -30,6 +31,10 @@ interface ChangeRequestRecord {
   resolutionNote?: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+interface ChangeRequestRequesterRecord {
+  requesterId: Types.ObjectId;
 }
 
 const decisionPayloadSchema = z.object({
@@ -49,15 +54,12 @@ export function parseDecisionPayload(value: unknown): z.infer<typeof decisionPay
   return decisionPayloadSchema.parse(value);
 }
 
-export async function listChangeRequests(input: {
-  pagination: PaginationQuery;
-  search?: string | undefined;
+export function buildChangeRequestListFilter(input: {
+  tenantId?: Types.ObjectId | undefined;
   statuses?: ChangeRequestDto['status'][] | undefined;
   priorities?: ChangeRequestDto['priority'][] | undefined;
-  sortBy: 'createdAt' | 'updatedAt' | 'priority' | 'status' | 'requestNumber';
-  sortDirection: 'asc' | 'desc';
-  tenantId?: Types.ObjectId | undefined;
-}): Promise<{ items: ChangeRequestDto[]; totalItems: number }> {
+  search?: string | undefined;
+}): FilterQuery<ChangeRequestRecord> {
   const filter: FilterQuery<ChangeRequestRecord> = {};
   if (input.tenantId) {
     filter.tenantId = input.tenantId;
@@ -75,6 +77,53 @@ export async function listChangeRequests(input: {
     const searchRegex = new RegExp(escapeRegex(input.search), 'i');
     filter.$or = [{ requestNumber: searchRegex }, { description: searchRegex }];
   }
+
+  return filter;
+}
+
+export function buildChangeRequestRequesterFilter(
+  scope: DataVisibilityScope,
+): FilterQuery<ChangeRequestRequesterRecord> | undefined {
+  if (scope.isAdmin) {
+    return undefined;
+  }
+
+  return { requesterId: scope.userId };
+}
+
+export function buildChangeRequestIdentityFilter(
+  changeRequestId: Types.ObjectId,
+  tenantId?: Types.ObjectId,
+): FilterQuery<ChangeRequestRecord> {
+  return {
+    _id: changeRequestId,
+    ...(tenantId ? { tenantId } : {}),
+  };
+}
+
+export function buildDecisionUpdateDocument(
+  payload: z.infer<typeof decisionPayloadSchema>,
+): { $set: Partial<Pick<ChangeRequestRecord, 'status' | 'resolutionNote'>> } {
+  return {
+    $set: {
+      status: payload.status,
+      ...(payload.note !== undefined ? { resolutionNote: payload.note } : {}),
+    },
+  };
+}
+
+export async function listChangeRequests(input: {
+  pagination: PaginationQuery;
+  search?: string | undefined;
+  statuses?: ChangeRequestDto['status'][] | undefined;
+  priorities?: ChangeRequestDto['priority'][] | undefined;
+  sortBy: 'createdAt' | 'updatedAt' | 'priority' | 'status' | 'requestNumber';
+  sortDirection: 'asc' | 'desc';
+  tenantId?: Types.ObjectId | undefined;
+  scope?: DataVisibilityScope | undefined;
+}): Promise<{ items: ChangeRequestDto[]; totalItems: number }> {
+  const filter = buildChangeRequestListFilter(input);
+  await applyChangeRequestScopeFilter(filter, input.scope);
 
   const totalItems = await ChangeRequestModel.countDocuments(filter);
   const sort: Record<string, SortOrder> = {
@@ -123,11 +172,10 @@ export async function listChangeRequests(input: {
 export async function getChangeRequest(
   changeRequestId: Types.ObjectId,
   tenantId?: Types.ObjectId,
+  scope?: DataVisibilityScope,
 ): Promise<ChangeRequestDto> {
-  const filter: FilterQuery<ChangeRequestRecord> = { _id: changeRequestId };
-  if (tenantId) {
-    filter.tenantId = tenantId;
-  }
+  const filter = buildChangeRequestIdentityFilter(changeRequestId, tenantId);
+  await applyChangeRequestScopeFilter(filter, scope);
 
   const record = await ChangeRequestModel.findOne(filter).lean<ChangeRequestRecord | null>().exec();
   if (!record) {
@@ -164,18 +212,14 @@ export async function decideChangeRequest(
   changeRequestId: Types.ObjectId,
   payload: z.infer<typeof decisionPayloadSchema>,
   tenantId?: Types.ObjectId,
+  scope?: DataVisibilityScope,
 ): Promise<ChangeRequestDto> {
-  const filter: FilterQuery<ChangeRequestRecord> = { _id: changeRequestId };
-  if (tenantId) {
-    filter.tenantId = tenantId;
-  }
+  const filter = buildChangeRequestIdentityFilter(changeRequestId, tenantId);
+  await applyChangeRequestScopeFilter(filter, scope);
 
   const record = await ChangeRequestModel.findOneAndUpdate(
     filter,
-    { $set: {
-      status: payload.status,
-      resolutionNote: payload.note,
-    } },
+    buildDecisionUpdateDocument(payload),
     {
       new: true,
       runValidators: true,
@@ -193,10 +237,26 @@ export async function decideChangeRequest(
     });
   }
 
-  return getChangeRequest(record._id, tenantId);
+  return getChangeRequest(record._id, tenantId, scope);
 }
 
 export { buildPaginationMeta };
+
+async function applyChangeRequestScopeFilter(
+  filter: FilterQuery<ChangeRequestRecord>,
+  scope?: DataVisibilityScope,
+): Promise<void> {
+  if (!scope) {
+    return;
+  }
+
+  const requesterFilter = buildChangeRequestRequesterFilter(scope);
+  if (!requesterFilter) {
+    return;
+  }
+
+  filter.requesterId = requesterFilter.requesterId;
+}
 
 async function buildMap(
   model: {

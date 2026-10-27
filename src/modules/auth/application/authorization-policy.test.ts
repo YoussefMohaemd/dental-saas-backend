@@ -27,4 +27,11 @@ describe('resolveRoleCapabilities', () => {
     expect(capabilities).toContain('reports.read');
     expect(capabilities).not.toContain('orders.delete');
   });
+
+  it('allows doctors to delete and lock orders', () => {
+    const capabilities = resolveRoleCapabilities(['doctor']);
+
+    expect(capabilities).toContain('orders.delete');
+    expect(capabilities).toContain('orders.lock');
+  });
 });

@@ -1,8 +1,12 @@
 const seedReferenceDate = new Date();
 const millisecondsPerDay = 24 * 60 * 60 * 1000;
-const CLINIC_COUNT = 10;
-const DOCTOR_COUNT = 10;
-const PATIENT_COUNT = 65;
+const CLINIC_COUNT = 12;
+const DOCTOR_COUNT = 12;
+const PATIENT_COUNT = 90;
+const CASE_COUNT = 70;
+const CHANGE_REQUEST_COUNT = 60;
+const DOCUMENT_COUNT = 90;
+const NOTIFICATION_COUNT = 160;
 
 const dateDaysAgo = (days: number): string =>
   new Date(seedReferenceDate.getTime() - Math.max(days, 0) * millisecondsPerDay).toISOString();
@@ -86,7 +90,8 @@ const clinic = (index: number) => ({
   id: `clinic-${index}`,
   name: `Dental Care Clinic ${index}`,
   address: `${index} Health Street`,
-  city: [
+  city:
+    [
     'Cairo',
     'Giza',
     'Alexandria',
@@ -97,7 +102,7 @@ const clinic = (index: number) => ({
     'Suez',
     'Fayoum',
     'Zagazig',
-  ][index - 1],
+    ][(index - 1) % 10] ?? 'Cairo',
   phone: `+20 10 5555 00${index}`,
   email: `clinic${index}@example.test`,
   status: 'Active' as const,
@@ -107,7 +112,8 @@ const clinic = (index: number) => ({
 const doctor = (index: number) => ({
   id: `doctor-${index}`,
   lookupId: `DR-${String(index).padStart(3, '0')}`,
-  name: [
+  name:
+    [
     'Amira Hassan',
     'Omar Khalil',
     'Mariam Adel',
@@ -118,9 +124,10 @@ const doctor = (index: number) => ({
     'Hassan Adel',
     'Rana Nabil',
     'Mostafa Samir',
-  ][index - 1],
+    ][index - 1] ?? `Doctor ${index}`,
   gender: [1, 3, 5, 7, 9].includes(index) ? 'F' : 'M',
-  specialty: [
+  specialty:
+    [
     'Prosthodontics',
     'Orthodontics',
     'Implantology',
@@ -131,8 +138,8 @@ const doctor = (index: number) => ({
     'Oral Surgery',
     'Restorative Dentistry',
     'Digital Dentistry',
-  ][index - 1],
-  clinicId: `clinic-${index}`,
+    ][(index - 1) % 10] ?? 'General Dentistry',
+  clinicId: `clinic-${((index - 1) % CLINIC_COUNT) + 1}`,
   email: `doctor${index}@example.test`,
   phone: `+20 11 4444 00${index}`,
   status: 'Active' as const,
@@ -345,11 +352,12 @@ const subOrder = (index: number) => {
 
 const dentalCase = (index: number) => {
   const doctorIndex = ((index - 1) % DOCTOR_COUNT) + 1;
+  const patientIndex = ((index - 1) % PATIENT_COUNT) + 1;
   return {
     id: `case-${index}`,
     caseNumber: `CASE-${String(4000 + index)}`,
     title: `Treatment plan ${index}`,
-    patientId: `patient-${index}`,
+    patientId: `patient-${patientIndex}`,
     doctorId: `doctor-${doctorIndex}`,
     clinicId: `clinic-${doctorIndex}`,
     status: ['Open', 'In Progress', 'Review', 'Closed'][index % 4],
@@ -368,7 +376,7 @@ export const generatedSeedData: Record<string, unknown> = {
   'patients.json': Array.from({ length: PATIENT_COUNT }, (_, index) => patient(index + 1)),
   'orders.json': Array.from({ length: PATIENT_COUNT }, (_, index) => order(index + 1)),
   'sub-orders.json': Array.from({ length: PATIENT_COUNT }, (_, index) => subOrder(index + 1)),
-  'cases.json': Array.from({ length: 25 }, (_, index) => dentalCase(index + 1)),
+  'cases.json': Array.from({ length: CASE_COUNT }, (_, index) => dentalCase(index + 1)),
   'billing.json': Array.from({ length: PATIENT_COUNT }, (_, index) => ({
     id: `billing-${index + 1}`,
     orderId: `order-${index + 1}`,
@@ -381,27 +389,27 @@ export const generatedSeedData: Record<string, unknown> = {
     vouchers: (index + 1) % 3,
     notes: '',
   })),
-  'change-requests.json': Array.from({ length: 10 }, (_, index) => ({
+  'change-requests.json': Array.from({ length: CHANGE_REQUEST_COUNT }, (_, index) => ({
     id: `change-request-${index + 1}`,
     requestNumber: `CR-${String(5000 + index + 1)}`,
-    orderId: `order-${index + 1}`,
-    requester: doctor((index % 5) + 1).name,
+    orderId: `order-${(index % PATIENT_COUNT) + 1}`,
+    requester: doctor((index % DOCTOR_COUNT) + 1).name,
     status: ['Pending', 'In Review', 'Approved', 'Completed'][index % 4],
     priority: priorities[index % priorities.length],
     description: `Change request ${index + 1}`,
     createdAt: dateDaysAgo(15 + index),
     updatedAt: dateDaysAgo(7 + index),
   })),
-  'documents.json': Array.from({ length: 20 }, (_, index) => ({
+  'documents.json': Array.from({ length: DOCUMENT_COUNT }, (_, index) => ({
     id: `document-${index + 1}`,
     name: `Patient document ${index + 1}.pdf`,
     category: ['Prescriptions', 'Scan Files', 'Patient Photos', 'Invoices', 'Reports'][index % 5],
     type: 'PDF',
     size: `${1 + (index % 8)} MB`,
     date: dateOnlyDaysAgo(60 + index),
-    doctor: doctor((index % 5) + 1).name,
+    doctor: doctor((index % DOCTOR_COUNT) + 1).name,
   })),
-  'notifications.json': Array.from({ length: 25 }, (_, index) => ({
+  'notifications.json': Array.from({ length: NOTIFICATION_COUNT }, (_, index) => ({
     id: `notification-${index + 1}`,
     type: ['order', 'workflow', 'file', 'billing', 'system'][index % 5],
     title: `Notification ${index + 1}`,
