@@ -31,6 +31,7 @@ interface DocumentRecord {
   clinicId?: Types.ObjectId;
   orderId?: Types.ObjectId;
   subOrderId?: Types.ObjectId;
+  uploadedBy?: Types.ObjectId;
 }
 
 const optionalObjectIdString = z
@@ -65,12 +66,9 @@ export async function listDocuments(input: {
   categories?: DocumentDto['category'][] | undefined;
   sortBy: 'name' | 'date' | 'sizeBytes' | 'category' | 'type';
   sortDirection: 'asc' | 'desc';
-  tenantId?: Types.ObjectId | undefined;
+  scope: DataVisibilityScope;
 }): Promise<{ items: DocumentDto[]; totalItems: number }> {
-  const filter: FilterQuery<DocumentRecord> = {};
-  if (input.tenantId) {
-    filter.tenantId = input.tenantId;
-  }
+  const filter: FilterQuery<DocumentRecord> = buildDocumentAccessFilter(input.scope);
 
   if (input.categories && input.categories.length > 0) {
     filter.category = { $in: input.categories };
@@ -94,19 +92,19 @@ export async function listDocuments(input: {
     .exec();
 
   return {
-    items: await mapDocuments(records, input.tenantId),
+    items: await mapDocuments(records, input.scope.tenantId),
     totalItems,
   };
 }
 
 export async function getDocumentById(
   documentId: Types.ObjectId,
-  tenantId?: Types.ObjectId,
+  scope: DataVisibilityScope,
 ): Promise<DocumentDto> {
-  const filter: FilterQuery<DocumentRecord> = { _id: documentId };
-  if (tenantId) {
-    filter.tenantId = tenantId;
-  }
+  const filter: FilterQuery<DocumentRecord> = {
+    _id: documentId,
+    ...buildDocumentAccessFilter(scope),
+  };
   const record = await DocumentModel.findOne(filter).lean<DocumentRecord | null>().exec();
   if (!record) {
     throw new ApplicationError({
@@ -117,7 +115,7 @@ export async function getDocumentById(
     });
   }
 
-  const [dto] = await mapDocuments([record], tenantId);
+  const [dto] = await mapDocuments([record], scope.tenantId);
   if (!dto) {
     throw new ApplicationError({
       message: 'Document not found',
@@ -135,9 +133,17 @@ export async function createDocument(
   scope: DataVisibilityScope,
 ): Promise<DocumentDto> {
   const tenantId = scope.tenantId;
+  const scopedDoctorId = scope.isDoctor && scope.doctorId
+    ? scope.doctorId.toString()
+    : payload.doctorId;
+  const scopedClinicId = scope.clinicId
+    ? scope.clinicId.toString()
+    : payload.clinicId;
+
+  assertScopedReferenceMatch(scope, scopedDoctorId, scopedClinicId);
   const references: boolean[] = await Promise.all([
-    payload.doctorId
-      ? DoctorModel.exists({ _id: new Types.ObjectId(payload.doctorId), tenantId })
+    scopedDoctorId
+      ? DoctorModel.exists({ _id: new Types.ObjectId(scopedDoctorId), tenantId })
           .exec()
           .then((record) => Boolean(record))
       : Promise.resolve(true),
@@ -146,8 +152,8 @@ export async function createDocument(
           .exec()
           .then((record) => Boolean(record))
       : Promise.resolve(true),
-    payload.clinicId
-      ? ClinicModel.exists({ _id: new Types.ObjectId(payload.clinicId), tenantId })
+    scopedClinicId
+      ? ClinicModel.exists({ _id: new Types.ObjectId(scopedClinicId), tenantId })
           .exec()
           .then((record) => Boolean(record))
       : Promise.resolve(true),
@@ -183,26 +189,26 @@ export async function createDocument(
       type: payload.type,
       sizeBytes: payload.sizeBytes,
       date: payload.date ?? new Date(),
-      doctorId: payload.doctorId ? new Types.ObjectId(payload.doctorId) : undefined,
+      doctorId: scopedDoctorId ? new Types.ObjectId(scopedDoctorId) : undefined,
       patientId: payload.patientId ? new Types.ObjectId(payload.patientId) : undefined,
-      clinicId: payload.clinicId ? new Types.ObjectId(payload.clinicId) : undefined,
+      clinicId: scopedClinicId ? new Types.ObjectId(scopedClinicId) : undefined,
       orderId: payload.orderId ? new Types.ObjectId(payload.orderId) : undefined,
       subOrderId: payload.subOrderId ? new Types.ObjectId(payload.subOrderId) : undefined,
       uploadedBy: scope.userId,
     })) as { _id: Types.ObjectId }
   )._id;
 
-  return getDocumentById(createdId, tenantId);
+  return getDocumentById(createdId, scope);
 }
 
 export async function deleteDocument(
   documentId: Types.ObjectId,
-  tenantId?: Types.ObjectId,
+  scope: DataVisibilityScope,
 ): Promise<void> {
-  const filter: FilterQuery<DocumentRecord> = { _id: documentId };
-  if (tenantId) {
-    filter.tenantId = tenantId;
-  }
+  const filter: FilterQuery<DocumentRecord> = {
+    _id: documentId,
+    ...buildDocumentAccessFilter(scope),
+  };
   const existingCount = await DocumentModel.countDocuments(filter).exec();
   if (existingCount === 0) {
     throw new ApplicationError({
@@ -217,6 +223,70 @@ export async function deleteDocument(
 }
 
 export { buildPaginationMeta };
+
+function buildDocumentAccessFilter(scope: DataVisibilityScope): FilterQuery<DocumentRecord> {
+  const baseFilter: FilterQuery<DocumentRecord> = {
+    tenantId: scope.tenantId,
+  };
+
+  if (scope.isAdmin) {
+    return baseFilter;
+  }
+
+  if (scope.isDoctor && scope.doctorId) {
+    return {
+      ...baseFilter,
+      doctorId: scope.doctorId,
+    };
+  }
+
+  if (scope.clinicId) {
+    return {
+      ...baseFilter,
+      clinicId: scope.clinicId,
+    };
+  }
+
+  if (scope.isTechnician) {
+    return {
+      ...baseFilter,
+      uploadedBy: scope.userId,
+    };
+  }
+
+  if (scope.isStaff || scope.isManager) {
+    return baseFilter;
+  }
+
+  return {
+    ...baseFilter,
+    _id: { $in: [] as Types.ObjectId[] },
+  };
+}
+
+function assertScopedReferenceMatch(
+  scope: DataVisibilityScope,
+  doctorId: string | undefined,
+  clinicId: string | undefined,
+): void {
+  if (scope.isDoctor && scope.doctorId && doctorId && scope.doctorId.toString() !== doctorId) {
+    throw new ApplicationError({
+      message: 'Doctors can only create documents under their own profile',
+      statusCode: 403,
+      code: APPLICATION_ERROR_CODES.FORBIDDEN,
+      expose: true,
+    });
+  }
+
+  if (scope.clinicId && clinicId && scope.clinicId.toString() !== clinicId) {
+    throw new ApplicationError({
+      message: 'Document clinic must match the authenticated clinic scope',
+      statusCode: 403,
+      code: APPLICATION_ERROR_CODES.FORBIDDEN,
+      expose: true,
+    });
+  }
+}
 
 async function mapDocuments(
   records: DocumentRecord[],

@@ -40,7 +40,7 @@ documentsRouter.get('/documents', async (req, res) => {
     categories,
     sortBy: sort.sortBy as 'name' | 'date' | 'sizeBytes' | 'category' | 'type',
     sortDirection: sort.sortDirection,
-    tenantId: scope.tenantId,
+    scope,
   });
 
   sendOk(res, result.items, buildRequestMeta(req, buildPaginationMeta(result.totalItems, pagination)));
@@ -50,7 +50,7 @@ documentsRouter.get('/documents/:documentId', async (req, res) => {
   const params = z.object({ documentId: z.string() }).parse(req.params);
   const documentId = ensureObjectId(params.documentId, 'document id');
   const scope = await getAuthenticatedDataScope(req);
-  const data = await getDocumentById(documentId, scope.tenantId);
+  const data = await getDocumentById(documentId, scope);
 
   sendOk(res, data, buildRequestMeta(req));
 });
@@ -67,7 +67,7 @@ documentsRouter.delete('/documents/:documentId', requireAnyRole(['admin', 'staff
   const params = z.object({ documentId: z.string() }).parse(req.params);
   const documentId = ensureObjectId(params.documentId, 'document id');
   const scope = await getAuthenticatedDataScope(req);
-  await deleteDocument(documentId, scope.tenantId);
+  await deleteDocument(documentId, scope);
 
   sendNoContent(res);
 });

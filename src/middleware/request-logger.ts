@@ -17,9 +17,12 @@ export const requestLogger = pinoHttp({
   },
   serializers: {
     req(req: { method?: string; url?: string }) {
+      const rawUrl = req.url ?? '';
+      const queryStartIndex = rawUrl.indexOf('?');
+      const sanitizedUrl = queryStartIndex >= 0 ? rawUrl.slice(0, queryStartIndex) : rawUrl;
       return {
         method: req.method ?? 'UNKNOWN',
-        url: req.url ?? '',
+        url: sanitizedUrl,
       };
     },
     res(res: { statusCode?: number }) {

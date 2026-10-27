@@ -26,6 +26,16 @@ describe('API integration', () => {
     expect(response.body).toHaveProperty('error.code', 'UNAUTHORIZED');
   });
 
+  it('rejects spoofed identity headers without bearer token', async () => {
+    const response = await request(app)
+      .get('/api/v1/clinics')
+      .set('x-tenant-id', '507f191e810c19729de860ea')
+      .set('x-user-id', '507f191e810c19729de860eb');
+
+    expect(response.status).toBe(401);
+    expect(response.body).toHaveProperty('error.code', 'UNAUTHORIZED');
+  });
+
   it('rewrites legacy /api/order route to v1 orders surface', async () => {
     const response = await request(app).get('/api/order');
 

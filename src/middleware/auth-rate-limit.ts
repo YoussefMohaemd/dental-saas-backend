@@ -6,7 +6,9 @@ const attempts = new Map<string, { count: number; resetAt: number }>();
 
 export const authRateLimit: RequestHandler = (req, res, next) => {
   const now = Date.now();
-  const key = req.ip ?? req.socket.remoteAddress ?? 'unknown';
+  const forwardedFor = req.header('x-forwarded-for');
+  const forwardedIp = forwardedFor?.split(',')[0]?.trim();
+  const key = forwardedIp || req.ip || req.socket.remoteAddress || 'unknown';
   const current = attempts.get(key);
 
   if (!current || current.resetAt <= now) {

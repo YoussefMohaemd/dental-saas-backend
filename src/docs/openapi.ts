@@ -22,20 +22,6 @@ const jsonContentType = 'application/json';
 const bearerSecurity = [{ bearerAuth: [] }];
 
 const commonParameters = {
-  tenantIdHeader: {
-    name: 'x-tenant-id',
-    in: 'header',
-    required: false,
-    description: 'Tenant scope. Optional for routes that infer tenant from auth context.',
-    schema: { type: 'string' },
-  },
-  userIdHeader: {
-    name: 'x-user-id',
-    in: 'header',
-    required: false,
-    description: 'Current user identifier, used by notification filtering routes.',
-    schema: { type: 'string' },
-  },
   search: {
     name: 'search',
     in: 'query',
@@ -99,7 +85,7 @@ const endpoints: EndpointSpec[] = [
     method: 'post',
     path: '/api/auth/login',
     tag: 'auth',
-    summary: 'Authenticate user credentials',
+    summary: 'Authenticate user credentials and issue refresh cookie policy',
     requestBody: {
       required: true,
       content: {
@@ -111,7 +97,10 @@ const endpoints: EndpointSpec[] = [
               tenantId: { type: 'string' },
               email: { type: 'string', format: 'email' },
               password: { type: 'string', minLength: 8, maxLength: 128 },
-              rememberMe: { type: 'boolean' },
+              rememberMe: {
+                type: 'boolean',
+                description: 'true keeps a persistent refresh cookie; false issues a session cookie',
+              },
             },
           },
         },
@@ -684,14 +673,6 @@ export function createOpenApiDocument(): OpenApiObject {
 
 function createOperation(endpoint: EndpointSpec): OpenApiObject {
   const parameters = [...(endpoint.parameters ?? [])];
-
-  if (endpoint.path.startsWith('/api/v1') && !endpoint.path.startsWith('/api/v1/settings/')) {
-    parameters.push(commonParameters.tenantIdHeader);
-  }
-
-  if (endpoint.path.startsWith('/api/v1/notifications')) {
-    parameters.push(commonParameters.userIdHeader);
-  }
 
   if (listQueryPaths.has(endpoint.path) && endpoint.method === 'get') {
     parameters.push(

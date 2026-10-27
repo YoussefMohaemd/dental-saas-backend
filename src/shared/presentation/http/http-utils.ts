@@ -216,6 +216,15 @@ export async function getAuthenticatedDataScope(req: Request): Promise<Authentic
           .exec()
       : null;
 
+  if (!isAdmin && isDoctor && !doctor) {
+    throw new ApplicationError({
+      message: 'Doctor role is not linked to an active doctor profile',
+      statusCode: 403,
+      code: APPLICATION_ERROR_CODES.FORBIDDEN,
+      expose: true,
+    });
+  }
+
   return {
     tenantId,
     userId,
@@ -234,25 +243,49 @@ function normalizeRoleAliases(roles: readonly string[]): string[] {
   return Array.from(new Set(roles.map((role) => normalizeRoleAlias(role))));
 }
 
+const ROLE_ALIASES = {
+  admin: new Set(['admin', 'administrator', 'superadmin', 'super-admin', 'super_admin']),
+  staff: new Set(['staff']),
+  manager: new Set(['manager']),
+  doctor: new Set(['doctor', 'dentist']),
+  technician: new Set(['technician', 'tech', 'lab-technician', 'lab_technician', 'labtech']),
+} as const;
+
 function normalizeRoleAlias(role: string): string {
   const normalized = role.trim().toLowerCase();
-  if (normalized.includes('admin')) {
+  const compact = normalized.replace(/[\s_-]+/g, '');
+  const segments = normalized.split(/[\s_-]+/).filter((segment) => segment.length > 0);
+
+  if (
+    ROLE_ALIASES.admin.has(normalized) ||
+    ROLE_ALIASES.admin.has(compact) ||
+    segments.includes('admin')
+  ) {
     return 'admin';
   }
 
-  if (normalized.includes('staff')) {
+  if (ROLE_ALIASES.staff.has(normalized) || segments.includes('staff')) {
     return 'staff';
   }
 
-  if (normalized.includes('manager')) {
+  if (ROLE_ALIASES.manager.has(normalized) || segments.includes('manager')) {
     return 'manager';
   }
 
-  if (normalized.includes('doctor')) {
+  if (
+    ROLE_ALIASES.doctor.has(normalized) ||
+    ROLE_ALIASES.doctor.has(compact) ||
+    segments.includes('doctor')
+  ) {
     return 'doctor';
   }
 
-  if (normalized.includes('technician') || normalized.includes('tech')) {
+  if (
+    ROLE_ALIASES.technician.has(normalized) ||
+    ROLE_ALIASES.technician.has(compact) ||
+    segments.includes('technician') ||
+    segments.includes('tech')
+  ) {
     return 'technician';
   }
 

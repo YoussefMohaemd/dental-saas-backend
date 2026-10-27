@@ -323,10 +323,7 @@ const seedDevelopmentData = async (): Promise<void> => {
   const defaultPasswordHash = await passwordHasher.hash('ChangeMe123!');
 
   await mongoose.connect(env.MONGODB_URI);
-  logger.info(
-    { database: env.MONGODB_URI },
-    'Connected to MongoDB for development seeding (Angular data import)',
-  );
+  logger.info('Connected to MongoDB for development seeding (Angular data import)');
 
   const clinicIdMap = new Map(
     clinicsSource.map((item) => [item.id, objectIdFromSeed('clinic', item.id)]),

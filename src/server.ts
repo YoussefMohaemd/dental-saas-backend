@@ -59,7 +59,7 @@ const startServer = async (): Promise<void> => {
   registerPersistenceModels();
   await mongoose.connect(env.MONGODB_URI);
 
-  logger.info({ database: env.MONGODB_URI }, 'MongoDB connection established');
+  logger.info('MongoDB connection established');
 
   server = app.listen(env.PORT, () => {
     logger.info({ port: env.PORT, env: env.NODE_ENV }, 'Backend service listening');

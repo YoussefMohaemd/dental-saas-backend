@@ -31,7 +31,6 @@ const refreshCookieOptions: CookieOptions = {
   sameSite: env.AUTH_REFRESH_COOKIE_SAME_SITE,
   domain: env.AUTH_REFRESH_COOKIE_DOMAIN,
   path: env.AUTH_REFRESH_COOKIE_PATH,
-  maxAge: env.AUTH_REFRESH_TOKEN_TTL_SECONDS * 1000,
 };
 
 const clearRefreshCookieOptions: CookieOptions = {
@@ -44,11 +43,18 @@ export async function loginController(req: Request, res: Response, next: NextFun
     const payload = loginSchema.parse(req.body);
     const sessionContext = getSessionContext(req);
     const authResult = await authService.login({
-      ...payload,
+      tenantId: payload.tenantId,
+      email: payload.email,
+      password: payload.password,
+      rememberMe: payload.rememberMe ?? true,
       ...sessionContext,
     });
 
-    res.cookie(env.AUTH_REFRESH_COOKIE_NAME, authResult.refreshToken, refreshCookieOptions);
+    res.cookie(
+      env.AUTH_REFRESH_COOKIE_NAME,
+      authResult.refreshToken,
+      buildRefreshCookieOptions(authResult.refreshTokenPersistent),
+    );
     sendOk(res, {
       accessToken: authResult.accessToken,
       user: authResult.user,
@@ -63,7 +69,11 @@ export async function refreshController(req: Request, res: Response, next: NextF
     const refreshToken = getRefreshTokenFromCookie(req);
     const authResult = await authService.refresh(refreshToken, getSessionContext(req));
 
-    res.cookie(env.AUTH_REFRESH_COOKIE_NAME, authResult.refreshToken, refreshCookieOptions);
+    res.cookie(
+      env.AUTH_REFRESH_COOKIE_NAME,
+      authResult.refreshToken,
+      buildRefreshCookieOptions(authResult.refreshTokenPersistent),
+    );
     sendOk(res, {
       accessToken: authResult.accessToken,
       user: authResult.user,
@@ -118,6 +128,7 @@ export async function changePasswordController(
       userId: principal.userId,
       tenantId: principal.tenantId,
     });
+    res.clearCookie(env.AUTH_REFRESH_COOKIE_NAME, clearRefreshCookieOptions);
     sendNoContent(res);
   } catch (error) {
     next(error);
@@ -166,5 +177,12 @@ function getSessionContext(req: Request): { ipAddress: string | undefined; userA
   return {
     ipAddress: ipAddress || undefined,
     userAgent,
+  };
+}
+
+function buildRefreshCookieOptions(isPersistent: boolean): CookieOptions {
+  return {
+    ...refreshCookieOptions,
+    ...(isPersistent ? { maxAge: env.AUTH_REFRESH_TOKEN_TTL_SECONDS * 1000 } : {}),
   };
 }

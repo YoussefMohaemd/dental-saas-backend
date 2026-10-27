@@ -25,6 +25,11 @@ const authSessionSchema = new Schema(
       type: String,
       trim: true,
     },
+    isPersistent: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
     revokedAt: Date,
     replacedByTokenId: {
       type: String,
@@ -47,7 +52,6 @@ authSessionSchema.index({ userId: 1, revokedAt: 1 });
 authSessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 export const AuthSessionModel: Model<any> = (models.AuthSession as Model<any> | undefined) ?? model('AuthSession', authSessionSchema);
-
 
 
 

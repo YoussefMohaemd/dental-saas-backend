@@ -15,6 +15,7 @@ interface LoginInput {
   tenantId: string;
   email: string;
   password: string;
+  rememberMe?: boolean;
   ipAddress: string | undefined;
   userAgent: string | undefined;
 }
@@ -38,6 +39,7 @@ interface AuthenticatedUser {
 export interface AuthTokensResponse {
   accessToken: string;
   refreshToken: string;
+  refreshTokenPersistent: boolean;
   user: AuthenticatedUser;
 }
 
@@ -64,6 +66,7 @@ interface AuthSessionRecord {
   refreshTokenHash: string;
   userAgent?: string;
   ipAddress?: string;
+  isPersistent: boolean;
   revokedAt?: Date;
   replacedByTokenId?: string;
   lastUsedAt?: Date;
@@ -119,6 +122,7 @@ export class AuthService {
     await userModel
       .updateOne({ _id: user._id, tenantId: user.tenantId }, { $set: { passwordHash } })
       .exec();
+    await this.revokeAllUserSessions(input.userId, input.tenantId);
   }
 
   public async login(input: LoginInput): Promise<AuthTokensResponse> {
@@ -150,7 +154,7 @@ export class AuthService {
     return this.issueSessionTokens(user, {
       ipAddress: input.ipAddress,
       userAgent: input.userAgent,
-    });
+    }, input.rememberMe ?? true);
   }
 
   public async refresh(
@@ -204,6 +208,7 @@ export class AuthService {
     return {
       accessToken: tokenPair.accessToken,
       refreshToken: tokenPair.refreshToken,
+      refreshTokenPersistent: session.isPersistent,
       user: this.toAuthenticatedUser(user),
     };
   }
@@ -250,6 +255,7 @@ export class AuthService {
   private async issueSessionTokens(
     user: UserWithAuth,
     context: SessionContext,
+    isPersistent: boolean,
   ): Promise<AuthTokensResponse> {
     const now = new Date();
     await authSessionModel
@@ -262,6 +268,7 @@ export class AuthService {
     const sessionQuery = {
       userId: user._id,
       tenantId: user.tenantId,
+      isPersistent,
       revokedAt: { $exists: false },
       expiresAt: { $gt: now },
       ...(context.userAgent
@@ -285,6 +292,7 @@ export class AuthService {
       if (context.ipAddress) {
         existingSession.ipAddress = context.ipAddress;
       }
+      existingSession.isPersistent = isPersistent;
       existingSession.expiresAt = new Date(Date.now() + env.AUTH_REFRESH_TOKEN_TTL_SECONDS * 1000);
       existingSession.lastUsedAt = now;
       existingSession.set({ replacedByTokenId: undefined });
@@ -298,6 +306,7 @@ export class AuthService {
         refreshTokenHash,
         userAgent: context.userAgent,
         ipAddress: context.ipAddress,
+        isPersistent,
         expiresAt: new Date(Date.now() + env.AUTH_REFRESH_TOKEN_TTL_SECONDS * 1000),
         lastUsedAt: now,
       });
@@ -306,6 +315,7 @@ export class AuthService {
     return {
       accessToken: tokenPair.accessToken,
       refreshToken: tokenPair.refreshToken,
+      refreshTokenPersistent: isPersistent,
       user: this.toAuthenticatedUser(user),
     };
   }
