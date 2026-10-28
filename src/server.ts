@@ -59,7 +59,7 @@ const startServer = async (): Promise<void> => {
   registerPersistenceModels();
   await mongoose.connect(env.MONGODB_URI);
 
-  logger.info('MongoDB connection established');
+  logger.info({ mongoTarget: redactMongoConnectionString(env.MONGODB_URI) }, 'MongoDB connection established');
 
   server = app.listen(env.PORT, () => {
     logger.info({ port: env.PORT, env: env.NODE_ENV }, 'Backend service listening');
@@ -84,6 +84,37 @@ process.on('unhandledRejection', (reason) => {
 });
 
 void startServer().catch((error) => {
-  logger.fatal({ err: error }, 'Failed to start backend service');
+  logger.fatal({ err: sanitizeStartupError(error) }, 'Failed to start backend service');
   process.exit(1);
 });
+
+function sanitizeStartupError(error: unknown): { name: string; message: string; stack?: string } {
+  if (!(error instanceof Error)) {
+    return {
+      name: 'UnknownError',
+      message: 'Unexpected startup failure',
+    };
+  }
+
+  const redactedMessage = redactStartupText(error.message);
+  const redactedStack = error.stack ? redactStartupText(error.stack) : undefined;
+
+  return {
+    name: error.name,
+    message: redactedMessage,
+    ...(redactedStack ? { stack: redactedStack } : {}),
+  };
+}
+
+function redactStartupText(value: string): string {
+  const trimmedUri = env.MONGODB_URI.trim();
+  if (trimmedUri.length === 0) {
+    return value;
+  }
+
+  return value.replaceAll(trimmedUri, redactMongoConnectionString(trimmedUri));
+}
+
+function redactMongoConnectionString(uri: string): string {
+  return uri.replace(/\/\/[^/@]*@/u, '//***:***@');
+}

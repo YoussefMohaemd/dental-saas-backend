@@ -79,6 +79,11 @@ Copy `.env.example` to `.env` and adjust values as needed.
   the authenticated tenant.
 - Non-admin doctor and clinic visibility remains governed by the existing
   authenticated data-scope rules; no new role restrictions were introduced.
+- Doctor-scoped access now fails closed: non-admin users with doctor role must
+  resolve to an active doctor profile in the authenticated tenant, otherwise
+  the request is rejected with `403 FORBIDDEN`.
+- Startup logging redacts MongoDB connection credentials; full `MONGODB_URI`
+  values are not emitted to logs.
 - Postman collection (all endpoints): `postman/Dental-SaaS-API.postman_collection.json`
 
 See `docs/README.md` for architecture boundaries and dependency direction.

@@ -193,6 +193,7 @@ export async function getAuthenticatedDataScope(req: Request): Promise<Authentic
   const isTechnician = roles.includes('technician');
   const isStaff = roles.includes('staff');
   const isManager = roles.includes('manager');
+  const requiresDoctorProfile = !isAdmin && isDoctor;
 
   const user = await UserModel.findOne({ _id: userId, tenantId })
     .select({ email: 1, clinicId: 1 })
@@ -208,15 +209,7 @@ export async function getAuthenticatedDataScope(req: Request): Promise<Authentic
     });
   }
 
-  const doctor =
-    !isAdmin && isDoctor && user.email
-      ? await DoctorModel.findOne({ tenantId, email: user.email })
-          .select({ _id: 1 })
-          .lean<{ _id: Types.ObjectId } | null>()
-          .exec()
-      : null;
-
-  if (!isAdmin && isDoctor && !doctor) {
+  if (requiresDoctorProfile && !user.email) {
     throw new ApplicationError({
       message: 'Doctor role is not linked to an active doctor profile',
       statusCode: 403,
@@ -225,11 +218,30 @@ export async function getAuthenticatedDataScope(req: Request): Promise<Authentic
     });
   }
 
+  const doctor =
+    requiresDoctorProfile && user.email
+      ? await DoctorModel.findOne({ tenantId, email: user.email, status: 'Active' })
+          .select({ _id: 1, clinicId: 1, status: 1 })
+          .lean<{ _id: Types.ObjectId; clinicId: Types.ObjectId; status: 'Active' | 'Inactive' } | null>()
+          .exec()
+      : null;
+
+  if (requiresDoctorProfile && !doctor) {
+    throw new ApplicationError({
+      message: 'Doctor role is not linked to an active doctor profile',
+      statusCode: 403,
+      code: APPLICATION_ERROR_CODES.FORBIDDEN,
+      expose: true,
+    });
+  }
+
+  const clinicId = doctor?.clinicId ?? user.clinicId;
+
   return {
     tenantId,
     userId,
     roles,
-    ...(user.clinicId ? { clinicId: user.clinicId } : {}),
+    ...(clinicId ? { clinicId } : {}),
     ...(doctor ? { doctorId: doctor._id } : {}),
     isAdmin,
     isDoctor,
