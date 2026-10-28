@@ -58,6 +58,11 @@ class RecordingOrdersRepository implements OrderRepository {
     return false;
   }
 
+  public async deleteOrderWithSubOrders(): Promise<boolean> {
+    await Promise.resolve();
+    return false;
+  }
+
   public async isOrderNumberTaken(
     _orderNumber: string,
     scope: DataVisibilityScope,

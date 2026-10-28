@@ -14,6 +14,7 @@ import { requestContextMiddleware } from './shared/presentation/http/request-con
 const app = express();
 
 app.disable('x-powered-by');
+app.set('trust proxy', env.TRUST_PROXY_HOPS);
 app.use(requestLogger);
 app.use(requestContextMiddleware);
 app.use(securityHeadersMiddleware);

@@ -34,6 +34,7 @@ export interface OrderRepository {
   listOrders(query: OrderListQuery): Promise<OrderListResult>;
   updateOrder(orderId: string, payload: OrderUpdatePayload, scope: DataVisibilityScope): Promise<Order | null>;
   deleteOrder(orderId: string, scope: DataVisibilityScope): Promise<boolean>;
+  deleteOrderWithSubOrders(orderId: string, scope: DataVisibilityScope): Promise<boolean>;
   isOrderNumberTaken(orderNumber: string, scope: DataVisibilityScope, excludeOrderId?: string): Promise<boolean>;
   findPatientById(patientId: string, scope: DataVisibilityScope): Promise<PatientReference | null>;
   findDoctorById(doctorId: string, scope: DataVisibilityScope): Promise<DoctorReference | null>;

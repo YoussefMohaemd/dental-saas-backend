@@ -34,6 +34,30 @@ interface DocumentRecord {
   uploadedBy?: Types.ObjectId;
 }
 
+interface DoctorScopeRecord {
+  _id: Types.ObjectId;
+  clinicId: Types.ObjectId;
+}
+
+interface PatientScopeRecord {
+  _id: Types.ObjectId;
+  doctorId: Types.ObjectId;
+  clinicId: Types.ObjectId;
+}
+
+interface OrderScopeRecord {
+  _id: Types.ObjectId;
+  patientId: Types.ObjectId;
+  doctorId: Types.ObjectId;
+  clinicId: Types.ObjectId;
+  technicianId?: Types.ObjectId;
+}
+
+interface SubOrderScopeRecord {
+  _id: Types.ObjectId;
+  orderId: Types.ObjectId;
+}
+
 const optionalObjectIdString = z
   .string()
   .regex(/^[a-f\d]{24}$/i, 'Expected ObjectId string')
@@ -139,46 +163,121 @@ export async function createDocument(
   const scopedClinicId = scope.clinicId
     ? scope.clinicId.toString()
     : payload.clinicId;
+  const scopedDoctorObjectId = scopedDoctorId ? new Types.ObjectId(scopedDoctorId) : undefined;
+  const patientObjectId = payload.patientId ? new Types.ObjectId(payload.patientId) : undefined;
+  const scopedClinicObjectId = scopedClinicId ? new Types.ObjectId(scopedClinicId) : undefined;
+  const orderObjectId = payload.orderId ? new Types.ObjectId(payload.orderId) : undefined;
+  const subOrderObjectId = payload.subOrderId ? new Types.ObjectId(payload.subOrderId) : undefined;
 
   assertScopedReferenceMatch(scope, scopedDoctorId, scopedClinicId);
-  const references: boolean[] = await Promise.all([
-    scopedDoctorId
-      ? DoctorModel.exists({ _id: new Types.ObjectId(scopedDoctorId), tenantId })
+  const [doctorRecord, patientRecord, clinicRecord, orderRecord, subOrderRecord, uploaderExists] = await Promise.all([
+    scopedDoctorObjectId
+      ? DoctorModel.findOne({
+          _id: scopedDoctorObjectId,
+          tenantId,
+          ...buildDoctorScopeFilter(scope),
+        })
+          .select({ _id: 1, clinicId: 1 })
+          .lean<DoctorScopeRecord | null>()
           .exec()
-          .then((record) => Boolean(record))
-      : Promise.resolve(true),
-    payload.patientId
-      ? PatientModel.exists({ _id: new Types.ObjectId(payload.patientId), tenantId })
+      : Promise.resolve(null),
+    patientObjectId
+      ? PatientModel.findOne({
+          _id: patientObjectId,
+          tenantId,
+          ...buildPatientScopeFilter(scope),
+        })
+          .select({ _id: 1, doctorId: 1, clinicId: 1 })
+          .lean<PatientScopeRecord | null>()
           .exec()
-          .then((record) => Boolean(record))
-      : Promise.resolve(true),
-    scopedClinicId
-      ? ClinicModel.exists({ _id: new Types.ObjectId(scopedClinicId), tenantId })
+      : Promise.resolve(null),
+    scopedClinicObjectId
+      ? ClinicModel.findOne({
+          _id: scopedClinicObjectId,
+          tenantId,
+          ...buildClinicScopeFilter(scope),
+        })
+          .select({ _id: 1 })
+          .lean<{ _id: Types.ObjectId } | null>()
           .exec()
-          .then((record) => Boolean(record))
-      : Promise.resolve(true),
-    payload.orderId
-      ? OrderModel.exists({ _id: new Types.ObjectId(payload.orderId), tenantId })
+      : Promise.resolve(null),
+    orderObjectId
+      ? OrderModel.findOne({
+          _id: orderObjectId,
+          tenantId,
+          ...buildOrderOwnershipFilter(scope),
+        })
+          .select({ _id: 1, patientId: 1, doctorId: 1, clinicId: 1 })
+          .lean<OrderScopeRecord | null>()
           .exec()
-          .then((record) => Boolean(record))
-      : Promise.resolve(true),
-    payload.subOrderId
-      ? SubOrderModel.exists({ _id: new Types.ObjectId(payload.subOrderId), tenantId })
+      : Promise.resolve(null),
+    subOrderObjectId
+      ? SubOrderModel.findOne({
+          _id: subOrderObjectId,
+          tenantId,
+        })
+          .select({ _id: 1, orderId: 1 })
+          .lean<SubOrderScopeRecord | null>()
           .exec()
-          .then((record) => Boolean(record))
-      : Promise.resolve(true),
+      : Promise.resolve(null),
     UserModel.exists({ _id: scope.userId, tenantId })
       .exec()
       .then((record) => Boolean(record)),
   ]);
 
-  if (references.some((reference) => !reference)) {
+  const subOrderScopeOrder = subOrderRecord
+    ? await OrderModel.findOne({
+        _id: subOrderRecord.orderId,
+        tenantId,
+        ...buildOrderOwnershipFilter(scope),
+      })
+        .select({ _id: 1 })
+        .lean<{ _id: Types.ObjectId } | null>()
+        .exec()
+    : null;
+
+  if (
+    !uploaderExists ||
+    (scopedDoctorObjectId && !doctorRecord) ||
+    (patientObjectId && !patientRecord) ||
+    (scopedClinicObjectId && !clinicRecord) ||
+    (orderObjectId && !orderRecord) ||
+    (subOrderObjectId && (!subOrderRecord || !subOrderScopeOrder))
+  ) {
     throw new ApplicationError({
-      message: 'Document references must belong to the authenticated tenant',
+      message: 'Document references must belong to the authenticated tenant and access scope',
       statusCode: 422,
       code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
       expose: true,
     });
+  }
+
+  if (patientRecord && scopedDoctorObjectId && !isSameObjectId(patientRecord.doctorId, scopedDoctorObjectId)) {
+    throwScopedRelationshipError('Document patient must belong to the selected doctor');
+  }
+
+  if (doctorRecord && scopedClinicObjectId && !isSameObjectId(doctorRecord.clinicId, scopedClinicObjectId)) {
+    throwScopedRelationshipError('Document doctor must belong to the selected clinic');
+  }
+
+  if (patientRecord && scopedClinicObjectId && !isSameObjectId(patientRecord.clinicId, scopedClinicObjectId)) {
+    throwScopedRelationshipError('Document patient must belong to the selected clinic');
+  }
+
+  if (orderRecord && patientObjectId && !isSameObjectId(orderRecord.patientId, patientObjectId)) {
+    throwScopedRelationshipError('Document order must belong to the selected patient');
+  }
+
+  if (orderRecord && scopedDoctorObjectId && !isSameObjectId(orderRecord.doctorId, scopedDoctorObjectId)) {
+    throwScopedRelationshipError('Document order must belong to the selected doctor');
+  }
+
+  if (orderRecord && scopedClinicObjectId && !isSameObjectId(orderRecord.clinicId, scopedClinicObjectId)) {
+    throwScopedRelationshipError('Document order must belong to the selected clinic');
+  }
+
+  if (subOrderRecord && orderObjectId && !isSameObjectId(subOrderRecord.orderId, orderObjectId)) {
+    throwScopedRelationshipError('Document sub-order must belong to the selected order');
   }
 
   const createdId = (
@@ -189,11 +288,11 @@ export async function createDocument(
       type: payload.type,
       sizeBytes: payload.sizeBytes,
       date: payload.date ?? new Date(),
-      doctorId: scopedDoctorId ? new Types.ObjectId(scopedDoctorId) : undefined,
-      patientId: payload.patientId ? new Types.ObjectId(payload.patientId) : undefined,
-      clinicId: scopedClinicId ? new Types.ObjectId(scopedClinicId) : undefined,
-      orderId: payload.orderId ? new Types.ObjectId(payload.orderId) : undefined,
-      subOrderId: payload.subOrderId ? new Types.ObjectId(payload.subOrderId) : undefined,
+      doctorId: scopedDoctorObjectId,
+      patientId: patientObjectId,
+      clinicId: scopedClinicObjectId,
+      orderId: orderObjectId,
+      subOrderId: subOrderObjectId,
       uploadedBy: scope.userId,
     })) as { _id: Types.ObjectId }
   )._id;
@@ -286,6 +385,79 @@ function assertScopedReferenceMatch(
       expose: true,
     });
   }
+}
+
+function throwScopedRelationshipError(message: string): never {
+  throw new ApplicationError({
+    message,
+    statusCode: 422,
+    code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+    expose: true,
+  });
+}
+
+function isSameObjectId(left: Types.ObjectId | undefined, right: Types.ObjectId): boolean {
+  return Boolean(left && left.equals(right));
+}
+
+function buildDoctorScopeFilter(scope: DataVisibilityScope): FilterQuery<DoctorScopeRecord> {
+  const filter: FilterQuery<DoctorScopeRecord> = {};
+
+  if (scope.doctorId) {
+    filter._id = scope.doctorId;
+  }
+
+  if (scope.clinicId) {
+    filter.clinicId = scope.clinicId;
+  }
+
+  return filter;
+}
+
+function buildPatientScopeFilter(scope: DataVisibilityScope): FilterQuery<PatientScopeRecord> {
+  const filter: FilterQuery<PatientScopeRecord> = {};
+
+  if (scope.doctorId) {
+    filter.doctorId = scope.doctorId;
+  }
+
+  if (scope.clinicId) {
+    filter.clinicId = scope.clinicId;
+  }
+
+  return filter;
+}
+
+function buildClinicScopeFilter(scope: DataVisibilityScope): FilterQuery<{ _id: Types.ObjectId }> {
+  if (scope.clinicId) {
+    return { _id: scope.clinicId };
+  }
+
+  return {};
+}
+
+function buildOrderOwnershipFilter(scope: DataVisibilityScope): FilterQuery<OrderScopeRecord> {
+  if (scope.isAdmin) {
+    return {};
+  }
+
+  if (scope.isDoctor && scope.doctorId) {
+    return { doctorId: scope.doctorId };
+  }
+
+  if (scope.isTechnician) {
+    return { technicianId: scope.userId };
+  }
+
+  if (scope.clinicId) {
+    return { clinicId: scope.clinicId };
+  }
+
+  if (scope.isStaff || scope.isManager) {
+    return {};
+  }
+
+  return { _id: { $in: [] as Types.ObjectId[] } };
 }
 
 async function mapDocuments(

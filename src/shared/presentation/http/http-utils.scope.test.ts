@@ -79,6 +79,14 @@ describe('getAuthenticatedDataScope', () => {
     });
     expect(doctorFindOne).not.toHaveBeenCalled();
   });
+
+  it('rejects unsupported role claims instead of inferring elevated access', async () => {
+    await expect(getAuthenticatedDataScope(createRequest(['clinic-admin']))).rejects.toMatchObject({
+      statusCode: 403,
+      code: APPLICATION_ERROR_CODES.FORBIDDEN,
+      message: 'Unsupported role claim: clinic-admin',
+    });
+  });
 });
 
 function createFindOneChain<TResult, TQuery>(result: TResult): TQuery {

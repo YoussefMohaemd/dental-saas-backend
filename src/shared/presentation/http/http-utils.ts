@@ -255,53 +255,55 @@ function normalizeRoleAliases(roles: readonly string[]): string[] {
   return Array.from(new Set(roles.map((role) => normalizeRoleAlias(role))));
 }
 
+type CanonicalRole = 'admin' | 'staff' | 'manager' | 'doctor' | 'technician';
+
 const ROLE_ALIASES = {
-  admin: new Set(['admin', 'administrator', 'superadmin', 'super-admin', 'super_admin']),
+  admin: new Set(['admin', 'administrator', 'superadmin', 'super-admin', 'super_admin', 'super admin']),
   staff: new Set(['staff']),
   manager: new Set(['manager']),
-  doctor: new Set(['doctor', 'dentist']),
-  technician: new Set(['technician', 'tech', 'lab-technician', 'lab_technician', 'labtech']),
+  doctor: new Set(['doctor', 'dentist', 'dental doctor']),
+  technician: new Set(['technician', 'tech', 'lab-technician', 'lab_technician', 'lab tech', 'labtech']),
 } as const;
 
-function normalizeRoleAlias(role: string): string {
+function normalizeRoleAlias(role: string): CanonicalRole {
   const normalized = role.trim().toLowerCase();
   const compact = normalized.replace(/[\s_-]+/g, '');
-  const segments = normalized.split(/[\s_-]+/).filter((segment) => segment.length > 0);
 
   if (
     ROLE_ALIASES.admin.has(normalized) ||
-    ROLE_ALIASES.admin.has(compact) ||
-    segments.includes('admin')
+    ROLE_ALIASES.admin.has(compact)
   ) {
     return 'admin';
   }
 
-  if (ROLE_ALIASES.staff.has(normalized) || segments.includes('staff')) {
+  if (ROLE_ALIASES.staff.has(normalized) || ROLE_ALIASES.staff.has(compact)) {
     return 'staff';
   }
 
-  if (ROLE_ALIASES.manager.has(normalized) || segments.includes('manager')) {
+  if (ROLE_ALIASES.manager.has(normalized) || ROLE_ALIASES.manager.has(compact)) {
     return 'manager';
   }
 
   if (
     ROLE_ALIASES.doctor.has(normalized) ||
-    ROLE_ALIASES.doctor.has(compact) ||
-    segments.includes('doctor')
+    ROLE_ALIASES.doctor.has(compact)
   ) {
     return 'doctor';
   }
 
   if (
     ROLE_ALIASES.technician.has(normalized) ||
-    ROLE_ALIASES.technician.has(compact) ||
-    segments.includes('technician') ||
-    segments.includes('tech')
+    ROLE_ALIASES.technician.has(compact)
   ) {
     return 'technician';
   }
 
-  return normalized;
+  throw new ApplicationError({
+    message: `Unsupported role claim: ${role}`,
+    statusCode: 403,
+    code: APPLICATION_ERROR_CODES.FORBIDDEN,
+    expose: true,
+  });
 }
 
 function parseStringList(value: unknown): string[] | undefined {

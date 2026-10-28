@@ -1,3 +1,4 @@
+import { AuthRateLimitModel } from './auth-rate-limit.model';
 import { AuthSessionModel } from './auth-session.model';
 import { BillingRecordModel } from './billing-record.model';
 import { CaseModel } from './case.model';
@@ -15,6 +16,7 @@ import { UserPreferencesModel } from './user-preferences.model';
 
 const persistenceModels = {
   users: UserModel,
+  authRateLimits: AuthRateLimitModel,
   authSessions: AuthSessionModel,
   clinics: ClinicModel,
   doctors: DoctorModel,
@@ -35,6 +37,7 @@ export const registerPersistenceModels = () => persistenceModels;
 export { persistenceModels };
 export {
   AuthSessionModel,
+  AuthRateLimitModel,
   BillingRecordModel,
   CaseModel,
   ChangeRequestModel,

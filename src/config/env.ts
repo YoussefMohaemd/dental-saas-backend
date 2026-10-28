@@ -32,6 +32,30 @@ const optionalString = z.preprocess((value) => {
   return trimmed.length > 0 ? trimmed : undefined;
 }, z.string().optional());
 
+const optionalNonNegativeInteger = z.preprocess((value) => {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (typeof value === 'number') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return undefined;
+    }
+
+    const parsed = Number(trimmed);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return value;
+}, z.number().int().min(0).optional());
+
 const buildTokenSecretSchema = (fallbackSecret: string) =>
   optionalString.default(fallbackSecret).pipe(z.string().min(32, 'Must be at least 32 characters'));
 
@@ -53,6 +77,9 @@ const envSchema = z.object({
   AUTH_REFRESH_COOKIE_SECURE: parseBoolean.default(false),
   AUTH_REFRESH_COOKIE_SAME_SITE: z.enum(['strict', 'lax', 'none']).default('lax'),
   AUTH_REFRESH_COOKIE_HTTP_ONLY: parseBoolean.default(true),
+  TRUST_PROXY_HOPS: optionalNonNegativeInteger.default(0),
+  AUTH_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().min(60).max(86_400).default(900),
+  AUTH_RATE_LIMIT_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10_000).default(20),
 });
 
 const refinedEnvSchema = envSchema.superRefine((value, context) => {

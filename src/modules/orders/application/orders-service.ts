@@ -100,12 +100,10 @@ export class OrdersService {
     }
     this.assertOrderWritable(existing);
 
-    const deleted = await this.orderRepository.deleteOrder(orderId, scope);
+    const deleted = await this.orderRepository.deleteOrderWithSubOrders(orderId, scope);
     if (!deleted) {
       throw new DomainError(`Order ${orderId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
     }
-
-    await this.orderRepository.deleteSubOrdersByOrder(orderId, scope);
   }
 
   public async listSubOrders(orderId: string, scope: DataVisibilityScope): Promise<SubOrderDto[]> {

@@ -170,8 +170,7 @@ function getRefreshTokenFromCookie(req: Request): string {
 }
 
 function getSessionContext(req: Request): { ipAddress: string | undefined; userAgent: string | undefined } {
-  const forwardedFor = req.header('x-forwarded-for');
-  const ipAddress = forwardedFor?.split(',')[0]?.trim() ?? req.ip;
+  const ipAddress = req.ip || req.socket.remoteAddress;
   const userAgent = req.header('user-agent') ?? undefined;
 
   return {

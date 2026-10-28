@@ -30,6 +30,9 @@ Copy `.env.example` to `.env` and adjust values as needed.
 - `AUTH_REFRESH_COOKIE_SECURE` (`true` required in production)
 - `AUTH_REFRESH_COOKIE_SAME_SITE` (`strict` | `lax` | `none`; `none` requires secure cookie)
 - `AUTH_REFRESH_COOKIE_HTTP_ONLY` (default `true`)
+- `TRUST_PROXY_HOPS` number of trusted proxy hops for Express `req.ip` resolution (default `0`; configure in production behind reverse proxies)
+- `AUTH_RATE_LIMIT_WINDOW_SECONDS` login rate-limit window length in seconds (default `900`)
+- `AUTH_RATE_LIMIT_MAX_ATTEMPTS` maximum login attempts allowed per window key (default `20`)
 - `MONGODB_URI` MongoDB connection URI used by app startup and seed script
 
 ## Included baseline

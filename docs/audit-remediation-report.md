@@ -84,9 +84,10 @@ commit, or push was performed.
 
 - Requests with a non-configured CORS origin are rejected with `403` instead
   of being allowed through without CORS headers.
-- Login requests have an in-process IP-based rate limit and return `429` with
-  `Retry-After` after repeated attempts. A shared/distributed limiter is still
-  required for multi-instance deployments.
+- Login requests now use a MongoDB-backed rate-limiter window keyed by
+  Express-resolved client IP + tenant + email. This removes in-memory
+  per-process counters and keeps enforcement consistent across backend
+  instances that share the same database.
 - Request IDs are accepted only when they match a bounded safe character set
   and length, preventing arbitrary header content from being reflected in API
   metadata.
@@ -118,8 +119,8 @@ All final frontend checks passed:
    changed.
 2. The frontend production build uses same-origin `/api`; production must
    route that path to the backend. Development uses the Angular proxy.
-3. A shared/distributed login rate limiter is required when running multiple
-   backend instances.
+3. Production deployments behind a reverse proxy must set `TRUST_PROXY_HOPS`
+   correctly so `req.ip` resolves the trusted client address.
 4. Authentication access tokens remain in memory/session storage for the active
    browser session; refresh tokens use an HttpOnly cookie. The application
    should continue to enforce CSP and XSS controls at deployment.

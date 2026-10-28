@@ -1,4 +1,4 @@
-import { type FilterQuery, type Model, type SortOrder, Types } from 'mongoose';
+import mongoose, { type ClientSession, type FilterQuery, type Model, type SortOrder, Types } from 'mongoose';
 
 import { ClinicModel } from '../../../shared/infrastructure/persistence/mongoose/models/clinic.model';
 import { ChangeRequestModel } from '../../../shared/infrastructure/persistence/mongoose/models/change-request.model';
@@ -107,6 +107,31 @@ export class MongooseOrdersRepository implements OrderRepository {
       ...orderScopeFilter(scope),
     }).exec();
     return deleted !== null;
+  }
+
+  public async deleteOrderWithSubOrders(orderId: string, scope: DataVisibilityScope): Promise<boolean> {
+    return runInTransaction(async (session) => {
+      const deleted = await orderModel.findOneAndDelete({
+        _id: orderId,
+        tenantId: scope.tenantId,
+        ...orderScopeFilter(scope),
+      })
+        .session(session)
+        .exec();
+
+      if (!deleted) {
+        return false;
+      }
+
+      await subOrderModel.deleteMany({
+        tenantId: scope.tenantId,
+        orderId: new Types.ObjectId(orderId),
+      })
+        .session(session)
+        .exec();
+
+      return true;
+    });
   }
 
   public async isOrderNumberTaken(
@@ -324,12 +349,27 @@ export class MongooseOrdersRepository implements OrderRepository {
     payloads: SubOrderWritePayload[],
     scope: DataVisibilityScope,
   ): Promise<SubOrder[]> {
-    await subOrderModel.deleteMany({
-      tenantId: scope.tenantId,
-      orderId: new Types.ObjectId(orderId),
-    }).exec();
+    return runInTransaction(async (session) => {
+      await subOrderModel.deleteMany({
+        tenantId: scope.tenantId,
+        orderId: new Types.ObjectId(orderId),
+      })
+        .session(session)
+        .exec();
 
-    return this.createSubOrders(orderId, payloads, scope);
+      if (payloads.length === 0) {
+        return [];
+      }
+
+      const created = await subOrderModel.insertMany(
+        payloads.map((payload) => ({
+          ...this.toSubOrderDocumentPayload(orderId, payload),
+          tenantId: scope.tenantId,
+        })),
+        { ordered: true, session },
+      );
+      return created.map((item) => this.toSubOrder(item.toObject() as SubOrderRecord));
+    });
   }
 
   public async updateSubOrder(
@@ -784,6 +824,25 @@ const clinicModel = ClinicModel as unknown as Model<ClinicNameRecord & { tenantI
 const subOrderModel = SubOrderModel as unknown as Model<SubOrderRecord>;
 const userModel = UserModel as unknown as Model<TechnicianNameRecord & { tenantId: Types.ObjectId }>;
 const changeRequestModel = ChangeRequestModel as unknown as Model<{ _id: Types.ObjectId; tenantId: Types.ObjectId }>;
+
+async function runInTransaction<T>(work: (session: ClientSession) => Promise<T>): Promise<T> {
+  const session = await mongoose.startSession();
+
+  try {
+    let outcome: T | undefined;
+    await session.withTransaction(async () => {
+      outcome = await work(session);
+    });
+
+    if (outcome === undefined) {
+      throw new Error('Transaction completed without a result');
+    }
+
+    return outcome;
+  } finally {
+    await session.endSession();
+  }
+}
 
 function uniqueObjectIds(ids: string[]): Types.ObjectId[] {
   const unique = new Set(ids);
