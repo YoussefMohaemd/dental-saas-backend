@@ -6,7 +6,6 @@ const authRateLimitSchema = new Schema(
   {
     key: {
       ...requiredTrimmedString(),
-      unique: true,
     },
     count: {
       type: Number,
@@ -29,4 +28,3 @@ authRateLimitSchema.index({ resetAt: 1 }, { expireAfterSeconds: 0 });
 
 export const AuthRateLimitModel: Model<any> =
   (models.AuthRateLimit as Model<any> | undefined) ?? model('AuthRateLimit', authRateLimitSchema);
-

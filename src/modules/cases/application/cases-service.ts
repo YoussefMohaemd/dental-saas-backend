@@ -60,11 +60,19 @@ export interface CreateCaseInput {
   priority: CaseDto['priority'];
   notes: string;
   tenantId: Types.ObjectId;
+  scope: DataVisibilityScope;
 }
 
 export async function createCase(input: CreateCaseInput): Promise<CaseDto> {
+  assertCreateCaseScope(input);
+
   const [patient, doctor, clinic] = await Promise.all([
-    PatientModel.findOne({ _id: input.patientId, tenantId: input.tenantId })
+    PatientModel.findOne({
+      _id: input.patientId,
+      tenantId: input.tenantId,
+      ...(input.scope.doctorId ? { doctorId: input.scope.doctorId } : {}),
+      ...(input.scope.clinicId ? { clinicId: input.scope.clinicId } : {}),
+    })
       .select({ _id: 1, name: 1, clinicId: 1, doctorId: 1 })
       .lean<{
         _id: Types.ObjectId;
@@ -73,11 +81,18 @@ export async function createCase(input: CreateCaseInput): Promise<CaseDto> {
         doctorId: Types.ObjectId;
       } | null>()
       .exec(),
-    DoctorModel.findOne({ _id: input.doctorId, tenantId: input.tenantId })
+    DoctorModel.findOne({
+      _id: input.doctorId,
+      tenantId: input.tenantId,
+      ...(input.scope.clinicId ? { clinicId: input.scope.clinicId } : {}),
+    })
       .select({ _id: 1, name: 1, clinicId: 1 })
       .lean<{ _id: Types.ObjectId; name: string; clinicId: Types.ObjectId } | null>()
       .exec(),
-    ClinicModel.findOne({ _id: input.clinicId, tenantId: input.tenantId })
+    ClinicModel.findOne({
+      _id: input.clinicId,
+      tenantId: input.tenantId,
+    })
       .select({ _id: 1, name: 1 })
       .lean<{ _id: Types.ObjectId; name: string } | null>()
       .exec(),
@@ -133,6 +148,32 @@ export async function createCase(input: CreateCaseInput): Promise<CaseDto> {
   });
 
   return getCaseById(created._id, input.tenantId);
+}
+
+function assertCreateCaseScope(input: CreateCaseInput): void {
+  const { scope } = input;
+
+  if (scope.isAdmin || scope.isStaff || scope.isManager) {
+    return;
+  }
+
+  if (scope.doctorId && scope.doctorId.toString() !== input.doctorId) {
+    throw new ApplicationError({
+      message: 'Doctors can only create cases for their own profile',
+      statusCode: 403,
+      code: APPLICATION_ERROR_CODES.FORBIDDEN,
+      expose: true,
+    });
+  }
+
+  if (scope.clinicId && scope.clinicId.toString() !== input.clinicId) {
+    throw new ApplicationError({
+      message: 'Case clinic must match the authenticated clinic scope',
+      statusCode: 403,
+      code: APPLICATION_ERROR_CODES.FORBIDDEN,
+      expose: true,
+    });
+  }
 }
 
 export async function listCases(input: CasesListInput): Promise<CasesListResult> {

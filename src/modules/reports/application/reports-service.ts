@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import type { PipelineStage, Types } from 'mongoose';
 
 import { buildPaginationMeta, type PaginationQuery } from '../../../shared/application/contracts/pagination';
 import { BillingRecordModel } from '../../../shared/infrastructure/persistence/mongoose/models/billing-record.model';
@@ -10,13 +10,12 @@ import { SubOrderModel } from '../../../shared/infrastructure/persistence/mongoo
 import { UserModel } from '../../../shared/infrastructure/persistence/mongoose/models/user.model';
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 
-interface OrderProjection {
+interface OrdersRangeAggregationRecord {
   _id: Types.ObjectId;
   orderNumber: string;
-  patientId: Types.ObjectId;
-  doctorId: Types.ObjectId;
-  clinicId: Types.ObjectId;
-  scanCenterId?: Types.ObjectId;
+  scanCenterName: string;
+  doctorName: string;
+  patientName: string;
   restoration: string;
   arch: string;
   amount: number;
@@ -25,8 +24,7 @@ interface OrderProjection {
   sentAt?: Date;
   archiveDate?: Date;
   chargedAt?: Date;
-  status: string;
-  technicianId?: Types.ObjectId;
+  operatorName: string;
 }
 
 export async function getDashboardVolume(
@@ -80,34 +78,78 @@ export async function getReportsOverview(
   workflowShare: Array<{ stage: string; count: number; percent: number }>;
 }> {
   const filter = buildScopedFilter(tenantId, scope);
-  const [orders, billingRecords]: [
-    Array<{ restoration: string; status: string; receivedAt: Date; sentAt?: Date }>,
-    Array<{ amount: number; invoiceDate?: Date; dueDate: Date }>,
-  ] = await Promise.all([
-    OrderModel.find(filter)
-      .select({ restoration: 1, status: 1, receivedAt: 1, sentAt: 1 })
-      .lean<Array<{ restoration: string; status: string; receivedAt: Date; sentAt?: Date }>>()
-      .exec(),
-    BillingRecordModel.find(filter)
-      .select({ amount: 1, invoiceDate: 1, dueDate: 1 })
-      .lean<Array<{ amount: number; invoiceDate?: Date; dueDate: Date }>>()
-      .exec(),
+  const monthRange = buildRecentMonthRange(6);
+  const [ordersSummary, monthlyRevenueRecords] = await Promise.all([
+    OrderModel.aggregate<{
+      restorationBreakdown: Array<{ _id: string; value: number }>;
+      workflowShare: Array<{ _id: string; count: number }>;
+      turnaround: Array<{ _id: number; days: number }>;
+      totalOrders: Array<{ count: number }>;
+    }>([
+      { $match: filter },
+      {
+        $facet: {
+          restorationBreakdown: [
+            { $group: { _id: '$restoration', value: { $sum: 1 } } },
+            { $sort: { value: -1, _id: 1 } },
+          ],
+          workflowShare: [
+            { $group: { _id: '$status', count: { $sum: 1 } } },
+            { $sort: { count: -1, _id: 1 } },
+          ],
+          totalOrders: [{ $count: 'count' }],
+          turnaround: [
+            { $match: { status: 'Completed', sentAt: { $type: 'date' }, receivedAt: { $type: 'date' } } },
+            {
+              $project: {
+                sentDay: { $dayOfWeek: '$sentAt' },
+                turnaroundDays: {
+                  $cond: [
+                    { $gte: [{ $subtract: ['$sentAt', '$receivedAt'] }, 0] },
+                    { $divide: [{ $subtract: ['$sentAt', '$receivedAt'] }, 1000 * 60 * 60 * 24] },
+                    0,
+                  ],
+                },
+              },
+            },
+            { $group: { _id: '$sentDay', days: { $avg: '$turnaroundDays' } } },
+            { $sort: { _id: 1 } },
+          ],
+        },
+      },
+    ]).exec(),
+    BillingRecordModel.aggregate<{ _id: { year: number; month: number }; revenue: number }>([
+      { $match: filter },
+      { $project: { amount: 1, sourceDate: { $ifNull: ['$invoiceDate', '$dueDate'] } } },
+      { $match: { sourceDate: { $gte: monthRange.start, $lt: monthRange.end } } },
+      {
+        $group: {
+          _id: { year: { $year: '$sourceDate' }, month: { $month: '$sourceDate' } },
+          revenue: { $sum: '$amount' },
+        },
+      },
+    ]).exec(),
   ]);
 
-  const monthlyRevenue = calculateMonthlyRevenue(billingRecords, 6);
-  const restorationBreakdown = countByField(orders, (item) => item.restoration)
-    .map(([name, value]) => ({ name, value }))
-    .sort((left, right) => right.value - left.value);
-  const workflowShareBase = countByField(orders, (item) => item.status);
-  const totalOrders = orders.length || 1;
-  const workflowShare = workflowShareBase
-    .map(([stage, count]) => ({
-      stage,
-      count,
-      percent: Number(((count / totalOrders) * 100).toFixed(1)),
-    }))
-    .sort((left, right) => right.count - left.count);
-  const turnaround = buildTurnaroundSeries(orders);
+  const summary = ordersSummary[0] ?? {
+    restorationBreakdown: [],
+    workflowShare: [],
+    turnaround: [],
+    totalOrders: [],
+  };
+  const monthlyRevenue = mapMonthlyRevenueSeries(monthlyRevenueRecords, monthRange.keys);
+  const restorationBreakdown = summary.restorationBreakdown.map((item) => ({
+    name: item._id,
+    value: item.value,
+  }));
+  const totalOrders = summary.totalOrders[0]?.count ?? 0;
+  const denominator = totalOrders > 0 ? totalOrders : 1;
+  const workflowShare = summary.workflowShare.map((item) => ({
+    stage: item._id,
+    count: item.count,
+    percent: Number(((item.count / denominator) * 100).toFixed(1)),
+  }));
+  const turnaround = buildTurnaroundSeriesFromAggregation(summary.turnaround);
 
   return {
     monthlyRevenue,
@@ -158,88 +200,95 @@ export async function getOrdersRangeReport(input: {
   }
 
   const sortDirection = input.sortDirection === 'asc' ? 1 : -1;
-  const records: OrderProjection[] = await OrderModel.find(filter)
-    .select({
-      _id: 1,
-      orderNumber: 1,
-      patientId: 1,
-      doctorId: 1,
-      scanCenterId: 1,
-      restoration: 1,
-      arch: 1,
-      amount: 1,
-      vouchers: 1,
-      receivedAt: 1,
-      sentAt: 1,
-      archiveDate: 1,
-      chargedAt: 1,
-    })
-    .sort({ [input.sortBy]: sortDirection })
-    .lean<OrderProjection[]>()
-    .exec();
+  const skip = (input.pagination.page - 1) * input.pagination.pageSize;
+  const aggregationPipeline: PipelineStage[] = [
+    { $match: filter },
+    { $lookup: { from: 'patients', localField: 'patientId', foreignField: '_id', as: 'patient' } },
+    { $lookup: { from: 'doctors', localField: 'doctorId', foreignField: '_id', as: 'doctor' } },
+    { $lookup: { from: 'scan_centers', localField: 'scanCenterId', foreignField: 'externalId', as: 'scanCenter' } },
+    {
+      $addFields: {
+        patientName: { $ifNull: [{ $arrayElemAt: ['$patient.name', 0] }, ''] },
+        doctorName: { $ifNull: [{ $arrayElemAt: ['$doctor.name', 0] }, ''] },
+        scanCenterName: { $ifNull: [{ $arrayElemAt: ['$scanCenter.name', 0] }, 'Unassigned'] },
+        operatorName: { $ifNull: [{ $arrayElemAt: ['$scanCenter.operator', 0] }, 'N/A'] },
+      },
+    },
+  ];
 
-  const scanCenterRecords = await ScanCenterModel.find({
-    ...(input.tenantId ? { tenantId: input.tenantId } : {}),
-    externalId: { $in: records.map((record) => record.scanCenterId).filter(Boolean) },
-  })
-    .select({ externalId: 1, name: 1, operator: 1 })
-    .lean<Array<{ externalId: string; name: string; operator: string }>>()
-    .exec();
-  const scanCenterMap = new Map(scanCenterRecords.map((scanCenter) => [scanCenter.externalId, scanCenter]));
-  const patientMap = await buildNameMap(
-    PatientModel,
-    records.map((record) => record.patientId),
-    'name',
-    input.tenantId,
-  );
-  const doctorMap = await buildNameMap(
-    DoctorModel,
-    records.map((record) => record.doctorId),
-    'name',
-    input.tenantId,
-  );
+  if (input.search && input.search.trim().length > 0) {
+    const searchRegex = new RegExp(escapeRegExp(input.search.trim()), 'i');
+    aggregationPipeline.push({
+      $match: {
+        $or: [
+          { orderNumber: searchRegex },
+          { patientName: searchRegex },
+          { doctorName: searchRegex },
+          { scanCenterName: searchRegex },
+          { restoration: searchRegex },
+        ],
+      },
+    });
+  }
 
-  let items = records.map((record) => {
-    const scanCenterKey = record.scanCenterId?.toString();
-    const scanCenter = scanCenterKey ? scanCenterMap.get(scanCenterKey) : undefined;
-    const receivedAtIso = toDate(record.receivedAt).toISOString();
-    const sentAtIso = record.sentAt ? toDate(record.sentAt).toISOString() : receivedAtIso;
-    const archiveDateIso = record.archiveDate
-      ? toDate(record.archiveDate).toISOString()
-      : receivedAtIso;
+  aggregationPipeline.push({
+    $facet: {
+      metadata: [{ $count: 'totalItems' }],
+      items: [
+        { $sort: { [input.sortBy]: sortDirection, _id: 1 } },
+        { $skip: skip },
+        { $limit: input.pagination.pageSize },
+        {
+          $project: {
+            _id: 1,
+            orderNumber: 1,
+            scanCenterName: 1,
+            doctorName: 1,
+            patientName: 1,
+            restoration: 1,
+            arch: 1,
+            amount: 1,
+            vouchers: 1,
+            receivedAt: 1,
+            sentAt: 1,
+            archiveDate: 1,
+            chargedAt: 1,
+            operatorName: 1,
+          },
+        },
+      ],
+    },
+  });
+
+  const aggregated = await OrderModel.aggregate<{
+    metadata: Array<{ totalItems: number }>;
+    items: OrdersRangeAggregationRecord[];
+  }>(aggregationPipeline).exec();
+  const result = aggregated[0];
+  const totalItems = result?.metadata?.[0]?.totalItems ?? 0;
+  const items = (result?.items ?? []).map((record) => {
+    const receivedAt = toDate(record.receivedAt);
+    const sentAt = record.sentAt ? toDate(record.sentAt) : receivedAt;
+    const archiveDate = record.archiveDate ? toDate(record.archiveDate) : receivedAt;
 
     return {
       id: record._id.toString(),
       orderId: record._id.toString(),
-      scanCenter: scanCenter?.name ?? 'Unassigned',
-      doctorName: doctorMap.get(record.doctorId.toString()) ?? '',
-      patientName: patientMap.get(record.patientId.toString()) ?? '',
+      scanCenter: record.scanCenterName || 'Unassigned',
+      doctorName: record.doctorName || '',
+      patientName: record.patientName || '',
       serviceName: record.restoration,
       maxillary: record.arch === 'Maxilla' || record.arch === 'Both',
       mandibular: record.arch === 'Mandible' || record.arch === 'Both',
       amount: record.amount,
       vouchers: record.vouchers,
-      receivedAt: receivedAtIso,
-      sentAt: sentAtIso,
-      operator: scanCenter?.operator ?? 'N/A',
-      archiveDate: archiveDateIso,
+      receivedAt: receivedAt.toISOString(),
+      sentAt: sentAt.toISOString(),
+      operator: record.operatorName || 'N/A',
+      archiveDate: archiveDate.toISOString(),
       chargedAt: record.chargedAt ? toDate(record.chargedAt).toISOString() : null,
     };
   });
-
-  if (input.search) {
-    const normalized = input.search.toLowerCase();
-    items = items.filter((item) =>
-      [item.orderId, item.scanCenter, item.doctorName, item.patientName, item.serviceName]
-        .join(' ')
-        .toLowerCase()
-        .includes(normalized),
-    );
-  }
-
-  const totalItems = items.length;
-  const startIndex = (input.pagination.page - 1) * input.pagination.pageSize;
-  items = items.slice(startIndex, startIndex + input.pagination.pageSize);
 
   return {
     items,
@@ -718,31 +767,31 @@ function splitName(fullName: string | undefined): { firstName: string; lastName:
   return { firstName, lastName };
 }
 
-function calculateMonthlyRevenue(
-  records: Array<{ amount: number; invoiceDate?: Date; dueDate: Date }>,
+function buildRecentMonthRange(
   monthCount: number,
-): Array<{ month: string; revenue: number }> {
+): { start: Date; end: Date; keys: string[] } {
   const now = new Date();
-  const monthKeys: string[] = [];
+  const keys: string[] = [];
   for (let index = monthCount - 1; index >= 0; index -= 1) {
     const date = new Date(now.getFullYear(), now.getMonth() - index, 1);
-    monthKeys.push(`${date.getFullYear()}-${date.getMonth()}`);
+    keys.push(`${date.getFullYear()}-${date.getMonth() + 1}`);
   }
 
-  const revenueByMonth = new Map(monthKeys.map((key) => [key, 0]));
-  for (const record of records) {
-    const sourceDate = record.invoiceDate ?? record.dueDate;
-    const key = `${sourceDate.getFullYear()}-${sourceDate.getMonth()}`;
-    if (!revenueByMonth.has(key)) {
-      continue;
-    }
+  const [firstYear, firstMonth] = keys[0]!.split('-');
+  const start = new Date(Number(firstYear), Number(firstMonth) - 1, 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  return { start, end, keys };
+}
 
-    revenueByMonth.set(key, (revenueByMonth.get(key) ?? 0) + record.amount);
-  }
+function mapMonthlyRevenueSeries(
+  groupedRecords: Array<{ _id: { year: number; month: number }; revenue: number }>,
+  monthKeys: string[],
+): Array<{ month: string; revenue: number }> {
+  const revenueByMonth = new Map(groupedRecords.map((item) => [`${item._id.year}-${item._id.month}`, Number(item.revenue) || 0]));
 
   return monthKeys.map((key) => {
     const [yearText, monthText] = key.split('-');
-    const labelDate = new Date(Number(yearText), Number(monthText), 1);
+    const labelDate = new Date(Number(yearText), Number(monthText) - 1, 1);
     return {
       month: labelDate.toLocaleString('en-US', { month: 'short' }),
       revenue: Number((revenueByMonth.get(key) ?? 0).toFixed(2)),
@@ -750,46 +799,16 @@ function calculateMonthlyRevenue(
   });
 }
 
-function countByField<TItem>(items: TItem[], selector: (item: TItem) => string): Array<[string, number]> {
-  const buckets = new Map<string, number>();
-  for (const item of items) {
-    const key = selector(item);
-    buckets.set(key, (buckets.get(key) ?? 0) + 1);
-  }
-
-  return [...buckets.entries()];
-}
-
-function buildTurnaroundSeries(
-  orders: Array<{ status: string; receivedAt: Date; sentAt?: Date }>,
+function buildTurnaroundSeriesFromAggregation(
+  records: Array<{ _id: number; days: number }>,
 ): Array<{ day: string; days: number }> {
-  const dayBuckets = new Map<number, { count: number; totalDays: number }>();
-  for (let day = 0; day < 7; day += 1) {
-    dayBuckets.set(day, { count: 0, totalDays: 0 });
-  }
-
-  for (const order of orders) {
-    if (order.status !== 'Completed' || !order.sentAt) {
-      continue;
-    }
-
-    const day = order.sentAt.getUTCDay();
-    const bucket = dayBuckets.get(day);
-    if (!bucket) {
-      continue;
-    }
-
-    bucket.count += 1;
-    bucket.totalDays += Math.max(
-      0,
-      (order.sentAt.getTime() - order.receivedAt.getTime()) / (1000 * 60 * 60 * 24),
-    );
-  }
+  const byDay = new Map(records.map((record) => [record._id, record.days]));
 
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   return dayNames.map((dayName, index) => {
-    const bucket = dayBuckets.get(index);
-    if (!bucket || bucket.count === 0) {
+    const mongoDay = index + 1;
+    const days = byDay.get(mongoDay);
+    if (days === undefined) {
       return {
         day: dayName,
         days: 0,
@@ -798,7 +817,7 @@ function buildTurnaroundSeries(
 
     return {
       day: dayName,
-      days: Number((bucket.totalDays / bucket.count).toFixed(2)),
+      days: Number(days.toFixed(2)),
     };
   });
 }
@@ -832,38 +851,6 @@ function formatWeekNumber(date: Date): string {
   const passedDays = Math.floor((date.getTime() - firstDay.getTime()) / (1000 * 60 * 60 * 24));
   const weekNumber = Math.ceil((passedDays + firstDay.getUTCDay() + 1) / 7);
   return String(weekNumber).padStart(2, '0');
-}
-
-async function buildNameMap(
-  model: {
-    find(filter: Record<string, unknown>): {
-      select(selection: Record<string, 1>): {
-        lean<TLean>(): { exec(): Promise<TLean> };
-      };
-    };
-  },
-  ids: Array<Types.ObjectId | string>,
-  field: string,
-  tenantId?: Types.ObjectId,
-): Promise<Map<string, string>> {
-  const uniqueIds = [...new Set(ids.map((id) => id.toString()))]
-    .filter((id) => Types.ObjectId.isValid(id))
-    .map((id) => new Types.ObjectId(id));
-
-  if (uniqueIds.length === 0) {
-    return new Map();
-  }
-
-  const records: Array<{ _id: Types.ObjectId } & Record<string, string>> = await model
-    .find({
-      _id: { $in: uniqueIds },
-      ...(tenantId ? { tenantId } : {}),
-    })
-    .select({ _id: 1, [field]: 1 })
-    .lean<Array<{ _id: Types.ObjectId } & Record<string, string>>>()
-    .exec();
-
-  return new Map(records.map((record) => [record._id.toString(), record[field] ?? '']));
 }
 
 function toDate(value: Date | string): Date {

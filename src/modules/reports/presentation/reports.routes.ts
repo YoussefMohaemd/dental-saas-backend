@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 
+import { requireAnyCapability } from '../../auth/presentation/auth.middleware';
 import { sendOk } from '../../../shared/presentation/http/api-response';
 import {
   baseListQuerySchema,
@@ -27,28 +28,28 @@ const ordersRangeQuerySchema = baseListQuerySchema.extend({
   to: z.string().optional(),
 });
 
-reportsRouter.get('/dashboard/volume', async (req, res) => {
+reportsRouter.get('/dashboard/volume', requireAnyCapability(['reports.read']), async (req, res) => {
   const scope = await getAuthenticatedDataScope(req);
   const data = await getDashboardVolume(scope.tenantId, scope);
 
   sendOk(res, data, buildRequestMeta(req));
 });
 
-reportsRouter.get('/reports/overview', async (req, res) => {
+reportsRouter.get('/reports/overview', requireAnyCapability(['reports.read']), async (req, res) => {
   const scope = await getAuthenticatedDataScope(req);
   const data = await getReportsOverview(scope.tenantId, scope);
 
   sendOk(res, data, buildRequestMeta(req));
 });
 
-reportsRouter.get('/reports/seed', async (req, res) => {
+reportsRouter.get('/reports/seed', requireAnyCapability(['reports.read']), async (req, res) => {
   const scope = await getAuthenticatedDataScope(req);
   const data = await getReportingSeedData(scope.tenantId, scope);
 
   sendOk(res, data, buildRequestMeta(req));
 });
 
-reportsRouter.get('/reports/orders-range', async (req, res) => {
+reportsRouter.get('/reports/orders-range', requireAnyCapability(['reports.read']), async (req, res) => {
   const query = ordersRangeQuerySchema.parse(req.query);
   const pagination = parsePaginationQuery(query);
   const sort = parseSort(
@@ -71,7 +72,7 @@ reportsRouter.get('/reports/orders-range', async (req, res) => {
   sendOk(res, data.items, buildRequestMeta(req, buildPaginationMeta(data.totalItems, pagination)));
 });
 
-reportsRouter.get('/reports/quarterly-targets', async (req, res) => {
+reportsRouter.get('/reports/quarterly-targets', requireAnyCapability(['reports.read']), async (req, res) => {
   const query = z
     .object({
       year: z.coerce.number().int().min(2000).max(3000),
@@ -89,7 +90,7 @@ reportsRouter.get('/reports/quarterly-targets', async (req, res) => {
   sendOk(res, data, buildRequestMeta(req));
 });
 
-reportsRouter.get('/reports/quarterly-targets/:year/:quarter', async (req, res) => {
+reportsRouter.get('/reports/quarterly-targets/:year/:quarter', requireAnyCapability(['reports.read']), async (req, res) => {
   const params = z
     .object({
       year: z.coerce.number().int().min(2000).max(3000),
@@ -107,13 +108,13 @@ reportsRouter.get('/reports/quarterly-targets/:year/:quarter', async (req, res) 
   sendOk(res, data, buildRequestMeta(req));
 });
 
-reportsRouter.get('/reports/team-performance', async (req, res) => {
+reportsRouter.get('/reports/team-performance', requireAnyCapability(['reports.read']), async (req, res) => {
   const scope = await getAuthenticatedDataScope(req);
   const data = await getTeamPerformance(scope.tenantId, scope);
   sendOk(res, data.records, buildRequestMeta(req));
 });
 
-reportsRouter.get('/reports/sub-orders', async (req, res) => {
+reportsRouter.get('/reports/sub-orders', requireAnyCapability(['reports.read']), async (req, res) => {
   const query = z
     .object({
       from: z.string().optional(),

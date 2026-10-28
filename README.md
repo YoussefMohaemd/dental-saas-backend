@@ -32,7 +32,9 @@ Copy `.env.example` to `.env` and adjust values as needed.
 - `AUTH_REFRESH_COOKIE_HTTP_ONLY` (default `true`)
 - `TRUST_PROXY_HOPS` number of trusted proxy hops for Express `req.ip` resolution (default `0`; configure in production behind reverse proxies)
 - `AUTH_RATE_LIMIT_WINDOW_SECONDS` login rate-limit window length in seconds (default `900`)
-- `AUTH_RATE_LIMIT_MAX_ATTEMPTS` maximum login attempts allowed per window key (default `20`)
+- `AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_IP` maximum login attempts allowed per IP in each window (default `100`)
+- `AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_ACCOUNT` maximum login attempts allowed per tenant/email account key in each window (default falls back to `AUTH_RATE_LIMIT_MAX_ATTEMPTS`, then `20`)
+- `AUTH_RATE_LIMIT_MAX_ATTEMPTS` backward-compatible fallback for per-account attempts when `AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_ACCOUNT` is not set
 - `MONGODB_URI` MongoDB connection URI used by app startup and seed script
 
 ## Included baseline
@@ -51,15 +53,15 @@ Copy `.env.example` to `.env` and adjust values as needed.
   - `GET /api/auth/me` (protected)
   - Auth responses (`login`/`refresh`/`me`) now include `user.capabilities`,
     a server-derived permission list for role-based frontend UX.
-  - `POST /api/auth/sessions/revoke` (protected, admin role)
+  - `POST /api/auth/sessions/revoke` (protected, requires `auth.sessions.revoke` capability)
   - No public registration endpoint is exposed
 - User/role provisioning endpoints under `/api/v1`:
   - `GET /api/v1/users` (protected)
   - `GET /api/v1/users/:userId` (protected)
-  - `POST /api/v1/users` (protected, admin role)
-  - `PATCH /api/v1/users/:userId/role-status` (protected, admin role)
-  - `POST /api/v1/users/:userId/deactivate` (protected, admin role)
-  - `POST /api/v1/users/:userId/reactivate` (protected, admin role)
+  - `POST /api/v1/users` (protected, requires `users.manage` capability)
+  - `PATCH /api/v1/users/:userId/role-status` (protected, requires `users.manage` capability)
+  - `POST /api/v1/users/:userId/deactivate` (protected, requires `users.manage` capability)
+  - `POST /api/v1/users/:userId/reactivate` (protected, requires `users.manage` capability)
 
 ## OpenAPI / Swagger docs
 

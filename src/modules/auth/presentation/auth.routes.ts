@@ -8,7 +8,7 @@ import {
   refreshController,
   revokeSessionsController,
 } from './auth.controller';
-import { requireAnyRole, requireAuthenticated } from './auth.middleware';
+import { requireAnyCapability, requireAuthenticated } from './auth.middleware';
 
 const authRouter = Router();
 
@@ -21,7 +21,7 @@ authRouter.post('/auth/password', requireAuthenticated, changePasswordController
 authRouter.post(
   '/auth/sessions/revoke',
   requireAuthenticated,
-  requireAnyRole(['admin']),
+  requireAnyCapability(['auth.sessions.revoke']),
   revokeSessionsController,
 );
 

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 
-import { requireAnyRole } from '../../auth/presentation/auth.middleware';
+import { requireAnyCapability } from '../../auth/presentation/auth.middleware';
 import { sendCreated, sendNoContent, sendOk } from '../../../shared/presentation/http/api-response';
 import {
   baseListQuerySchema,
@@ -27,7 +27,7 @@ const documentsListQuerySchema = baseListQuerySchema.extend({
   category: z.union([z.string(), z.array(z.string())]).optional(),
 });
 
-documentsRouter.get('/documents', async (req, res) => {
+documentsRouter.get('/documents', requireAnyCapability(['documents.read']), async (req, res) => {
   const query = documentsListQuerySchema.parse(req.query);
   const pagination = parsePaginationQuery(query);
   const sort = parseSort(query, ['name', 'date', 'sizeBytes', 'category', 'type'], 'date');
@@ -46,7 +46,7 @@ documentsRouter.get('/documents', async (req, res) => {
   sendOk(res, result.items, buildRequestMeta(req, buildPaginationMeta(result.totalItems, pagination)));
 });
 
-documentsRouter.get('/documents/:documentId', async (req, res) => {
+documentsRouter.get('/documents/:documentId', requireAnyCapability(['documents.read']), async (req, res) => {
   const params = z.object({ documentId: z.string() }).parse(req.params);
   const documentId = ensureObjectId(params.documentId, 'document id');
   const scope = await getAuthenticatedDataScope(req);
@@ -55,7 +55,7 @@ documentsRouter.get('/documents/:documentId', async (req, res) => {
   sendOk(res, data, buildRequestMeta(req));
 });
 
-documentsRouter.post('/documents', requireAnyRole(['admin', 'staff', 'doctor', 'technician']), async (req, res) => {
+documentsRouter.post('/documents', requireAnyCapability(['documents.manage']), async (req, res) => {
   const payload = parseCreateDocumentPayload(req.body);
   const scope = await getAuthenticatedDataScope(req);
   const data = await createDocument(payload, scope);
@@ -63,7 +63,7 @@ documentsRouter.post('/documents', requireAnyRole(['admin', 'staff', 'doctor', '
   sendCreated(res, data, buildRequestMeta(req));
 });
 
-documentsRouter.delete('/documents/:documentId', requireAnyRole(['admin', 'staff', 'doctor', 'technician']), async (req, res) => {
+documentsRouter.delete('/documents/:documentId', requireAnyCapability(['documents.manage']), async (req, res) => {
   const params = z.object({ documentId: z.string() }).parse(req.params);
   const documentId = ensureObjectId(params.documentId, 'document id');
   const scope = await getAuthenticatedDataScope(req);

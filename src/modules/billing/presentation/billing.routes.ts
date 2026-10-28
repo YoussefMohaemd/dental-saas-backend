@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 
-import { requireAnyRole } from '../../auth/presentation/auth.middleware';
+import { requireAnyCapability } from '../../auth/presentation/auth.middleware';
 import { sendOk } from '../../../shared/presentation/http/api-response';
 import {
   baseListQuerySchema,
@@ -29,7 +29,7 @@ const billingListQuerySchema = baseListQuerySchema.extend({
   dateTo: z.string().optional(),
 });
 
-billingRouter.get('/billing', async (req, res) => {
+billingRouter.get('/billing', requireAnyCapability(['billing.read']), async (req, res) => {
   const query = billingListQuerySchema.parse(req.query);
   const pagination = parsePaginationQuery(query);
   const sort = parseSort(
@@ -55,7 +55,7 @@ billingRouter.get('/billing', async (req, res) => {
   sendOk(res, result.items, buildRequestMeta(req, buildPaginationMeta(result.totalItems, pagination)));
 });
 
-billingRouter.get('/billing/:recordId', async (req, res) => {
+billingRouter.get('/billing/:recordId', requireAnyCapability(['billing.read']), async (req, res) => {
   const params = z.object({ recordId: z.string() }).parse(req.params);
   const billingId = ensureObjectId(params.recordId, 'billing record id');
   const scope = await getAuthenticatedDataScope(req);
@@ -64,7 +64,7 @@ billingRouter.get('/billing/:recordId', async (req, res) => {
   sendOk(res, data, buildRequestMeta(req));
 });
 
-billingRouter.patch('/billing/:recordId', requireAnyRole(['admin', 'staff']), async (req, res) => {
+billingRouter.patch('/billing/:recordId', requireAnyCapability(['billing.update']), async (req, res) => {
   const params = z.object({ recordId: z.string() }).parse(req.params);
   const billingId = ensureObjectId(params.recordId, 'billing record id');
   const payload = parseBillingPatchPayload(req.body);

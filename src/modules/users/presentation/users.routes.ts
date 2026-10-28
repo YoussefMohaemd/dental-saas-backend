@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-import { requireAnyRole, requireAuthenticated } from '../../auth/presentation/auth.middleware';
+import { requireAnyCapability, requireAuthenticated } from '../../auth/presentation/auth.middleware';
 import { UserService } from '../application/user-service';
 import { MongooseUserRepository } from '../infrastructure/mongoose-user-repository';
 import { UsersController } from './users.controller';
@@ -11,25 +11,25 @@ const usersController = new UsersController(
   new UserService(new MongooseUserRepository()),
 );
 
-usersRouter.get('/users', requireAuthenticated, requireAnyRole(['admin', 'staff']), usersController.listUsers);
-usersRouter.get('/users/:userId', requireAuthenticated, requireAnyRole(['admin', 'staff']), usersController.getUserById);
-usersRouter.post('/users', requireAuthenticated, requireAnyRole(['admin']), usersController.createUser);
+usersRouter.get('/users', requireAuthenticated, requireAnyCapability(['users.read']), usersController.listUsers);
+usersRouter.get('/users/:userId', requireAuthenticated, requireAnyCapability(['users.read']), usersController.getUserById);
+usersRouter.post('/users', requireAuthenticated, requireAnyCapability(['users.manage']), usersController.createUser);
 usersRouter.patch(
   '/users/:userId/role-status',
   requireAuthenticated,
-  requireAnyRole(['admin']),
+  requireAnyCapability(['users.manage']),
   usersController.updateUserRoleStatus,
 );
 usersRouter.post(
   '/users/:userId/deactivate',
   requireAuthenticated,
-  requireAnyRole(['admin']),
+  requireAnyCapability(['users.manage']),
   usersController.deactivateUser,
 );
 usersRouter.post(
   '/users/:userId/reactivate',
   requireAuthenticated,
-  requireAnyRole(['admin']),
+  requireAnyCapability(['users.manage']),
   usersController.reactivateUser,
 );
 

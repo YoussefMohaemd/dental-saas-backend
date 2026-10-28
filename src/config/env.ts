@@ -80,6 +80,8 @@ const envSchema = z.object({
   TRUST_PROXY_HOPS: optionalNonNegativeInteger.default(0),
   AUTH_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().min(60).max(86_400).default(900),
   AUTH_RATE_LIMIT_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10_000).default(20),
+  AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_IP: z.coerce.number().int().min(1).max(100_000).default(100),
+  AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_ACCOUNT: z.coerce.number().int().min(1).max(10_000).optional(),
 });
 
 const refinedEnvSchema = envSchema.superRefine((value, context) => {
@@ -126,4 +128,8 @@ if (!parsedEnv.success) {
   throw new Error(`Invalid environment configuration: ${issues}`);
 }
 
-export const env = parsedEnv.data;
+export const env = {
+  ...parsedEnv.data,
+  AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_ACCOUNT:
+    parsedEnv.data.AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_ACCOUNT ?? parsedEnv.data.AUTH_RATE_LIMIT_MAX_ATTEMPTS,
+};

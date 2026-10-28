@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 
-import { requireAnyRole } from '../../auth/presentation/auth.middleware';
+import { requireAnyCapability } from '../../auth/presentation/auth.middleware';
 import { sendOk } from '../../../shared/presentation/http/api-response';
 import {
   baseListQuerySchema,
@@ -28,7 +28,7 @@ const changeRequestsListQuerySchema = baseListQuerySchema.extend({
   priority: z.union([z.string(), z.array(z.string())]).optional(),
 });
 
-changeRequestsRouter.get('/change-requests', requireAnyRole(['admin', 'staff', 'manager', 'doctor', 'technician']), async (req, res) => {
+changeRequestsRouter.get('/change-requests', requireAnyCapability(['changeRequests.read']), async (req, res) => {
   const query = changeRequestsListQuerySchema.parse(req.query);
   const pagination = parsePaginationQuery(query);
   const sort = parseSort(
@@ -54,7 +54,7 @@ changeRequestsRouter.get('/change-requests', requireAnyRole(['admin', 'staff', '
   sendOk(res, result.items, buildRequestMeta(req, buildPaginationMeta(result.totalItems, pagination)));
 });
 
-changeRequestsRouter.get('/change-requests/:requestId', requireAnyRole(['admin', 'staff', 'manager', 'doctor', 'technician']), async (req, res) => {
+changeRequestsRouter.get('/change-requests/:requestId', requireAnyCapability(['changeRequests.read']), async (req, res) => {
   const params = z.object({ requestId: z.string() }).parse(req.params);
   const changeRequestId = ensureObjectId(params.requestId, 'change request id');
   const scope = await getAuthenticatedDataScope(req);
@@ -63,7 +63,7 @@ changeRequestsRouter.get('/change-requests/:requestId', requireAnyRole(['admin',
   sendOk(res, data, buildRequestMeta(req));
 });
 
-changeRequestsRouter.patch('/change-requests/:requestId/status', requireAnyRole(['admin', 'staff', 'doctor']), async (req, res) => {
+changeRequestsRouter.patch('/change-requests/:requestId/status', requireAnyCapability(['changeRequests.update']), async (req, res) => {
   const params = z.object({ requestId: z.string() }).parse(req.params);
   const changeRequestId = ensureObjectId(params.requestId, 'change request id');
   const payload = parseDecisionPayload(req.body);

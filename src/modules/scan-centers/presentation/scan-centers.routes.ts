@@ -5,6 +5,7 @@ import {
   APPLICATION_ERROR_CODES,
   ApplicationError,
 } from '../../../shared/application/errors/application-error';
+import { requireAnyCapability } from '../../auth/presentation/auth.middleware';
 import {
   buildRequestMeta,
   createPaginationMeta,
@@ -27,7 +28,7 @@ const scanCentersListSchema = z.object({
   status: z.string().optional(),
 });
 
-scanCentersRouter.get('/scan-centers', async (req, res) => {
+scanCentersRouter.get('/scan-centers', requireAnyCapability(['scanCenters.read']), async (req, res) => {
   const query = scanCentersListSchema.parse(req.query);
   const pagination = parsePaginationQuery(query);
   const sort = parseSort(
@@ -58,7 +59,7 @@ scanCentersRouter.get('/scan-centers', async (req, res) => {
   );
 });
 
-scanCentersRouter.get('/scan-centers/:scanCenterId', async (req, res) => {
+scanCentersRouter.get('/scan-centers/:scanCenterId', requireAnyCapability(['scanCenters.read']), async (req, res) => {
   const params = z.object({ scanCenterId: z.string().trim().min(1) }).parse(req.params);
   const scanCenter = await scanCenterRepository.findById(
     params.scanCenterId,

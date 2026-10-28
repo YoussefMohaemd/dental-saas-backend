@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 
-import { requireAnyRole } from '../../auth/presentation/auth.middleware';
+import { requireAnyCapability } from '../../auth/presentation/auth.middleware';
 import { sendOk } from '../../../shared/presentation/http/api-response';
 import {
   baseListQuerySchema,
@@ -37,18 +37,19 @@ const createCaseBodySchema = z
   })
   .strict();
 
-casesRouter.post('/cases', requireAnyRole(['admin', 'staff', 'doctor', 'technician']), async (req, res) => {
+casesRouter.post('/cases', requireAnyCapability(['cases.create']), async (req, res) => {
   const payload = createCaseBodySchema.parse(req.body);
   const scope = await getAuthenticatedDataScope(req);
   const created = await createCase({
     ...payload,
     tenantId: scope.tenantId,
+    scope,
   });
 
   sendOk(res, created, buildRequestMeta(req));
 });
 
-casesRouter.get('/cases', async (req, res) => {
+casesRouter.get('/cases', requireAnyCapability(['cases.read']), async (req, res) => {
   const query = casesQuerySchema.parse(req.query);
   const pagination = parsePaginationQuery(query);
   const sort = parseSort(
@@ -77,7 +78,7 @@ casesRouter.get('/cases', async (req, res) => {
   );
 });
 
-casesRouter.get('/cases/:caseId', async (req, res) => {
+casesRouter.get('/cases/:caseId', requireAnyCapability(['cases.read']), async (req, res) => {
   const params = z.object({ caseId: z.string() }).parse(req.params);
   const caseId = ensureObjectId(params.caseId, 'case id');
   const scope = await getAuthenticatedDataScope(req);

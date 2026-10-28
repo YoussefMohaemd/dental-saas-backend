@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { type Types } from 'mongoose';
 import { z } from 'zod';
 
+import { requireAnyCapability } from '../../auth/presentation/auth.middleware';
 import { ScanCenterModel } from '../../../shared/infrastructure/persistence/mongoose/models/scan-center.model';
 import { UserModel } from '../../../shared/infrastructure/persistence/mongoose/models/user.model';
 import { OrderModel } from '../../../shared/infrastructure/persistence/mongoose/models/order.model';
@@ -34,7 +35,7 @@ const preferencesSchema = z
   })
   .strict();
 
-settingsRouter.get('/settings/preferences', async (req, res) => {
+settingsRouter.get('/settings/preferences', requireAnyCapability(['settings.read']), async (req, res) => {
   const scope = await getAuthenticatedDataScope(req);
   const data = await UserPreferencesModel.findOne({
     tenantId: scope.tenantId,
@@ -46,7 +47,7 @@ settingsRouter.get('/settings/preferences', async (req, res) => {
   sendOk(res, data, buildRequestMeta(req));
 });
 
-settingsRouter.patch('/settings/preferences', async (req, res) => {
+settingsRouter.patch('/settings/preferences', requireAnyCapability(['settings.update']), async (req, res) => {
   const payload = preferencesSchema.parse(req.body);
   const scope = await getAuthenticatedDataScope(req);
   const data = await UserPreferencesModel.findOneAndUpdate(
@@ -60,7 +61,7 @@ settingsRouter.patch('/settings/preferences', async (req, res) => {
   sendOk(res, data, buildRequestMeta(req));
 });
 
-settingsRouter.get('/settings/reference-data', async (req, res) => {
+settingsRouter.get('/settings/reference-data', requireAnyCapability(['settings.read']), async (req, res) => {
   const query = referenceDataQuerySchema.parse(req.query);
   const include = query.include
     ?.split(',')

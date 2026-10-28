@@ -20,11 +20,10 @@ describe('resolveRoleCapabilities', () => {
     expect(capabilities).not.toContain('orders.create');
   });
 
-  it('falls back to baseline read access for unknown roles', () => {
+  it('returns no capabilities for unknown roles', () => {
     const capabilities = resolveRoleCapabilities(['viewer']);
 
-    expect(capabilities).toContain('dashboard.read');
-    expect(capabilities).toContain('reports.read');
+    expect(capabilities).toHaveLength(0);
     expect(capabilities).not.toContain('orders.delete');
   });
 

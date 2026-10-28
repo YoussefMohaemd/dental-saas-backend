@@ -323,7 +323,7 @@ export async function deleteDocument(
 
 export { buildPaginationMeta };
 
-function buildDocumentAccessFilter(scope: DataVisibilityScope): FilterQuery<DocumentRecord> {
+export function buildDocumentAccessFilter(scope: DataVisibilityScope): FilterQuery<DocumentRecord> {
   const baseFilter: FilterQuery<DocumentRecord> = {
     tenantId: scope.tenantId,
   };
@@ -339,17 +339,17 @@ function buildDocumentAccessFilter(scope: DataVisibilityScope): FilterQuery<Docu
     };
   }
 
-  if (scope.clinicId) {
-    return {
-      ...baseFilter,
-      clinicId: scope.clinicId,
-    };
-  }
-
   if (scope.isTechnician) {
     return {
       ...baseFilter,
       uploadedBy: scope.userId,
+    };
+  }
+
+  if (scope.clinicId) {
+    return {
+      ...baseFilter,
+      clinicId: scope.clinicId,
     };
   }
 

@@ -84,10 +84,10 @@ commit, or push was performed.
 
 - Requests with a non-configured CORS origin are rejected with `403` instead
   of being allowed through without CORS headers.
-- Login requests now use a MongoDB-backed rate-limiter window keyed by
-  Express-resolved client IP + tenant + email. This removes in-memory
-  per-process counters and keeps enforcement consistent across backend
-  instances that share the same database.
+- Login requests now use MongoDB-backed rate-limiter windows with dual keys:
+  one per Express-resolved client IP and another per tenant/email account.
+  This removes in-memory per-process counters and keeps enforcement
+  consistent across backend instances that share the same database.
 - Request IDs are accepted only when they match a bounded safe character set
   and length, preventing arbitrary header content from being reflected in API
   metadata.

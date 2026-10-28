@@ -38,6 +38,7 @@ export const DENTAL_CAPABILITIES = [
 ] as const;
 
 export type DentalCapability = (typeof DENTAL_CAPABILITIES)[number];
+type CanonicalRole = 'admin' | 'staff' | 'manager' | 'doctor' | 'technician';
 
 const BASE_CAPABILITIES: readonly DentalCapability[] = [
   'dashboard.read',
@@ -56,7 +57,7 @@ const BASE_CAPABILITIES: readonly DentalCapability[] = [
   'settings.update',
 ];
 
-const ROLE_CAPABILITY_MAP: Record<string, readonly DentalCapability[]> = {
+const ROLE_CAPABILITY_MAP: Record<CanonicalRole, readonly DentalCapability[]> = {
   admin: DENTAL_CAPABILITIES,
   staff: [
     ...BASE_CAPABILITIES,
@@ -131,44 +132,38 @@ export function resolveRoleCapabilities(roles: readonly string[]): DentalCapabil
     }
   }
 
-  if (resolved.size === 0) {
-    for (const capability of BASE_CAPABILITIES) {
-      resolved.add(capability);
-    }
-  }
-
   return [...resolved].sort();
 }
 
-function normalizeRoles(roles: readonly string[]): string[] {
+function normalizeRoles(roles: readonly string[]): CanonicalRole[] {
   return Array.from(
     new Set(
-      roles.map((role) => normalizeRoleAlias(role)).filter((role) => role.length > 0),
+      roles
+        .map((role) => normalizeRoleAlias(role))
+        .filter((role): role is CanonicalRole => role !== undefined),
     ),
   );
 }
 
-function normalizeRoleAlias(role: string): string {
+const ROLE_ALIASES: Record<CanonicalRole, ReadonlySet<string>> = {
+  admin: new Set(['admin', 'administrator', 'superadmin', 'super-admin', 'super_admin', 'super admin']),
+  staff: new Set(['staff']),
+  manager: new Set(['manager', 'lab manager', 'lab-manager', 'lab_manager']),
+  doctor: new Set(['doctor', 'dentist', 'dental doctor']),
+  technician: new Set(['technician', 'tech', 'lab-technician', 'lab_technician', 'lab tech', 'labtech']),
+};
+
+function normalizeRoleAlias(role: string): CanonicalRole | undefined {
   const normalized = role.trim().toLowerCase();
-  if (normalized.includes('admin')) {
-    return 'admin';
+  const compact = normalized.replace(/[\s_-]+/g, '');
+
+  for (const [canonicalRole, aliases] of Object.entries(ROLE_ALIASES) as Array<
+    [CanonicalRole, ReadonlySet<string>]
+  >) {
+    if (aliases.has(normalized) || aliases.has(compact)) {
+      return canonicalRole;
+    }
   }
 
-  if (normalized.includes('staff')) {
-    return 'staff';
-  }
-
-  if (normalized.includes('manager')) {
-    return 'manager';
-  }
-
-  if (normalized.includes('doctor')) {
-    return 'doctor';
-  }
-
-  if (normalized.includes('technician') || normalized.includes('tech')) {
-    return 'technician';
-  }
-
-  return normalized;
+  return undefined;
 }

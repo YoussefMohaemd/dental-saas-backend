@@ -4,6 +4,7 @@ import type mongoose from 'mongoose';
 import { APPLICATION_ERROR_CODES, ApplicationError } from '../../../shared/application/errors/application-error';
 import { UserModel } from '../../../shared/infrastructure/persistence/mongoose/models/user.model';
 import { type RequestWithContext } from '../../../shared/presentation/http/request-context';
+import { resolveRoleCapabilities, type DentalCapability } from '../application/authorization-policy';
 import { TokenService } from '../application/token-service';
 
 const tokenService = new TokenService();
@@ -71,12 +72,40 @@ export function requireAnyRole(allowedRoles: string[]) {
       return;
     }
 
-    function normalizeRole(role: string): string {
-      return role.trim().toLowerCase();
+    next();
+  };
+}
+
+export function requireAnyCapability(requiredCapabilities: DentalCapability[]) {
+  return (req: Request, _res: Response, next: NextFunction): void => {
+    const requestWithContext = req as RequestWithContext;
+    const principal = requestWithContext.context?.principal;
+    if (!principal) {
+      next(unauthorized('Authentication is required'));
+      return;
+    }
+
+    const roleCapabilities = new Set(resolveRoleCapabilities(principal.roles));
+    const hasAnyRequiredCapability = requiredCapabilities.some((capability) => roleCapabilities.has(capability));
+    if (!hasAnyRequiredCapability) {
+      next(
+        new ApplicationError({
+          message: 'Insufficient permissions',
+          statusCode: 403,
+          code: APPLICATION_ERROR_CODES.FORBIDDEN,
+          expose: true,
+          details: { requiredCapabilities },
+        }),
+      );
+      return;
     }
 
     next();
   };
+}
+
+function normalizeRole(role: string): string {
+  return role.trim().toLowerCase();
 }
 
 function parseBearerToken(headerValue: string | undefined): string {
@@ -86,7 +115,7 @@ function parseBearerToken(headerValue: string | undefined): string {
 
   const [scheme, token] = headerValue.split(' ');
   if (scheme?.toLowerCase() !== 'bearer' || !token) {
-    throw unauthorized('Authorization header must use Bearer token');
+    throw unauthorized('Authorization header must use ******');
   }
 
   return token;
