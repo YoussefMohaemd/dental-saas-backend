@@ -2,14 +2,14 @@ import { DOMAIN_ERROR_CODES, DomainError } from '../../../shared/domain/errors/d
 import { type OrderStatus } from '../../../shared/domain/entities/dental-data-model';
 
 export const ORDER_WORKFLOW_TRANSITIONS: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
-  New: ['Review', 'Design', 'Production', 'Quality Check', 'Ready', 'Completed', 'Cancelled'],
-  Review: ['New', 'Design', 'Production', 'Quality Check', 'Ready', 'Completed', 'Cancelled'],
-  Design: ['New', 'Review', 'Production', 'Quality Check', 'Ready', 'Completed', 'Cancelled'],
-  Production: ['New', 'Review', 'Design', 'Quality Check', 'Ready', 'Completed', 'Cancelled'],
-  'Quality Check': ['New', 'Review', 'Design', 'Production', 'Ready', 'Completed', 'Cancelled'],
-  Ready: ['New', 'Review', 'Design', 'Production', 'Quality Check', 'Completed', 'Cancelled'],
-  Completed: ['New', 'Review', 'Design', 'Production', 'Quality Check', 'Ready', 'Cancelled'],
-  Cancelled: ['New', 'Review', 'Design', 'Production', 'Quality Check', 'Ready', 'Completed'],
+  New: ['Review', 'Cancelled'],
+  Review: ['Design', 'Cancelled'],
+  Design: ['Production', 'Cancelled'],
+  Production: ['Quality Check', 'Cancelled'],
+  'Quality Check': ['Ready', 'Cancelled'],
+  Ready: ['Completed', 'Cancelled'],
+  Completed: [],
+  Cancelled: [],
 };
 
 export function assertOrderStatusTransition(fromStatus: OrderStatus, toStatus: OrderStatus): void {
