@@ -33,16 +33,5 @@ const clinicSchema = new Schema(
 clinicSchema.index({ tenantId: 1, name: 1 }, { unique: true });
 clinicSchema.index({ tenantId: 1, status: 1, city: 1 });
 
-export const ClinicModel: Model<any> = (models.Clinic as Model<any> | undefined) ?? model('Clinic', clinicSchema);
-
-
-
-
-
-
-
-
-
-
-
-
+export const ClinicModel: Model<any> =
+  (models.Clinic as Model<any> | undefined) ?? model('Clinic', clinicSchema);

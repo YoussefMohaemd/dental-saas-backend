@@ -1,10 +1,16 @@
 import type { NextFunction, Request, Response } from 'express';
 import type mongoose from 'mongoose';
 
-import { APPLICATION_ERROR_CODES, ApplicationError } from '../../../shared/application/errors/application-error';
+import {
+  APPLICATION_ERROR_CODES,
+  ApplicationError,
+} from '../../../shared/application/errors/application-error';
 import { UserModel } from '../../../shared/infrastructure/persistence/mongoose/models/user.model';
 import { type RequestWithContext } from '../../../shared/presentation/http/request-context';
-import { resolveRoleCapabilities, type DentalCapability } from '../application/authorization-policy';
+import {
+  resolveRoleCapabilities,
+  type DentalCapability,
+} from '../application/authorization-policy';
 import { TokenService } from '../application/token-service';
 
 const tokenService = new TokenService();
@@ -18,11 +24,12 @@ export async function requireAuthenticated(
   try {
     const token = parseBearerToken(req.header('authorization'));
     const claims = tokenService.verifyAccessToken(token);
-    const user = await userModel.findOne({
-      _id: claims.sub,
-      tenantId: claims.tid,
-      status: 'active',
-    })
+    const user = await userModel
+      .findOne({
+        _id: claims.sub,
+        tenantId: claims.tid,
+        status: 'active',
+      })
       .select({ roles: 1, tokenVersion: 1 })
       .lean<{ roles: string[]; tokenVersion: number }>()
       .exec();
@@ -58,7 +65,9 @@ export function requireAnyRole(allowedRoles: string[]) {
     }
 
     const normalizedAllowedRoles = allowedRoles.map((role) => normalizeRole(role));
-    const hasRole = principal.roles.some((role) => normalizedAllowedRoles.includes(normalizeRole(role)));
+    const hasRole = principal.roles.some((role) =>
+      normalizedAllowedRoles.includes(normalizeRole(role)),
+    );
     if (!hasRole) {
       next(
         new ApplicationError({
@@ -86,7 +95,9 @@ export function requireAnyCapability(requiredCapabilities: DentalCapability[]) {
     }
 
     const roleCapabilities = new Set(resolveRoleCapabilities(principal.roles));
-    const hasAnyRequiredCapability = requiredCapabilities.some((capability) => roleCapabilities.has(capability));
+    const hasAnyRequiredCapability = requiredCapabilities.some((capability) =>
+      roleCapabilities.has(capability),
+    );
     if (!hasAnyRequiredCapability) {
       next(
         new ApplicationError({

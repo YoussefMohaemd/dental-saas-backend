@@ -105,6 +105,7 @@ remediation, validation results, and remaining release concerns.
 
 After running `npm run seed:dev`, sample data from
 `dental-saas-backend/seed-data/*.json` is imported into MongoDB and development users are seeded with password `ChangeMe123!`:
+
 - `dev-admin@example.test`
 - `dev-tech@example.test`
 - `dev-staff@example.test`
@@ -113,12 +114,14 @@ After running `npm run seed:dev`, sample data from
 - `dev-doctor-tenant2@example.test`
 
 Seeded tenant ids for local multi-tenant verification:
+
 - Tenant 1: `66f100000000000000000001`
 - Tenant 2: `66f100000000000000000101`
 
 The login endpoint validates `tenantId` + `email` together. To test tenant isolation, authenticate each tenant separately and verify that lists/details (including `/api/v1/change-requests`) do not leak records across tenant boundaries.
 
 Seed files included by default:
+
 - `clinics.json`
 - `doctors.json`
 - `patients.json`

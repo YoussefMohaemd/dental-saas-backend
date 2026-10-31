@@ -65,15 +65,15 @@ npm run seed:dev
 
 The seeded development accounts use `ChangeMe123!`:
 
-| Account | Email | Scope |
-| --- | --- | --- |
-| Platform Admin | `def.admin@export.test` | All tenant records |
+| Account                        | Email                    | Scope              |
+| ------------------------------ | ------------------------ | ------------------ |
+| Platform Admin                 | `def.admin@export.test`  | All tenant records |
 | Platform Admin (compatibility) | `dev-admin@example.test` | All tenant records |
-| Doctor 1 | `doctor1@example.test` | Doctor 1's records |
-| Doctor 2 | `doctor2@example.test` | Doctor 2's records |
-| Doctor 3 | `doctor3@example.test` | Doctor 3's records |
-| Doctor 4 | `doctor4@example.test` | Doctor 4's records |
-| Doctor 5 | `doctor5@example.test` | Doctor 5's records |
+| Doctor 1                       | `doctor1@example.test`   | Doctor 1's records |
+| Doctor 2                       | `doctor2@example.test`   | Doctor 2's records |
+| Doctor 3                       | `doctor3@example.test`   | Doctor 3's records |
+| Doctor 4                       | `doctor4@example.test`   | Doctor 4's records |
+| Doctor 5                       | `doctor5@example.test`   | Doctor 5's records |
 
 The Postman collection uses the Platform Admin account by default. Run
 `Authenticate regular doctor account` after changing `regularEmail` to verify

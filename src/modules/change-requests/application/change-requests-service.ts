@@ -6,7 +6,10 @@ import {
   APPLICATION_ERROR_CODES,
   ApplicationError,
 } from '../../../shared/application/errors/application-error';
-import { buildPaginationMeta, type PaginationQuery } from '../../../shared/application/contracts/pagination';
+import {
+  buildPaginationMeta,
+  type PaginationQuery,
+} from '../../../shared/application/contracts/pagination';
 import {
   CHANGE_REQUEST_STATUSES,
   PRIORITIES,
@@ -37,16 +40,22 @@ interface ChangeRequestRequesterRecord {
   requesterId: Types.ObjectId;
 }
 
-const decisionPayloadSchema = z.object({
-  status: z.enum(['Approved', 'Rejected', 'In Review', 'Completed'] as const),
-  note: z.string().trim().max(5000).optional(),
-}).strict();
+const decisionPayloadSchema = z
+  .object({
+    status: z.enum(['Approved', 'Rejected', 'In Review', 'Completed'] as const),
+    note: z.string().trim().max(5000).optional(),
+  })
+  .strict();
 
-export function parseChangeRequestStatuses(value: unknown): ChangeRequestDto['status'][] | undefined {
+export function parseChangeRequestStatuses(
+  value: unknown,
+): ChangeRequestDto['status'][] | undefined {
   return parseEnumList(value, CHANGE_REQUEST_STATUSES);
 }
 
-export function parseChangeRequestPriorities(value: unknown): ChangeRequestDto['priority'][] | undefined {
+export function parseChangeRequestPriorities(
+  value: unknown,
+): ChangeRequestDto['priority'][] | undefined {
   return parseEnumList(value, PRIORITIES);
 }
 
@@ -83,7 +92,7 @@ export function buildChangeRequestListFilter(input: {
 
 export function buildChangeRequestRequesterFilter(
   scope: DataVisibilityScope,
-): FilterQuery<ChangeRequestRequesterRecord> | undefined {
+): ChangeRequestRequesterRecord | undefined {
   if (scope.isAdmin) {
     return undefined;
   }
@@ -101,9 +110,9 @@ export function buildChangeRequestIdentityFilter(
   };
 }
 
-export function buildDecisionUpdateDocument(
-  payload: z.infer<typeof decisionPayloadSchema>,
-): { $set: Partial<Pick<ChangeRequestRecord, 'status' | 'resolutionNote'>> } {
+export function buildDecisionUpdateDocument(payload: z.infer<typeof decisionPayloadSchema>): {
+  $set: Partial<Pick<ChangeRequestRecord, 'status' | 'resolutionNote'>>;
+} {
   return {
     $set: {
       status: payload.status,
@@ -123,7 +132,7 @@ export async function listChangeRequests(input: {
   scope?: DataVisibilityScope | undefined;
 }): Promise<{ items: ChangeRequestDto[]; totalItems: number }> {
   const filter = buildChangeRequestListFilter(input);
-  await applyChangeRequestScopeFilter(filter, input.scope);
+  applyChangeRequestScopeFilter(filter, input.scope);
 
   const totalItems = await ChangeRequestModel.countDocuments(filter);
   const sort: Record<string, SortOrder> = {
@@ -149,7 +158,10 @@ export async function listChangeRequests(input: {
     'fullName',
     input.tenantId,
   );
-  const patientMap = await buildOrderPatientMap(records.map((record) => record.orderId), input.tenantId);
+  const patientMap = await buildOrderPatientMap(
+    records.map((record) => record.orderId),
+    input.tenantId,
+  );
 
   return {
     items: records.map((record) => ({
@@ -175,7 +187,7 @@ export async function getChangeRequest(
   scope?: DataVisibilityScope,
 ): Promise<ChangeRequestDto> {
   const filter = buildChangeRequestIdentityFilter(changeRequestId, tenantId);
-  await applyChangeRequestScopeFilter(filter, scope);
+  applyChangeRequestScopeFilter(filter, scope);
 
   const record = await ChangeRequestModel.findOne(filter).lean<ChangeRequestRecord | null>().exec();
   if (!record) {
@@ -215,7 +227,7 @@ export async function decideChangeRequest(
   scope?: DataVisibilityScope,
 ): Promise<ChangeRequestDto> {
   const filter = buildChangeRequestIdentityFilter(changeRequestId, tenantId);
-  await applyChangeRequestScopeFilter(filter, scope);
+  applyChangeRequestScopeFilter(filter, scope);
 
   const record = await ChangeRequestModel.findOneAndUpdate(
     filter,
@@ -242,10 +254,10 @@ export async function decideChangeRequest(
 
 export { buildPaginationMeta };
 
-async function applyChangeRequestScopeFilter(
+function applyChangeRequestScopeFilter(
   filter: FilterQuery<ChangeRequestRecord>,
   scope?: DataVisibilityScope,
-): Promise<void> {
+): void {
   if (!scope) {
     return;
   }

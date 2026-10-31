@@ -51,7 +51,14 @@ export type ChangeRequestStatus = (typeof CHANGE_REQUEST_STATUSES)[number];
 export const BILLING_STATUSES = ['Pending', 'Invoiced', 'Paid', 'Overdue', 'Cancelled'] as const;
 export type BillingStatus = (typeof BILLING_STATUSES)[number];
 
-export const NOTIFICATION_TYPES = ['order', 'workflow', 'file', 'billing', 'system', 'request'] as const;
+export const NOTIFICATION_TYPES = [
+  'order',
+  'workflow',
+  'file',
+  'billing',
+  'system',
+  'request',
+] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
 export const DOCUMENT_CATEGORIES = [

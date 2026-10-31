@@ -46,16 +46,5 @@ patientSchema.index({ tenantId: 1, clinicId: 1, doctorId: 1 });
 patientSchema.index({ tenantId: 1, status: 1, lastVisit: -1 });
 patientSchema.index({ tenantId: 1, name: 1 });
 
-export const PatientModel: Model<any> = (models.Patient as Model<any> | undefined) ?? model('Patient', patientSchema);
-
-
-
-
-
-
-
-
-
-
-
-
+export const PatientModel: Model<any> =
+  (models.Patient as Model<any> | undefined) ?? model('Patient', patientSchema);

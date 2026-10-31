@@ -156,7 +156,10 @@ export class MongooseDoctorRepository implements DoctorRepository {
     return existing !== null;
   }
 
-  public async findClinicNameById(clinicId: string, scope: DataVisibilityScope): Promise<string | null> {
+  public async findClinicNameById(
+    clinicId: string,
+    scope: DataVisibilityScope,
+  ): Promise<string | null> {
     const clinic = await clinicModel
       .findOne({
         _id: clinicId,
@@ -170,9 +173,7 @@ export class MongooseDoctorRepository implements DoctorRepository {
   }
 
   public async hasPatients(doctorId: string, scope: DataVisibilityScope): Promise<boolean> {
-    const count = await patientModel
-      .countDocuments({ tenantId: scope.tenantId, doctorId })
-      .exec();
+    const count = await patientModel.countDocuments({ tenantId: scope.tenantId, doctorId }).exec();
     return count > 0;
   }
 

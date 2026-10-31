@@ -13,4 +13,3 @@ process.env.AUTH_REFRESH_COOKIE_PATH ??= '/api/auth';
 process.env.AUTH_REFRESH_COOKIE_SECURE ??= 'false';
 process.env.AUTH_REFRESH_COOKIE_SAME_SITE ??= 'lax';
 process.env.AUTH_REFRESH_COOKIE_HTTP_ONLY ??= 'true';
-

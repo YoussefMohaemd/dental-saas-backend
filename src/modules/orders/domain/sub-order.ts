@@ -33,21 +33,23 @@ export interface SubOrderFormItem {
   label: string;
   required: boolean;
   status: 'complete' | 'incomplete' | 'optional';
-  value?: {
-    values: Record<string, string>;
-    context: {
-      orderId: string;
-      orderNumber: string;
-      subOrderId: string;
-      service: string;
-      patientName: string;
-      doctorName: string;
-      clinicName: string;
-      selectedTeeth: number[];
-      caseNotes: string;
-    };
-    updatedAt: string;
-  } | undefined;
+  value?:
+    | {
+        values: Record<string, string>;
+        context: {
+          orderId: string;
+          orderNumber: string;
+          subOrderId: string;
+          service: string;
+          patientName: string;
+          doctorName: string;
+          clinicName: string;
+          selectedTeeth: number[];
+          caseNotes: string;
+        };
+        updatedAt: string;
+      }
+    | undefined;
 }
 
 export interface SubOrderScanItem {
@@ -55,15 +57,17 @@ export interface SubOrderScanItem {
   label: string;
   format: string;
   status: 'uploaded' | 'missing' | 'optional' | 'selected-local';
-  localFiles?: Array<{
-    id: string;
-    name: string;
-    sizeBytes: number;
-    sizeLabel: string;
-    type: string;
-    lastModified: number;
-    selectedAt: string;
-  }> | undefined;
+  localFiles?:
+    | Array<{
+        id: string;
+        name: string;
+        sizeBytes: number;
+        sizeLabel: string;
+        type: string;
+        lastModified: number;
+        selectedAt: string;
+      }>
+    | undefined;
   updatedAt?: string | undefined;
 }
 

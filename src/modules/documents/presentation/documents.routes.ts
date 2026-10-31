@@ -43,17 +43,25 @@ documentsRouter.get('/documents', requireAnyCapability(['documents.read']), asyn
     scope,
   });
 
-  sendOk(res, result.items, buildRequestMeta(req, buildPaginationMeta(result.totalItems, pagination)));
+  sendOk(
+    res,
+    result.items,
+    buildRequestMeta(req, buildPaginationMeta(result.totalItems, pagination)),
+  );
 });
 
-documentsRouter.get('/documents/:documentId', requireAnyCapability(['documents.read']), async (req, res) => {
-  const params = z.object({ documentId: z.string() }).parse(req.params);
-  const documentId = ensureObjectId(params.documentId, 'document id');
-  const scope = await getAuthenticatedDataScope(req);
-  const data = await getDocumentById(documentId, scope);
+documentsRouter.get(
+  '/documents/:documentId',
+  requireAnyCapability(['documents.read']),
+  async (req, res) => {
+    const params = z.object({ documentId: z.string() }).parse(req.params);
+    const documentId = ensureObjectId(params.documentId, 'document id');
+    const scope = await getAuthenticatedDataScope(req);
+    const data = await getDocumentById(documentId, scope);
 
-  sendOk(res, data, buildRequestMeta(req));
-});
+    sendOk(res, data, buildRequestMeta(req));
+  },
+);
 
 documentsRouter.post('/documents', requireAnyCapability(['documents.manage']), async (req, res) => {
   const payload = parseCreateDocumentPayload(req.body);
@@ -63,13 +71,17 @@ documentsRouter.post('/documents', requireAnyCapability(['documents.manage']), a
   sendCreated(res, data, buildRequestMeta(req));
 });
 
-documentsRouter.delete('/documents/:documentId', requireAnyCapability(['documents.manage']), async (req, res) => {
-  const params = z.object({ documentId: z.string() }).parse(req.params);
-  const documentId = ensureObjectId(params.documentId, 'document id');
-  const scope = await getAuthenticatedDataScope(req);
-  await deleteDocument(documentId, scope);
+documentsRouter.delete(
+  '/documents/:documentId',
+  requireAnyCapability(['documents.manage']),
+  async (req, res) => {
+    const params = z.object({ documentId: z.string() }).parse(req.params);
+    const documentId = ensureObjectId(params.documentId, 'document id');
+    const scope = await getAuthenticatedDataScope(req);
+    await deleteDocument(documentId, scope);
 
-  sendNoContent(res);
-});
+    sendNoContent(res);
+  },
+);
 
 export { documentsRouter };

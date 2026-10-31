@@ -21,7 +21,10 @@ import { type DataVisibilityScope } from '../../../shared/application/contracts/
 export class DoctorService {
   public constructor(private readonly doctorRepository: DoctorRepository) {}
 
-  public async createDoctor(payload: DoctorWritePayload, scope: DataVisibilityScope): Promise<DoctorDto> {
+  public async createDoctor(
+    payload: DoctorWritePayload,
+    scope: DataVisibilityScope,
+  ): Promise<DoctorDto> {
     await this.ensureClinicExists(payload.clinicId, scope);
     await this.ensureUniqueEmail(payload.email, scope);
     await this.ensureUniqueLookupId(payload.lookupId, scope);
@@ -51,7 +54,9 @@ export class DoctorService {
       pageSize: pagination.pageSize,
     });
 
-    const items = await Promise.all(result.items.map((item) => this.toDoctorDto(item, query.scope)));
+    const items = await Promise.all(
+      result.items.map((item) => this.toDoctorDto(item, query.scope)),
+    );
 
     return {
       items,

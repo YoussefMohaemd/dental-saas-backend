@@ -22,16 +22,24 @@ describe('createDocument scoped references', () => {
     const clinicId = scope.clinicId as Types.ObjectId;
 
     vi.spyOn(DoctorModel, 'findOne').mockReturnValue(
-      createFindOneChain<{ _id: Types.ObjectId; clinicId: Types.ObjectId } | null, ReturnType<typeof DoctorModel.findOne>>({
+      createFindOneChain<
+        { _id: Types.ObjectId; clinicId: Types.ObjectId } | null,
+        ReturnType<typeof DoctorModel.findOne>
+      >({
         _id: doctorId,
         clinicId,
       }),
     );
     vi.spyOn(PatientModel, 'findOne').mockReturnValue(
-      createFindOneChain<{ _id: Types.ObjectId; doctorId: Types.ObjectId; clinicId: Types.ObjectId } | null, ReturnType<typeof PatientModel.findOne>>(null),
+      createFindOneChain<
+        { _id: Types.ObjectId; doctorId: Types.ObjectId; clinicId: Types.ObjectId } | null,
+        ReturnType<typeof PatientModel.findOne>
+      >(null),
     );
     vi.spyOn(ClinicModel, 'findOne').mockReturnValue(
-      createFindOneChain<{ _id: Types.ObjectId } | null, ReturnType<typeof ClinicModel.findOne>>({ _id: clinicId }),
+      createFindOneChain<{ _id: Types.ObjectId } | null, ReturnType<typeof ClinicModel.findOne>>({
+        _id: clinicId,
+      }),
     );
     vi.spyOn(UserModel, 'exists').mockReturnValue(
       createExecChain<{ _id: Types.ObjectId } | null, ReturnType<typeof UserModel.exists>>({
@@ -63,7 +71,12 @@ describe('createDocument scoped references', () => {
     orderFindOne
       .mockReturnValueOnce(
         createFindOneChain<
-          { _id: Types.ObjectId; patientId: Types.ObjectId; doctorId: Types.ObjectId; clinicId: Types.ObjectId } | null,
+          {
+            _id: Types.ObjectId;
+            patientId: Types.ObjectId;
+            doctorId: Types.ObjectId;
+            clinicId: Types.ObjectId;
+          } | null,
           ReturnType<typeof OrderModel.findOne>
         >({
           _id: selectedOrderId,
@@ -79,7 +92,10 @@ describe('createDocument scoped references', () => {
       );
 
     vi.spyOn(SubOrderModel, 'findOne').mockReturnValue(
-      createFindOneChain<{ _id: Types.ObjectId; orderId: Types.ObjectId } | null, ReturnType<typeof SubOrderModel.findOne>>({
+      createFindOneChain<
+        { _id: Types.ObjectId; orderId: Types.ObjectId } | null,
+        ReturnType<typeof SubOrderModel.findOne>
+      >({
         _id: new Types.ObjectId('66f100000000000000000501'),
         orderId: mismatchedOrderId,
       }),

@@ -1,9 +1,6 @@
 import { model, models, Schema, type Model } from 'mongoose';
 
-import {
-  CHANGE_REQUEST_STATUSES,
-  PRIORITIES,
-} from '../../../../domain/entities/dental-data-model';
+import { CHANGE_REQUEST_STATUSES, PRIORITIES } from '../../../../domain/entities/dental-data-model';
 import { baseSchemaOptions, objectIdRef, requiredTrimmedString } from '../shared-schema';
 
 const changeRequestSchema = new Schema(
@@ -41,16 +38,5 @@ changeRequestSchema.index({ tenantId: 1, requestNumber: 1 }, { unique: true });
 changeRequestSchema.index({ tenantId: 1, orderId: 1, createdAt: -1 });
 changeRequestSchema.index({ tenantId: 1, status: 1, priority: 1, updatedAt: -1 });
 
-export const ChangeRequestModel: Model<any> = (models.ChangeRequest as Model<any> | undefined) ?? model('ChangeRequest', changeRequestSchema);
-
-
-
-
-
-
-
-
-
-
-
-
+export const ChangeRequestModel: Model<any> =
+  (models.ChangeRequest as Model<any> | undefined) ?? model('ChangeRequest', changeRequestSchema);

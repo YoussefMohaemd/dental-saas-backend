@@ -1,4 +1,10 @@
-import mongoose, { type ClientSession, type FilterQuery, type Model, type SortOrder, Types } from 'mongoose';
+import mongoose, {
+  type ClientSession,
+  type FilterQuery,
+  type Model,
+  type SortOrder,
+  Types,
+} from 'mongoose';
 
 import { ClinicModel } from '../../../shared/infrastructure/persistence/mongoose/models/clinic.model';
 import { ChangeRequestModel } from '../../../shared/infrastructure/persistence/mongoose/models/change-request.model';
@@ -8,7 +14,13 @@ import { PatientModel } from '../../../shared/infrastructure/persistence/mongoos
 import { SubOrderModel } from '../../../shared/infrastructure/persistence/mongoose/models/sub-order.model';
 import { UserModel } from '../../../shared/infrastructure/persistence/mongoose/models/user.model';
 import { ScanCenterModel } from '../../../shared/infrastructure/persistence/mongoose/models/scan-center.model';
-import { type Order, type OrderCreationData, type OrderListQuery, type OrderUpdatePayload, type OrderWritePayload } from '../domain/order';
+import {
+  type Order,
+  type OrderCreationData,
+  type OrderListQuery,
+  type OrderUpdatePayload,
+  type OrderWritePayload,
+} from '../domain/order';
 import {
   type DoctorReference,
   type NameReferences,
@@ -53,11 +65,12 @@ export class MongooseOrdersRepository implements OrderRepository {
   }
 
   public async findOrderById(orderId: string, scope: DataVisibilityScope): Promise<Order | null> {
-    const found = await orderModel.findOne({
-      _id: orderId,
-      tenantId: scope.tenantId,
-      ...orderScopeFilter(scope),
-    })
+    const found = await orderModel
+      .findOne({
+        _id: orderId,
+        tenantId: scope.tenantId,
+        ...orderScopeFilter(scope),
+      })
       .lean<OrderRecord | null>()
       .exec();
     return found === null ? null : this.toOrder(found);
@@ -70,7 +83,8 @@ export class MongooseOrdersRepository implements OrderRepository {
     const skip = (query.page - 1) * query.pageSize;
 
     const [items, totalItems] = await Promise.all([
-      orderModel.find(filter)
+      orderModel
+        .find(filter)
         .sort({ [sortBy]: sortValue })
         .skip(skip)
         .limit(query.pageSize)
@@ -104,11 +118,8 @@ export class MongooseOrdersRepository implements OrderRepository {
       filter.status = { $in: [...constraints.expectedCurrentStatuses] };
     }
 
-    const updated = await orderModel.findOneAndUpdate(
-      filter,
-      this.toOrderDocumentPayload(payload),
-      { new: true },
-    )
+    const updated = await orderModel
+      .findOneAndUpdate(filter, this.toOrderDocumentPayload(payload), { new: true })
       .lean<OrderRecord | null>()
       .exec();
 
@@ -116,21 +127,27 @@ export class MongooseOrdersRepository implements OrderRepository {
   }
 
   public async deleteOrder(orderId: string, scope: DataVisibilityScope): Promise<boolean> {
-    const deleted = await orderModel.findOneAndDelete({
-      _id: orderId,
-      tenantId: scope.tenantId,
-      ...orderScopeFilter(scope),
-    }).exec();
-    return deleted !== null;
-  }
-
-  public async deleteOrderWithSubOrders(orderId: string, scope: DataVisibilityScope): Promise<boolean> {
-    return runInTransaction(async (session) => {
-      const deleted = await orderModel.findOneAndDelete({
+    const deleted = await orderModel
+      .findOneAndDelete({
         _id: orderId,
         tenantId: scope.tenantId,
         ...orderScopeFilter(scope),
       })
+      .exec();
+    return deleted !== null;
+  }
+
+  public async deleteOrderWithSubOrders(
+    orderId: string,
+    scope: DataVisibilityScope,
+  ): Promise<boolean> {
+    return runInTransaction(async (session) => {
+      const deleted = await orderModel
+        .findOneAndDelete({
+          _id: orderId,
+          tenantId: scope.tenantId,
+          ...orderScopeFilter(scope),
+        })
         .session(session)
         .exec();
 
@@ -138,10 +155,11 @@ export class MongooseOrdersRepository implements OrderRepository {
         return false;
       }
 
-      await subOrderModel.deleteMany({
-        tenantId: scope.tenantId,
-        orderId: new Types.ObjectId(orderId),
-      })
+      await subOrderModel
+        .deleteMany({
+          tenantId: scope.tenantId,
+          orderId: new Types.ObjectId(orderId),
+        })
         .session(session)
         .exec();
 
@@ -163,7 +181,10 @@ export class MongooseOrdersRepository implements OrderRepository {
     return found !== null;
   }
 
-  public async findPatientById(patientId: string, scope: DataVisibilityScope): Promise<PatientReference | null> {
+  public async findPatientById(
+    patientId: string,
+    scope: DataVisibilityScope,
+  ): Promise<PatientReference | null> {
     const patientFilter: FilterQuery<PatientReferenceRecord> = {
       _id: patientId,
       tenantId: scope.tenantId,
@@ -175,9 +196,10 @@ export class MongooseOrdersRepository implements OrderRepository {
       patientFilter.clinicId = scope.clinicId;
     }
 
-    const record = await patientModel.findOne({
-      ...patientFilter,
-    })
+    const record = await patientModel
+      .findOne({
+        ...patientFilter,
+      })
       .select('_id name doctorId clinicId')
       .lean<PatientReferenceRecord | null>()
       .exec();
@@ -194,16 +216,20 @@ export class MongooseOrdersRepository implements OrderRepository {
     };
   }
 
-  public async findDoctorById(doctorId: string, scope: DataVisibilityScope): Promise<DoctorReference | null> {
+  public async findDoctorById(
+    doctorId: string,
+    scope: DataVisibilityScope,
+  ): Promise<DoctorReference | null> {
     if (scope.doctorId && scope.doctorId.toString() !== doctorId) {
       return null;
     }
 
-    const record = await doctorModel.findOne({
-      _id: doctorId,
-      tenantId: scope.tenantId,
-      ...(scope.clinicId ? { clinicId: scope.clinicId } : {}),
-    })
+    const record = await doctorModel
+      .findOne({
+        _id: doctorId,
+        tenantId: scope.tenantId,
+        ...(scope.clinicId ? { clinicId: scope.clinicId } : {}),
+      })
       .select('_id name clinicId')
       .lean<DoctorReferenceRecord | null>()
       .exec();
@@ -223,21 +249,26 @@ export class MongooseOrdersRepository implements OrderRepository {
       return false;
     }
 
-    const clinic = await clinicModel.findOne({
-      _id: clinicId,
-      tenantId: scope.tenantId,
-    })
+    const clinic = await clinicModel
+      .findOne({
+        _id: clinicId,
+        tenantId: scope.tenantId,
+      })
       .select('_id')
       .lean()
       .exec();
     return clinic !== null;
   }
 
-  public async technicianExists(technicianId: string, scope: DataVisibilityScope): Promise<boolean> {
-    const technician = await userModel.findOne({
-      _id: technicianId,
-      tenantId: scope.tenantId,
-    })
+  public async technicianExists(
+    technicianId: string,
+    scope: DataVisibilityScope,
+  ): Promise<boolean> {
+    const technician = await userModel
+      .findOne({
+        _id: technicianId,
+        tenantId: scope.tenantId,
+      })
       .select('_id')
       .lean()
       .exec();
@@ -248,22 +279,28 @@ export class MongooseOrdersRepository implements OrderRepository {
     changeRequestId: string,
     scope: DataVisibilityScope,
   ): Promise<boolean> {
-    const changeRequest = await changeRequestModel.findOne({
-      _id: changeRequestId,
-      tenantId: scope.tenantId,
-    })
+    const changeRequest = await changeRequestModel
+      .findOne({
+        _id: changeRequestId,
+        tenantId: scope.tenantId,
+      })
       .select('_id')
       .lean()
       .exec();
     return changeRequest !== null;
   }
 
-  public async getNameReferences(orders: Order[], scope: DataVisibilityScope): Promise<NameReferences> {
+  public async getNameReferences(
+    orders: Order[],
+    scope: DataVisibilityScope,
+  ): Promise<NameReferences> {
     const patientIds = uniqueObjectIds(orders.map((order) => order.patientId));
     const doctorIds = uniqueObjectIds(orders.map((order) => order.doctorId));
     const clinicIds = uniqueObjectIds(orders.map((order) => order.clinicId));
     const technicianIds = uniqueObjectIds(
-      orders.map((order) => order.technicianId).filter((value): value is string => value !== undefined),
+      orders
+        .map((order) => order.technicianId)
+        .filter((value): value is string => value !== undefined),
     );
     const scanCenterIds = orders
       .map((order) => order.scanCenterId)
@@ -272,37 +309,41 @@ export class MongooseOrdersRepository implements OrderRepository {
     const [patients, doctors, clinics, technicians, scanCenters] = await Promise.all([
       patientIds.length === 0
         ? Promise.resolve([] as PatientNameRecord[])
-        : patientModel.find({ _id: { $in: patientIds }, tenantId: scope.tenantId })
-          .select('_id name')
-          .lean<PatientNameRecord[]>()
-          .exec(),
+        : patientModel
+            .find({ _id: { $in: patientIds }, tenantId: scope.tenantId })
+            .select('_id name')
+            .lean<PatientNameRecord[]>()
+            .exec(),
       doctorIds.length === 0
         ? Promise.resolve([] as DoctorNameRecord[])
-        : doctorModel.find({ _id: { $in: doctorIds }, tenantId: scope.tenantId })
-          .select('_id name')
-          .lean<DoctorNameRecord[]>()
-          .exec(),
+        : doctorModel
+            .find({ _id: { $in: doctorIds }, tenantId: scope.tenantId })
+            .select('_id name')
+            .lean<DoctorNameRecord[]>()
+            .exec(),
       clinicIds.length === 0
         ? Promise.resolve([] as ClinicNameRecord[])
-        : clinicModel.find({ _id: { $in: clinicIds }, tenantId: scope.tenantId })
-          .select('_id name')
-          .lean<ClinicNameRecord[]>()
-          .exec(),
+        : clinicModel
+            .find({ _id: { $in: clinicIds }, tenantId: scope.tenantId })
+            .select('_id name')
+            .lean<ClinicNameRecord[]>()
+            .exec(),
       technicianIds.length === 0
         ? Promise.resolve([] as TechnicianNameRecord[])
-        : userModel.find({ _id: { $in: technicianIds }, tenantId: scope.tenantId })
-          .select('_id fullName')
-          .lean<TechnicianNameRecord[]>()
-          .exec(),
+        : userModel
+            .find({ _id: { $in: technicianIds }, tenantId: scope.tenantId })
+            .select('_id fullName')
+            .lean<TechnicianNameRecord[]>()
+            .exec(),
       scanCenterIds.length === 0
         ? Promise.resolve([] as ScanCenterNameRecord[])
         : ScanCenterModel.find({
             tenantId: scope.tenantId,
             externalId: { $in: scanCenterIds },
           })
-          .select('externalId name')
-          .lean<ScanCenterNameRecord[]>()
-          .exec(),
+            .select('externalId name')
+            .lean<ScanCenterNameRecord[]>()
+            .exec(),
     ]);
 
     return {
@@ -315,10 +356,11 @@ export class MongooseOrdersRepository implements OrderRepository {
   }
 
   public async listSubOrders(orderId: string, scope: DataVisibilityScope): Promise<SubOrder[]> {
-    const records = await subOrderModel.find({
-      tenantId: scope.tenantId,
-      orderId: new Types.ObjectId(orderId),
-    })
+    const records = await subOrderModel
+      .find({
+        tenantId: scope.tenantId,
+        orderId: new Types.ObjectId(orderId),
+      })
       .sort({ createdAt: -1 })
       .lean<SubOrderRecord[]>()
       .exec();
@@ -330,11 +372,12 @@ export class MongooseOrdersRepository implements OrderRepository {
     subOrderId: string,
     scope: DataVisibilityScope,
   ): Promise<SubOrder | null> {
-    const record = await subOrderModel.findOne({
-      _id: subOrderId,
-      tenantId: scope.tenantId,
-      orderId: new Types.ObjectId(orderId),
-    })
+    const record = await subOrderModel
+      .findOne({
+        _id: subOrderId,
+        tenantId: scope.tenantId,
+        orderId: new Types.ObjectId(orderId),
+      })
       .lean<SubOrderRecord | null>()
       .exec();
     return record === null ? null : this.toSubOrder(record);
@@ -365,10 +408,11 @@ export class MongooseOrdersRepository implements OrderRepository {
     scope: DataVisibilityScope,
   ): Promise<SubOrder[]> {
     return runInTransaction(async (session) => {
-      await subOrderModel.deleteMany({
-        tenantId: scope.tenantId,
-        orderId: new Types.ObjectId(orderId),
-      })
+      await subOrderModel
+        .deleteMany({
+          tenantId: scope.tenantId,
+          orderId: new Types.ObjectId(orderId),
+        })
         .session(session)
         .exec();
 
@@ -440,15 +484,16 @@ export class MongooseOrdersRepository implements OrderRepository {
       update.activity = payload.activity;
     }
 
-    const updated = await subOrderModel.findOneAndUpdate(
-      {
-        _id: subOrderId,
-        tenantId: scope.tenantId,
-        orderId: new Types.ObjectId(orderId),
-      },
-      update,
-      { new: true },
-    )
+    const updated = await subOrderModel
+      .findOneAndUpdate(
+        {
+          _id: subOrderId,
+          tenantId: scope.tenantId,
+          orderId: new Types.ObjectId(orderId),
+        },
+        update,
+        { new: true },
+      )
       .lean<SubOrderRecord | null>()
       .exec();
 
@@ -460,20 +505,24 @@ export class MongooseOrdersRepository implements OrderRepository {
     subOrderId: string,
     scope: DataVisibilityScope,
   ): Promise<boolean> {
-    const deleted = await subOrderModel.findOneAndDelete({
-      _id: subOrderId,
-      tenantId: scope.tenantId,
-      orderId: new Types.ObjectId(orderId),
-    }).exec();
+    const deleted = await subOrderModel
+      .findOneAndDelete({
+        _id: subOrderId,
+        tenantId: scope.tenantId,
+        orderId: new Types.ObjectId(orderId),
+      })
+      .exec();
 
     return deleted !== null;
   }
 
   public async deleteSubOrdersByOrder(orderId: string, scope: DataVisibilityScope): Promise<void> {
-    await subOrderModel.deleteMany({
-      tenantId: scope.tenantId,
-      orderId: new Types.ObjectId(orderId),
-    }).exec();
+    await subOrderModel
+      .deleteMany({
+        tenantId: scope.tenantId,
+        orderId: new Types.ObjectId(orderId),
+      })
+      .exec();
   }
 
   private async buildOrderListFilter(query: OrderListQuery): Promise<FilterQuery<OrderRecord>> {
@@ -487,10 +536,12 @@ export class MongooseOrdersRepository implements OrderRepository {
     }
 
     if (query.serviceIds.length > 0) {
-      const orderIds = await subOrderModel.distinct('orderId', {
-        tenantId: query.scope.tenantId,
-        service: { $in: query.serviceIds },
-      }).exec();
+      const orderIds = await subOrderModel
+        .distinct('orderId', {
+          tenantId: query.scope.tenantId,
+          service: { $in: query.serviceIds },
+        })
+        .exec();
 
       if (orderIds.length === 0) {
         filter._id = { $in: [] as Types.ObjectId[] };
@@ -527,7 +578,9 @@ export class MongooseOrdersRepository implements OrderRepository {
     return filter;
   }
 
-  private toOrderDocumentPayload(payload: OrderWritePayload | OrderUpdatePayload): Record<string, unknown> {
+  private toOrderDocumentPayload(
+    payload: OrderWritePayload | OrderUpdatePayload,
+  ): Record<string, unknown> {
     const doc: Record<string, unknown> = {};
 
     if ('orderNumber' in payload && payload.orderNumber !== undefined) {
@@ -625,7 +678,10 @@ export class MongooseOrdersRepository implements OrderRepository {
     return doc;
   }
 
-  private toSubOrderDocumentPayload(orderId: string, payload: SubOrderWritePayload): Record<string, unknown> {
+  private toSubOrderDocumentPayload(
+    orderId: string,
+    payload: SubOrderWritePayload,
+  ): Record<string, unknown> {
     return {
       orderId: new Types.ObjectId(orderId),
       service: payload.service,
@@ -676,10 +732,16 @@ export class MongooseOrdersRepository implements OrderRepository {
       ...(document.sentAt !== undefined ? { sentAt: toDate(document.sentAt) } : {}),
       ...(document.chargedAt !== undefined ? { chargedAt: toDate(document.chargedAt) } : {}),
       dueDate: toDate(document.dueDate),
-      ...(document.changeRequestId !== undefined ? { changeRequestId: document.changeRequestId.toString() } : {}),
+      ...(document.changeRequestId !== undefined
+        ? { changeRequestId: document.changeRequestId.toString() }
+        : {}),
       ...(document.csTask !== undefined ? { csTask: document.csTask } : {}),
-      ...(document.technicianId !== undefined ? { technicianId: document.technicianId.toString() } : {}),
-      ...(document.creationData !== undefined ? { creationData: mapOrderCreationData(document.creationData) } : {}),
+      ...(document.technicianId !== undefined
+        ? { technicianId: document.technicianId.toString() }
+        : {}),
+      ...(document.creationData !== undefined
+        ? { creationData: mapOrderCreationData(document.creationData) }
+        : {}),
       createdAt: toDate(document.createdAt),
       updatedAt: toDate(document.updatedAt),
     };
@@ -743,23 +805,27 @@ interface OrderRecord {
   changeRequestId?: Types.ObjectId | undefined;
   csTask?: string | undefined;
   technicianId?: Types.ObjectId | undefined;
-  creationData?: {
-    services: Array<{
-      serviceId: string;
-      serviceDetails: Record<string, string> | Map<string, string>;
-      serviceForm: Record<string, string> | Map<string, string>;
-      selectedTeeth: number[];
-      scanRequirements: string[];
-      fileReferences: string[];
-    }>;
-    communication?: {
-      internalCaseNote: string;
-      internalCaseFiles: string[];
-      sendMailTo: string[];
-      sendIhTaskTo?: string | undefined;
-      rushTask: boolean;
-    } | undefined;
-  } | undefined;
+  creationData?:
+    | {
+        services: Array<{
+          serviceId: string;
+          serviceDetails: Record<string, string> | Map<string, string>;
+          serviceForm: Record<string, string> | Map<string, string>;
+          selectedTeeth: number[];
+          scanRequirements: string[];
+          fileReferences: string[];
+        }>;
+        communication?:
+          | {
+              internalCaseNote: string;
+              internalCaseFiles: string[];
+              sendMailTo: string[];
+              sendIhTaskTo?: string | undefined;
+              rushTask: boolean;
+            }
+          | undefined;
+      }
+    | undefined;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -779,14 +845,16 @@ interface SubOrderRecord {
   priority: SubOrder['priority'];
   dueDate: Date;
   notes: string;
-  creationData?: {
-    serviceId: string;
-    serviceDetails: Record<string, string> | Map<string, string>;
-    serviceForm: Record<string, string> | Map<string, string>;
-    selectedTeeth: number[];
-    scanRequirements: string[];
-    fileReferences: string[];
-  } | undefined;
+  creationData?:
+    | {
+        serviceId: string;
+        serviceDetails: Record<string, string> | Map<string, string>;
+        serviceForm: Record<string, string> | Map<string, string>;
+        selectedTeeth: number[];
+        scanRequirements: string[];
+        fileReferences: string[];
+      }
+    | undefined;
   forms?: SubOrderFormItem[] | undefined;
   scans?: SubOrderScanItem[] | undefined;
   activity?: SubOrderActivityItem[] | undefined;
@@ -833,12 +901,23 @@ interface ScanCenterNameRecord {
 }
 
 const orderModel = OrderModel as unknown as Model<OrderRecord>;
-const patientModel = PatientModel as unknown as Model<PatientReferenceRecord & PatientNameRecord & { tenantId: Types.ObjectId }>;
-const doctorModel = DoctorModel as unknown as Model<DoctorReferenceRecord & DoctorNameRecord & { tenantId: Types.ObjectId }>;
-const clinicModel = ClinicModel as unknown as Model<ClinicNameRecord & { tenantId: Types.ObjectId }>;
+const patientModel = PatientModel as unknown as Model<
+  PatientReferenceRecord & PatientNameRecord & { tenantId: Types.ObjectId }
+>;
+const doctorModel = DoctorModel as unknown as Model<
+  DoctorReferenceRecord & DoctorNameRecord & { tenantId: Types.ObjectId }
+>;
+const clinicModel = ClinicModel as unknown as Model<
+  ClinicNameRecord & { tenantId: Types.ObjectId }
+>;
 const subOrderModel = SubOrderModel as unknown as Model<SubOrderRecord>;
-const userModel = UserModel as unknown as Model<TechnicianNameRecord & { tenantId: Types.ObjectId }>;
-const changeRequestModel = ChangeRequestModel as unknown as Model<{ _id: Types.ObjectId; tenantId: Types.ObjectId }>;
+const userModel = UserModel as unknown as Model<
+  TechnicianNameRecord & { tenantId: Types.ObjectId }
+>;
+const changeRequestModel = ChangeRequestModel as unknown as Model<{
+  _id: Types.ObjectId;
+  tenantId: Types.ObjectId;
+}>;
 
 async function runInTransaction<T>(work: (session: ClientSession) => Promise<T>): Promise<T> {
   const session = await mongoose.startSession();
@@ -861,9 +940,7 @@ async function runInTransaction<T>(work: (session: ClientSession) => Promise<T>)
 
 function uniqueObjectIds(ids: string[]): Types.ObjectId[] {
   const unique = new Set(ids);
-  return [...unique]
-    .filter((id) => Types.ObjectId.isValid(id))
-    .map((id) => new Types.ObjectId(id));
+  return [...unique].filter((id) => Types.ObjectId.isValid(id)).map((id) => new Types.ObjectId(id));
 }
 
 function buildOrderOwnershipFilter(scope: DataVisibilityScope): Record<string, unknown> {
@@ -894,9 +971,10 @@ function toDate(value: Date | string): Date {
   return value instanceof Date ? value : new Date(value);
 }
 
-function buildDurationRange(
-  duration: NonNullable<OrderListQuery['duration']>,
-): { $gte: Date; $lte: Date } {
+function buildDurationRange(duration: NonNullable<OrderListQuery['duration']>): {
+  $gte: Date;
+  $lte: Date;
+} {
   const now = new Date();
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);

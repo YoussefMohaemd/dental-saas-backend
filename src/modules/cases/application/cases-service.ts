@@ -120,10 +120,12 @@ export async function createCase(input: CreateCaseInput): Promise<CaseDto> {
     });
   }
 
-  const duplicate = await caseModel.exists({
-    tenantId: input.tenantId,
-    caseNumber: input.caseNumber,
-  }).exec();
+  const duplicate = await caseModel
+    .exists({
+      tenantId: input.tenantId,
+      caseNumber: input.caseNumber,
+    })
+    .exec();
   if (duplicate) {
     throw new ApplicationError({
       message: `Case number '${input.caseNumber}' already exists`,
@@ -198,7 +200,8 @@ export async function listCases(input: CasesListInput): Promise<CasesListResult>
     [input.sortBy]: input.sortDirection === 'asc' ? 1 : -1,
   };
 
-  const records: CaseRecord[] = await caseModel.find(filter)
+  const records: CaseRecord[] = await caseModel
+    .find(filter)
     .sort(sort)
     .skip(skip)
     .limit(input.pagination.pageSize)

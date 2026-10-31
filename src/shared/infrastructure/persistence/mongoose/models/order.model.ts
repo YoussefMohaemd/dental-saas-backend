@@ -166,15 +166,5 @@ orderSchema.index({ tenantId: 1, patientId: 1, receivedAt: -1 });
 orderSchema.index({ tenantId: 1, clinicId: 1, updatedAt: -1 });
 orderSchema.index({ tenantId: 1, technicianId: 1, status: 1 });
 
-export const OrderModel: Model<any> = (models.Order as Model<any> | undefined) ?? model('Order', orderSchema);
-
-
-
-
-
-
-
-
-
-
-
+export const OrderModel: Model<any> =
+  (models.Order as Model<any> | undefined) ?? model('Order', orderSchema);

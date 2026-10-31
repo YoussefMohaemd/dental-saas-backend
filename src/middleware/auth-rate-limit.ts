@@ -1,21 +1,16 @@
 import type { Request, RequestHandler } from 'express';
 
 import { env } from '../config/env';
+import { logger } from '../config/logger';
 import { AuthRateLimitModel } from '../shared/infrastructure/persistence/mongoose/models/auth-rate-limit.model';
 
 const WINDOW_MS = env.AUTH_RATE_LIMIT_WINDOW_SECONDS * 1000;
 const MAX_ATTEMPTS_PER_IP = env.AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_IP;
 const MAX_ATTEMPTS_PER_ACCOUNT = env.AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_ACCOUNT;
 const MIN_DATE = new Date(0);
-const OBJECT_ID_PATTERN = /^[a-f\d]{24}$/i;
 
 export const authRateLimit: RequestHandler = async (req, res, next) => {
   try {
-    if (!isRateLimitEligible(req.body)) {
-      next();
-      return;
-    }
-
     const now = new Date();
     const resetAt = new Date(now.getTime() + WINDOW_MS);
     const ipKey = buildIpRateLimitKey(req);
@@ -42,7 +37,10 @@ export const authRateLimit: RequestHandler = async (req, res, next) => {
     }
 
     if (violations.length > 0) {
-      const retryAfterSeconds = Math.max(1, Math.ceil((maxDate(violations).getTime() - now.getTime()) / 1000));
+      const retryAfterSeconds = Math.max(
+        1,
+        Math.ceil((maxDate(violations).getTime() - now.getTime()) / 1000),
+      );
       res.setHeader('Retry-After', retryAfterSeconds);
       res.status(429).json({
         error: {
@@ -55,7 +53,15 @@ export const authRateLimit: RequestHandler = async (req, res, next) => {
 
     next();
   } catch (error) {
-    next(error);
+    logger.warn(
+      {
+        err: error,
+        ip: req.ip ?? req.socket.remoteAddress,
+        route: req.originalUrl ?? req.url,
+      },
+      'Authentication rate-limit check failed; proceeding without enforcement',
+    );
+    next();
   }
 };
 
@@ -71,11 +77,7 @@ async function incrementRateLimitCounter(
         $set: {
           key,
           resetAt: {
-            $cond: [
-              { $gt: [{ $ifNull: ['$resetAt', MIN_DATE] }, now] },
-              '$resetAt',
-              resetAt,
-            ],
+            $cond: [{ $gt: [{ $ifNull: ['$resetAt', MIN_DATE] }, now] }, '$resetAt', resetAt],
           },
           count: {
             $cond: [
@@ -130,11 +132,4 @@ function extractBodyString(value: unknown, field: string): string | undefined {
 
   const normalized = raw.trim().toLowerCase();
   return normalized.length > 0 ? normalized : undefined;
-}
-
-function isRateLimitEligible(body: unknown): boolean {
-  const tenantId = extractBodyString(body, 'tenantId');
-  const email = extractBodyString(body, 'email');
-
-  return Boolean(tenantId && OBJECT_ID_PATTERN.test(tenantId) && email);
 }

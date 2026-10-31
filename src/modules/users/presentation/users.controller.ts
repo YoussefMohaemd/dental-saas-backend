@@ -2,9 +2,15 @@ import { type Request, type Response } from 'express';
 import { Types } from 'mongoose';
 
 import { normalizePaginationQuery } from '../../../shared/application/contracts/pagination';
-import { APPLICATION_ERROR_CODES, ApplicationError } from '../../../shared/application/errors/application-error';
+import {
+  APPLICATION_ERROR_CODES,
+  ApplicationError,
+} from '../../../shared/application/errors/application-error';
 import { sendCreated, sendOk } from '../../../shared/presentation/http/api-response';
-import { hasAuthenticatedPrincipal, type RequestWithContext } from '../../../shared/presentation/http/request-context';
+import {
+  hasAuthenticatedPrincipal,
+  type RequestWithContext,
+} from '../../../shared/presentation/http/request-context';
 import { type UserService } from '../application/user-service';
 import {
   createUserBodySchema,
@@ -84,7 +90,11 @@ export class UsersController {
     const { userId } = userIdParamsSchema.parse(req.params);
     assertValidObjectId(userId, 'userId');
 
-    const updated = await this.userService.deactivateUser(principal.tenantId, userId, principal.userId);
+    const updated = await this.userService.deactivateUser(
+      principal.tenantId,
+      userId,
+      principal.userId,
+    );
     sendOk(res, updated, this.buildMeta(req as RequestWithContext));
   };
 
@@ -97,7 +107,9 @@ export class UsersController {
     sendOk(res, updated, this.buildMeta(req as RequestWithContext));
   };
 
-  private getPrincipal(req: RequestWithContext): NonNullable<RequestWithContext['context']['principal']> {
+  private getPrincipal(
+    req: RequestWithContext,
+  ): NonNullable<RequestWithContext['context']['principal']> {
     if (!hasAuthenticatedPrincipal(req)) {
       throw new ApplicationError({
         message: 'Authentication is required',

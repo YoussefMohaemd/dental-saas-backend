@@ -151,10 +151,14 @@ export class AuthService {
 
     await userModel.updateOne({ _id: user._id }, { $set: { lastLoginAt: new Date() } }).exec();
 
-    return this.issueSessionTokens(user, {
-      ipAddress: input.ipAddress,
-      userAgent: input.userAgent,
-    }, input.rememberMe ?? true);
+    return this.issueSessionTokens(
+      user,
+      {
+        ipAddress: input.ipAddress,
+        userAgent: input.userAgent,
+      },
+      input.rememberMe ?? true,
+    );
   }
 
   public async refresh(

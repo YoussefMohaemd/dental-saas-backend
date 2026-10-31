@@ -11,10 +11,30 @@ const patientsController = new PatientsController(
   new PatientService(new MongoosePatientRepository()),
 );
 
-patientsRouter.get('/patients', requireAnyCapability(['patients.read']), patientsController.listPatients);
-patientsRouter.post('/patients', requireAnyCapability(['patients.create']), patientsController.createPatient);
-patientsRouter.get('/patients/:patientId', requireAnyCapability(['patients.read']), patientsController.getPatientById);
-patientsRouter.patch('/patients/:patientId', requireAnyCapability(['patients.update']), patientsController.updatePatient);
-patientsRouter.delete('/patients/:patientId', requireAnyCapability(['patients.delete']), patientsController.deletePatient);
+patientsRouter.get(
+  '/patients',
+  requireAnyCapability(['patients.read']),
+  patientsController.listPatients,
+);
+patientsRouter.post(
+  '/patients',
+  requireAnyCapability(['patients.create']),
+  patientsController.createPatient,
+);
+patientsRouter.get(
+  '/patients/:patientId',
+  requireAnyCapability(['patients.read']),
+  patientsController.getPatientById,
+);
+patientsRouter.patch(
+  '/patients/:patientId',
+  requireAnyCapability(['patients.update']),
+  patientsController.updatePatient,
+);
+patientsRouter.delete(
+  '/patients/:patientId',
+  requireAnyCapability(['patients.delete']),
+  patientsController.deletePatient,
+);
 
 export { patientsRouter };

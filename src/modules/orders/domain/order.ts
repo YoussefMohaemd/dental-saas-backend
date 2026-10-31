@@ -13,13 +13,15 @@ import { type DataVisibilityScope } from '../../../shared/application/contracts/
 
 export interface OrderCreationData {
   services: SubOrderCreationDataEntity[];
-  communication?: {
-    internalCaseNote: string;
-    internalCaseFiles: string[];
-    sendMailTo: string[];
-    sendIhTaskTo?: string | undefined;
-    rushTask: boolean;
-  } | undefined;
+  communication?:
+    | {
+        internalCaseNote: string;
+        internalCaseFiles: string[];
+        sendMailTo: string[];
+        sendIhTaskTo?: string | undefined;
+        rushTask: boolean;
+      }
+    | undefined;
 }
 
 export interface Order {
@@ -154,9 +156,14 @@ export const ORDER_LIST_SORT_FIELDS: readonly OrderListQuery['sortBy'][] = [
   'updatedAt',
 ];
 
-export const ORDER_DURATION_VALUES: ReadonlyArray<
-  NonNullable<OrderListQuery['duration']>
-> = ['today', 'week', 'month', '2-months', '3-months', '6-months'];
+export const ORDER_DURATION_VALUES: ReadonlyArray<NonNullable<OrderListQuery['duration']>> = [
+  'today',
+  'week',
+  'month',
+  '2-months',
+  '3-months',
+  '6-months',
+];
 
 export const ORDER_STATUS_VALUES = ORDER_STATUSES;
 export const ORDER_PRIORITY_VALUES = PRIORITIES;

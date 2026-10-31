@@ -3,7 +3,10 @@ import crypto from 'crypto';
 import jwt, { type JwtPayload } from 'jsonwebtoken';
 
 import { env } from '../../../config/env';
-import { APPLICATION_ERROR_CODES, ApplicationError } from '../../../shared/application/errors/application-error';
+import {
+  APPLICATION_ERROR_CODES,
+  ApplicationError,
+} from '../../../shared/application/errors/application-error';
 
 export interface AuthTokenClaims {
   sub: string;
@@ -98,6 +101,7 @@ export class TokenService {
       const decoded = jwt.verify(token, secret, {
         issuer: env.AUTH_JWT_ISSUER,
         audience: env.AUTH_JWT_AUDIENCE,
+        algorithms: ['HS256'],
       });
 
       if (typeof decoded === 'string') {

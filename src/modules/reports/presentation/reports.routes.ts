@@ -49,100 +49,128 @@ reportsRouter.get('/reports/seed', requireAnyCapability(['reports.read']), async
   sendOk(res, data, buildRequestMeta(req));
 });
 
-reportsRouter.get('/reports/orders-range', requireAnyCapability(['reports.read']), async (req, res) => {
-  const query = ordersRangeQuerySchema.parse(req.query);
-  const pagination = parsePaginationQuery(query);
-  const sort = parseSort(
-    query,
-    ['receivedAt', 'sentAt', 'amount', 'archiveDate', 'chargedAt', 'orderNumber'],
-    'receivedAt',
-  );
-  const scope = await getAuthenticatedDataScope(req);
-  const data = await getOrdersRangeReport({
-    pagination,
-    from: parseDateOrUndefined(query.from),
-    to: parseDateOrUndefined(query.to),
-    search: query.search,
-    sortBy: sort.sortBy as 'receivedAt' | 'sentAt' | 'amount' | 'archiveDate' | 'chargedAt' | 'orderNumber',
-    sortDirection: sort.sortDirection,
-    tenantId: scope.tenantId,
-    scope,
-  });
+reportsRouter.get(
+  '/reports/orders-range',
+  requireAnyCapability(['reports.read']),
+  async (req, res) => {
+    const query = ordersRangeQuerySchema.parse(req.query);
+    const pagination = parsePaginationQuery(query);
+    const sort = parseSort(
+      query,
+      ['receivedAt', 'sentAt', 'amount', 'archiveDate', 'chargedAt', 'orderNumber'],
+      'receivedAt',
+    );
+    const scope = await getAuthenticatedDataScope(req);
+    const data = await getOrdersRangeReport({
+      pagination,
+      from: parseDateOrUndefined(query.from),
+      to: parseDateOrUndefined(query.to),
+      search: query.search,
+      sortBy: sort.sortBy as
+        'receivedAt' | 'sentAt' | 'amount' | 'archiveDate' | 'chargedAt' | 'orderNumber',
+      sortDirection: sort.sortDirection,
+      tenantId: scope.tenantId,
+      scope,
+    });
 
-  sendOk(res, data.items, buildRequestMeta(req, buildPaginationMeta(data.totalItems, pagination)));
-});
+    sendOk(
+      res,
+      data.items,
+      buildRequestMeta(req, buildPaginationMeta(data.totalItems, pagination)),
+    );
+  },
+);
 
-reportsRouter.get('/reports/quarterly-targets', requireAnyCapability(['reports.read']), async (req, res) => {
-  const query = z
-    .object({
-      year: z.coerce.number().int().min(2000).max(3000),
-      quarter: z.coerce.number().int().min(1).max(4).optional(),
-    })
-    .parse(req.query);
+reportsRouter.get(
+  '/reports/quarterly-targets',
+  requireAnyCapability(['reports.read']),
+  async (req, res) => {
+    const query = z
+      .object({
+        year: z.coerce.number().int().min(2000).max(3000),
+        quarter: z.coerce.number().int().min(1).max(4).optional(),
+      })
+      .parse(req.query);
 
-  const scope = await getAuthenticatedDataScope(req);
-  const data = await getQuarterlyTargets(
-    query.year,
-    query.quarter as 1 | 2 | 3 | 4 | undefined,
-    scope.tenantId,
-    scope,
-  );
-  sendOk(res, data, buildRequestMeta(req));
-});
+    const scope = await getAuthenticatedDataScope(req);
+    const data = await getQuarterlyTargets(
+      query.year,
+      query.quarter as 1 | 2 | 3 | 4 | undefined,
+      scope.tenantId,
+      scope,
+    );
+    sendOk(res, data, buildRequestMeta(req));
+  },
+);
 
-reportsRouter.get('/reports/quarterly-targets/:year/:quarter', requireAnyCapability(['reports.read']), async (req, res) => {
-  const params = z
-    .object({
-      year: z.coerce.number().int().min(2000).max(3000),
-      quarter: z.coerce.number().int().min(1).max(4),
-    })
-    .parse(req.params);
+reportsRouter.get(
+  '/reports/quarterly-targets/:year/:quarter',
+  requireAnyCapability(['reports.read']),
+  async (req, res) => {
+    const params = z
+      .object({
+        year: z.coerce.number().int().min(2000).max(3000),
+        quarter: z.coerce.number().int().min(1).max(4),
+      })
+      .parse(req.params);
 
-  const scope = await getAuthenticatedDataScope(req);
-  const data = await getQuarterlyTargets(
-    params.year,
-    params.quarter as 1 | 2 | 3 | 4,
-    scope.tenantId,
-    scope,
-  );
-  sendOk(res, data, buildRequestMeta(req));
-});
+    const scope = await getAuthenticatedDataScope(req);
+    const data = await getQuarterlyTargets(
+      params.year,
+      params.quarter as 1 | 2 | 3 | 4,
+      scope.tenantId,
+      scope,
+    );
+    sendOk(res, data, buildRequestMeta(req));
+  },
+);
 
-reportsRouter.get('/reports/team-performance', requireAnyCapability(['reports.read']), async (req, res) => {
-  const scope = await getAuthenticatedDataScope(req);
-  const data = await getTeamPerformance(scope.tenantId, scope);
-  sendOk(res, data.records, buildRequestMeta(req));
-});
+reportsRouter.get(
+  '/reports/team-performance',
+  requireAnyCapability(['reports.read']),
+  async (req, res) => {
+    const scope = await getAuthenticatedDataScope(req);
+    const data = await getTeamPerformance(scope.tenantId, scope);
+    sendOk(res, data.records, buildRequestMeta(req));
+  },
+);
 
-reportsRouter.get('/reports/sub-orders', requireAnyCapability(['reports.read']), async (req, res) => {
-  const query = z
-    .object({
-      from: z.string().optional(),
-      to: z.string().optional(),
-      service: z.string().trim().min(1).optional(),
-      status: z.union([
-        z.enum(['done', 'in-progress', 'pending', 'blocked']),
-        z.array(z.enum(['done', 'in-progress', 'pending', 'blocked'])),
-      ]).optional(),
-    })
-    .parse(req.query);
-  const scope = await getAuthenticatedDataScope(req);
-  const statuses = query.status === undefined
-    ? undefined
-    : Array.isArray(query.status)
-      ? query.status
-      : [query.status];
-  const data = await getSubOrderReport({
-    from: parseDateOrUndefined(query.from),
-    to: parseDateOrUndefined(query.to),
-    service: query.service,
-    statuses,
-    tenantId: scope.tenantId,
-    scope,
-  });
+reportsRouter.get(
+  '/reports/sub-orders',
+  requireAnyCapability(['reports.read']),
+  async (req, res) => {
+    const query = z
+      .object({
+        from: z.string().optional(),
+        to: z.string().optional(),
+        service: z.string().trim().min(1).optional(),
+        status: z
+          .union([
+            z.enum(['done', 'in-progress', 'pending', 'blocked']),
+            z.array(z.enum(['done', 'in-progress', 'pending', 'blocked'])),
+          ])
+          .optional(),
+      })
+      .parse(req.query);
+    const scope = await getAuthenticatedDataScope(req);
+    const statuses =
+      query.status === undefined
+        ? undefined
+        : Array.isArray(query.status)
+          ? query.status
+          : [query.status];
+    const data = await getSubOrderReport({
+      from: parseDateOrUndefined(query.from),
+      to: parseDateOrUndefined(query.to),
+      service: query.service,
+      statuses,
+      tenantId: scope.tenantId,
+      scope,
+    });
 
-  sendOk(res, data, buildRequestMeta(req));
-});
+    sendOk(res, data, buildRequestMeta(req));
+  },
+);
 
 function parseDateOrUndefined(value: string | undefined): Date | undefined {
   if (!value) {

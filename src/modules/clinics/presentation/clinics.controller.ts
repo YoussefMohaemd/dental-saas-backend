@@ -2,10 +2,18 @@ import { type Request, type Response } from 'express';
 import { Types } from 'mongoose';
 
 import { type ClinicService } from '../application/clinic-service';
-import { clinicsListQuerySchema, clinicIdParamsSchema, createClinicBodySchema, updateClinicBodySchema } from './clinics.schemas';
+import {
+  clinicsListQuerySchema,
+  clinicIdParamsSchema,
+  createClinicBodySchema,
+  updateClinicBodySchema,
+} from './clinics.schemas';
 import { sendCreated, sendNoContent, sendOk } from '../../../shared/presentation/http/api-response';
 import { type RequestWithContext } from '../../../shared/presentation/http/request-context';
-import { APPLICATION_ERROR_CODES, ApplicationError } from '../../../shared/application/errors/application-error';
+import {
+  APPLICATION_ERROR_CODES,
+  ApplicationError,
+} from '../../../shared/application/errors/application-error';
 import { ensureNonEmptyUpdate } from '../application/clinic-service';
 import { normalizePaginationQuery } from '../../../shared/application/contracts/pagination';
 import { getAuthenticatedDataScope } from '../../../shared/presentation/http/http-utils';
@@ -74,10 +82,7 @@ export class ClinicsController {
     const { clinicId } = clinicIdParamsSchema.parse(req.params);
     assertValidObjectId(clinicId, 'clinicId');
 
-    await this.clinicService.deleteClinic(
-      clinicId,
-      await getAuthenticatedDataScope(req),
-    );
+    await this.clinicService.deleteClinic(clinicId, await getAuthenticatedDataScope(req));
     sendNoContent(res);
   };
 

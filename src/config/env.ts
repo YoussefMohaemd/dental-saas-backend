@@ -101,7 +101,10 @@ const refinedEnvSchema = envSchema.superRefine((value, context) => {
     });
   }
 
-  if (value.NODE_ENV === 'production' && value.AUTH_ACCESS_TOKEN_SECRET === DEV_ACCESS_TOKEN_SECRET) {
+  if (
+    value.NODE_ENV === 'production' &&
+    value.AUTH_ACCESS_TOKEN_SECRET === DEV_ACCESS_TOKEN_SECRET
+  ) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['AUTH_ACCESS_TOKEN_SECRET'],
@@ -109,7 +112,10 @@ const refinedEnvSchema = envSchema.superRefine((value, context) => {
     });
   }
 
-  if (value.NODE_ENV === 'production' && value.AUTH_REFRESH_TOKEN_SECRET === DEV_REFRESH_TOKEN_SECRET) {
+  if (
+    value.NODE_ENV === 'production' &&
+    value.AUTH_REFRESH_TOKEN_SECRET === DEV_REFRESH_TOKEN_SECRET
+  ) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['AUTH_REFRESH_TOKEN_SECRET'],
@@ -131,5 +137,6 @@ if (!parsedEnv.success) {
 export const env = {
   ...parsedEnv.data,
   AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_ACCOUNT:
-    parsedEnv.data.AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_ACCOUNT ?? parsedEnv.data.AUTH_RATE_LIMIT_MAX_ATTEMPTS,
+    parsedEnv.data.AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_ACCOUNT ??
+    parsedEnv.data.AUTH_RATE_LIMIT_MAX_ATTEMPTS,
 };

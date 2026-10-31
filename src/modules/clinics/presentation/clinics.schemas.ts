@@ -8,27 +8,27 @@ const listSortBy = z.enum(['name', 'city', 'status', 'accountManager', 'createdA
 const sortDirection = z.enum(['asc', 'desc']);
 
 const statusSchema = z.enum(CLINIC_STATUSES);
-const statusesQuerySchema = z.preprocess(
-  (value) => {
-    if (value === undefined || value === null) {
-      return [];
-    }
-
-    if (typeof value === 'string') {
-      return value.split(',').map((item) => item.trim()).filter((item) => item.length > 0);
-    }
-
-    if (Array.isArray(value)) {
-      return value
-        .filter((item): item is string => typeof item === 'string')
-        .map((item) => item.trim())
-        .filter((item) => item.length > 0);
-    }
-
+const statusesQuerySchema = z.preprocess((value) => {
+  if (value === undefined || value === null) {
     return [];
-  },
-  z.array(statusSchema),
-);
+  }
+
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .filter((item): item is string => typeof item === 'string')
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
+  }
+
+  return [];
+}, z.array(statusSchema));
 
 export const clinicIdParamsSchema = z.object({
   clinicId: z.string().trim().min(1),
@@ -43,14 +43,20 @@ export const clinicsListQuerySchema = z.object({
   status: statusesQuerySchema.default([]),
 });
 
-export const createClinicBodySchema = z.object({
-  name: stringField,
-  address: stringField,
-  city: stringField,
-  phone: stringField,
-  email: z.string().trim().email().transform((value) => value.toLowerCase()),
-  status: statusSchema.default('Active'),
-  accountManager: stringField,
-}).strict();
+export const createClinicBodySchema = z
+  .object({
+    name: stringField,
+    address: stringField,
+    city: stringField,
+    phone: stringField,
+    email: z
+      .string()
+      .trim()
+      .email()
+      .transform((value) => value.toLowerCase()),
+    status: statusSchema.default('Active'),
+    accountManager: stringField,
+  })
+  .strict();
 
 export const updateClinicBodySchema = createClinicBodySchema.partial().strict();

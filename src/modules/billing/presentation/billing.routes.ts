@@ -46,32 +46,45 @@ billingRouter.get('/billing', requireAnyCapability(['billing.read']), async (req
     statuses,
     dateFrom: parseOptionalDate(query.dateFrom),
     dateTo: parseOptionalDate(query.dateTo),
-    sortBy: sort.sortBy as 'dueDate' | 'amount' | 'status' | 'createdAt' | 'updatedAt' | 'invoiceDate',
+    sortBy: sort.sortBy as
+      'dueDate' | 'amount' | 'status' | 'createdAt' | 'updatedAt' | 'invoiceDate',
     sortDirection: sort.sortDirection,
     tenantId: scope.tenantId,
     scope,
   });
 
-  sendOk(res, result.items, buildRequestMeta(req, buildPaginationMeta(result.totalItems, pagination)));
+  sendOk(
+    res,
+    result.items,
+    buildRequestMeta(req, buildPaginationMeta(result.totalItems, pagination)),
+  );
 });
 
-billingRouter.get('/billing/:recordId', requireAnyCapability(['billing.read']), async (req, res) => {
-  const params = z.object({ recordId: z.string() }).parse(req.params);
-  const billingId = ensureObjectId(params.recordId, 'billing record id');
-  const scope = await getAuthenticatedDataScope(req);
-  const data = await getBillingRecord(billingId, scope.tenantId, scope);
+billingRouter.get(
+  '/billing/:recordId',
+  requireAnyCapability(['billing.read']),
+  async (req, res) => {
+    const params = z.object({ recordId: z.string() }).parse(req.params);
+    const billingId = ensureObjectId(params.recordId, 'billing record id');
+    const scope = await getAuthenticatedDataScope(req);
+    const data = await getBillingRecord(billingId, scope.tenantId, scope);
 
-  sendOk(res, data, buildRequestMeta(req));
-});
+    sendOk(res, data, buildRequestMeta(req));
+  },
+);
 
-billingRouter.patch('/billing/:recordId', requireAnyCapability(['billing.update']), async (req, res) => {
-  const params = z.object({ recordId: z.string() }).parse(req.params);
-  const billingId = ensureObjectId(params.recordId, 'billing record id');
-  const payload = parseBillingPatchPayload(req.body);
-  const scope = await getAuthenticatedDataScope(req);
-  const data = await updateBillingRecord(billingId, payload, scope.tenantId, scope);
+billingRouter.patch(
+  '/billing/:recordId',
+  requireAnyCapability(['billing.update']),
+  async (req, res) => {
+    const params = z.object({ recordId: z.string() }).parse(req.params);
+    const billingId = ensureObjectId(params.recordId, 'billing record id');
+    const payload = parseBillingPatchPayload(req.body);
+    const scope = await getAuthenticatedDataScope(req);
+    const data = await updateBillingRecord(billingId, payload, scope.tenantId, scope);
 
-  sendOk(res, data, buildRequestMeta(req));
-});
+    sendOk(res, data, buildRequestMeta(req));
+  },
+);
 
 export { billingRouter };

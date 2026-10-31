@@ -186,10 +186,7 @@ const fixedSecondaryDoctorUserId = toObjectId('66f100000000000000000106');
 
 const passwordHasher = new PasswordHasher();
 
-const defaultScanCenterDetails: Record<
-  string,
-  Omit<Required<ScanCenterSeed>, 'id'>
-> = {
+const defaultScanCenterDetails: Record<string, Omit<Required<ScanCenterSeed>, 'id'>> = {
   'scan-center-1': {
     name: 'Cairo Digital Scanning',
     location: 'Cairo Lab Campus',
@@ -681,9 +678,8 @@ const seedDevelopmentData = async (): Promise<void> => {
   const notificationRecipients = uploaders;
 
   const documentsDocs = documentsSource.map((document, index) => {
-    const sourceOrder = ordersSource.length > 0
-      ? ordersSource[index % ordersSource.length]
-      : undefined;
+    const sourceOrder =
+      ordersSource.length > 0 ? ordersSource[index % ordersSource.length] : undefined;
     const uploaderId = uploaders[index % uploaders.length] ?? fixedAdminUserId;
 
     return {
@@ -709,8 +705,7 @@ const seedDevelopmentData = async (): Promise<void> => {
 
   const notificationsDocs = notificationsSource.map((notification, index) => {
     const recipientId =
-      notificationRecipients[index % notificationRecipients.length] ??
-      fixedAdminUserId;
+      notificationRecipients[index % notificationRecipients.length] ?? fixedAdminUserId;
 
     return {
       _id: notificationIdMap.get(notification.id),

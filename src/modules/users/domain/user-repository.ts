@@ -1,4 +1,9 @@
-import { type User, type UserCreatePayload, type UserListQuery, type UserRoleStatusUpdatePayload } from './user';
+import {
+  type User,
+  type UserCreatePayload,
+  type UserListQuery,
+  type UserRoleStatusUpdatePayload,
+} from './user';
 
 export interface UserListResult {
   items: User[];

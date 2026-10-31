@@ -1,4 +1,4 @@
-import type { Types } from "mongoose";
+import type { Types } from 'mongoose';
 
 export interface DataVisibilityScope {
   tenantId: Types.ObjectId;

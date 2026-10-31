@@ -2,7 +2,10 @@ import { type Request, type Response } from 'express';
 import { Types } from 'mongoose';
 
 import { normalizePaginationQuery } from '../../../shared/application/contracts/pagination';
-import { APPLICATION_ERROR_CODES, ApplicationError } from '../../../shared/application/errors/application-error';
+import {
+  APPLICATION_ERROR_CODES,
+  ApplicationError,
+} from '../../../shared/application/errors/application-error';
 import { sendCreated, sendNoContent, sendOk } from '../../../shared/presentation/http/api-response';
 import { type RequestWithContext } from '../../../shared/presentation/http/request-context';
 import { ensureNonEmptyPatientUpdate, type PatientService } from '../application/patient-service';
@@ -88,10 +91,7 @@ export class PatientsController {
     const { patientId } = patientIdParamsSchema.parse(req.params);
     assertValidObjectId(patientId, 'patientId');
 
-    await this.patientService.deletePatient(
-      patientId,
-      await getAuthenticatedDataScope(req),
-    );
+    await this.patientService.deletePatient(patientId, await getAuthenticatedDataScope(req));
     sendNoContent(res);
   };
 

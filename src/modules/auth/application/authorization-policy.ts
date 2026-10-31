@@ -82,12 +82,7 @@ const ROLE_CAPABILITY_MAP: Record<CanonicalRole, readonly DentalCapability[]> = 
     'forms.read',
     'grid.read',
   ],
-  manager: [
-    ...BASE_CAPABILITIES,
-    'orders.export',
-    'forms.read',
-    'grid.read',
-  ],
+  manager: [...BASE_CAPABILITIES, 'orders.export', 'forms.read', 'grid.read'],
   doctor: [
     ...BASE_CAPABILITIES,
     'orders.create',
@@ -146,11 +141,25 @@ function normalizeRoles(roles: readonly string[]): CanonicalRole[] {
 }
 
 const ROLE_ALIASES: Record<CanonicalRole, ReadonlySet<string>> = {
-  admin: new Set(['admin', 'administrator', 'superadmin', 'super-admin', 'super_admin', 'super admin']),
+  admin: new Set([
+    'admin',
+    'administrator',
+    'superadmin',
+    'super-admin',
+    'super_admin',
+    'super admin',
+  ]),
   staff: new Set(['staff']),
   manager: new Set(['manager', 'lab manager', 'lab-manager', 'lab_manager']),
   doctor: new Set(['doctor', 'dentist', 'dental doctor']),
-  technician: new Set(['technician', 'tech', 'lab-technician', 'lab_technician', 'lab tech', 'labtech']),
+  technician: new Set([
+    'technician',
+    'tech',
+    'lab-technician',
+    'lab_technician',
+    'lab tech',
+    'labtech',
+  ]),
 };
 
 function normalizeRoleAlias(role: string): CanonicalRole | undefined {

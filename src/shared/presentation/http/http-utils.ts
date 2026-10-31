@@ -222,7 +222,11 @@ export async function getAuthenticatedDataScope(req: Request): Promise<Authentic
     requiresDoctorProfile && user.email
       ? await DoctorModel.findOne({ tenantId, email: user.email, status: 'Active' })
           .select({ _id: 1, clinicId: 1, status: 1 })
-          .lean<{ _id: Types.ObjectId; clinicId: Types.ObjectId; status: 'Active' | 'Inactive' } | null>()
+          .lean<{
+            _id: Types.ObjectId;
+            clinicId: Types.ObjectId;
+            status: 'Active' | 'Inactive';
+          } | null>()
           .exec()
       : null;
 
@@ -258,21 +262,32 @@ function normalizeRoleAliases(roles: readonly string[]): string[] {
 type CanonicalRole = 'admin' | 'staff' | 'manager' | 'doctor' | 'technician';
 
 const ROLE_ALIASES = {
-  admin: new Set(['admin', 'administrator', 'superadmin', 'super-admin', 'super_admin', 'super admin']),
+  admin: new Set([
+    'admin',
+    'administrator',
+    'superadmin',
+    'super-admin',
+    'super_admin',
+    'super admin',
+  ]),
   staff: new Set(['staff']),
   manager: new Set(['manager']),
   doctor: new Set(['doctor', 'dentist', 'dental doctor']),
-  technician: new Set(['technician', 'tech', 'lab-technician', 'lab_technician', 'lab tech', 'labtech']),
+  technician: new Set([
+    'technician',
+    'tech',
+    'lab-technician',
+    'lab_technician',
+    'lab tech',
+    'labtech',
+  ]),
 } as const;
 
 function normalizeRoleAlias(role: string): CanonicalRole {
   const normalized = role.trim().toLowerCase();
   const compact = normalized.replace(/[\s_-]+/g, '');
 
-  if (
-    ROLE_ALIASES.admin.has(normalized) ||
-    ROLE_ALIASES.admin.has(compact)
-  ) {
+  if (ROLE_ALIASES.admin.has(normalized) || ROLE_ALIASES.admin.has(compact)) {
     return 'admin';
   }
 
@@ -284,17 +299,11 @@ function normalizeRoleAlias(role: string): CanonicalRole {
     return 'manager';
   }
 
-  if (
-    ROLE_ALIASES.doctor.has(normalized) ||
-    ROLE_ALIASES.doctor.has(compact)
-  ) {
+  if (ROLE_ALIASES.doctor.has(normalized) || ROLE_ALIASES.doctor.has(compact)) {
     return 'doctor';
   }
 
-  if (
-    ROLE_ALIASES.technician.has(normalized) ||
-    ROLE_ALIASES.technician.has(compact)
-  ) {
+  if (ROLE_ALIASES.technician.has(normalized) || ROLE_ALIASES.technician.has(compact)) {
     return 'technician';
   }
 
@@ -339,7 +348,9 @@ function parseStringList(value: unknown): string[] | undefined {
   return undefined;
 }
 
-function getAuthenticatedPrincipal(req: Request): NonNullable<RequestWithContext['context']['principal']> {
+function getAuthenticatedPrincipal(
+  req: Request,
+): NonNullable<RequestWithContext['context']['principal']> {
   const requestWithContext = req as RequestWithContext;
   if (!hasAuthenticatedPrincipal(requestWithContext)) {
     throw new ApplicationError({

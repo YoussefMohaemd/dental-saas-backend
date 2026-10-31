@@ -1,15 +1,30 @@
-import { buildPaginationMeta, type PaginatedResult, type PaginationQuery } from '../../../shared/application/contracts/pagination';
-import { APPLICATION_ERROR_CODES, ApplicationError } from '../../../shared/application/errors/application-error';
+import {
+  buildPaginationMeta,
+  type PaginatedResult,
+  type PaginationQuery,
+} from '../../../shared/application/contracts/pagination';
+import {
+  APPLICATION_ERROR_CODES,
+  ApplicationError,
+} from '../../../shared/application/errors/application-error';
 import { type PatientDto } from '../../../shared/application/contracts/dental-api-contract';
 import { DOMAIN_ERROR_CODES, DomainError } from '../../../shared/domain/errors/domain-error';
-import { type Patient, type PatientListQuery, type PatientUpdatePayload, type PatientWritePayload } from '../domain/patient';
+import {
+  type Patient,
+  type PatientListQuery,
+  type PatientUpdatePayload,
+  type PatientWritePayload,
+} from '../domain/patient';
 import { type PatientRepository } from '../domain/patient-repository';
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 
 export class PatientService {
   public constructor(private readonly patientRepository: PatientRepository) {}
 
-  public async createPatient(payload: PatientWritePayload, scope: DataVisibilityScope): Promise<PatientDto> {
+  public async createPatient(
+    payload: PatientWritePayload,
+    scope: DataVisibilityScope,
+  ): Promise<PatientDto> {
     await this.assertClinicDoctorLink(payload.clinicId, payload.doctorId, scope);
     const patient = await this.patientRepository.create(payload, scope);
     return this.toPatientDto(patient, scope);
@@ -18,7 +33,10 @@ export class PatientService {
   public async getPatientById(patientId: string, scope: DataVisibilityScope): Promise<PatientDto> {
     const patient = await this.patientRepository.findById(patientId, scope);
     if (patient === null) {
-      throw new DomainError(`Patient ${patientId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
+      throw new DomainError(
+        `Patient ${patientId} was not found`,
+        DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND,
+      );
     }
 
     return this.toPatientDto(patient, scope);
@@ -34,7 +52,9 @@ export class PatientService {
       pageSize: pagination.pageSize,
     });
 
-    const items = await Promise.all(result.items.map((item) => this.toPatientDto(item, query.scope)));
+    const items = await Promise.all(
+      result.items.map((item) => this.toPatientDto(item, query.scope)),
+    );
 
     return {
       items,
@@ -50,7 +70,10 @@ export class PatientService {
     if (payload.clinicId !== undefined || payload.doctorId !== undefined) {
       const existing = await this.patientRepository.findById(patientId, scope);
       if (existing === null) {
-        throw new DomainError(`Patient ${patientId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
+        throw new DomainError(
+          `Patient ${patientId} was not found`,
+          DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND,
+        );
       }
 
       const clinicId = payload.clinicId ?? existing.clinicId;
@@ -60,7 +83,10 @@ export class PatientService {
 
     const updated = await this.patientRepository.update(patientId, payload, scope);
     if (updated === null) {
-      throw new DomainError(`Patient ${patientId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
+      throw new DomainError(
+        `Patient ${patientId} was not found`,
+        DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND,
+      );
     }
 
     return this.toPatientDto(updated, scope);
@@ -69,7 +95,10 @@ export class PatientService {
   public async deletePatient(patientId: string, scope: DataVisibilityScope): Promise<void> {
     const deleted = await this.patientRepository.delete(patientId, scope);
     if (!deleted) {
-      throw new DomainError(`Patient ${patientId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
+      throw new DomainError(
+        `Patient ${patientId} was not found`,
+        DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND,
+      );
     }
   }
 
@@ -141,7 +170,9 @@ export class PatientService {
   }
 }
 
-export function ensureNonEmptyPatientUpdate<TPayload extends Record<string, unknown>>(payload: TPayload): void {
+export function ensureNonEmptyPatientUpdate<TPayload extends Record<string, unknown>>(
+  payload: TPayload,
+): void {
   if (Object.keys(payload).length === 0) {
     throw new ApplicationError({
       message: 'At least one field must be provided for update',

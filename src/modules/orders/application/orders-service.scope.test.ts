@@ -83,7 +83,10 @@ class RecordingOrdersRepository implements OrderRepository {
   public updateOrderResult: Order | null = null;
   public updateConstraints: UpdateOrderConstraints | undefined;
 
-  public async createOrder(_payload: OrderWritePayload, scope: DataVisibilityScope): Promise<Order> {
+  public async createOrder(
+    _payload: OrderWritePayload,
+    scope: DataVisibilityScope,
+  ): Promise<Order> {
     await Promise.resolve();
     this.createScope = scope;
     return buildOrder();
@@ -135,7 +138,12 @@ class RecordingOrdersRepository implements OrderRepository {
   public async findPatientById(_patientId: string, scope: DataVisibilityScope) {
     await Promise.resolve();
     this.relationScopes.push(scope);
-    return { id: '66f100000000000000000010', name: 'Patient', doctorId: '66f100000000000000000011', clinicId: '66f100000000000000000012' };
+    return {
+      id: '66f100000000000000000010',
+      name: 'Patient',
+      doctorId: '66f100000000000000000011',
+      clinicId: '66f100000000000000000012',
+    };
   }
 
   public async findDoctorById(_doctorId: string, scope: DataVisibilityScope) {

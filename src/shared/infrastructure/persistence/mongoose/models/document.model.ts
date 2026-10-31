@@ -40,16 +40,5 @@ documentSchema.index({ tenantId: 1, category: 1, date: -1 });
 documentSchema.index({ tenantId: 1, orderId: 1, subOrderId: 1 });
 documentSchema.index({ tenantId: 1, patientId: 1, date: -1 });
 
-export const DocumentModel: Model<any> = (models.Document as Model<any> | undefined) ?? model('Document', documentSchema);
-
-
-
-
-
-
-
-
-
-
-
-
+export const DocumentModel: Model<any> =
+  (models.Document as Model<any> | undefined) ?? model('Document', documentSchema);

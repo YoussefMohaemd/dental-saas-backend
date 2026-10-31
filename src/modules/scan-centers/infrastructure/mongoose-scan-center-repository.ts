@@ -48,14 +48,16 @@ export class MongooseScanCenterRepository {
         .sort({ [query.sortBy]: sortDirection })
         .skip((query.page - 1) * query.pageSize)
         .limit(query.pageSize)
-        .lean<Array<{
-          externalId: string;
-          name: string;
-          location: string;
-          operator: string;
-          devices: number;
-          status: 'Operational' | 'Maintenance';
-        }>>()
+        .lean<
+          Array<{
+            externalId: string;
+            name: string;
+            location: string;
+            operator: string;
+            devices: number;
+            status: 'Operational' | 'Maintenance';
+          }>
+        >()
         .exec(),
       ScanCenterModel.countDocuments(filter).exec(),
     ]);

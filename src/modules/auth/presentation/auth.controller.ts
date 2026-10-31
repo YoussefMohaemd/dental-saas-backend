@@ -2,7 +2,10 @@ import { type CookieOptions, type NextFunction, type Request, type Response } fr
 import { z } from 'zod';
 
 import { env } from '../../../config/env';
-import { APPLICATION_ERROR_CODES, ApplicationError } from '../../../shared/application/errors/application-error';
+import {
+  APPLICATION_ERROR_CODES,
+  ApplicationError,
+} from '../../../shared/application/errors/application-error';
 import { sendNoContent, sendOk } from '../../../shared/presentation/http/api-response';
 import { objectIdSchema } from '../../../shared/presentation/http/http-utils';
 import { type AuthenticatedRequest } from '../../../shared/presentation/http/request-context';
@@ -10,12 +13,14 @@ import { AuthService } from '../application/auth-service';
 
 const authService = new AuthService();
 
-const loginSchema = z.object({
-  tenantId: objectIdSchema,
-  email: z.string().trim().email(),
-  password: z.string().min(8).max(128),
-  rememberMe: z.boolean().optional(),
-}).strict();
+const loginSchema = z
+  .object({
+    tenantId: objectIdSchema,
+    email: z.string().trim().email(),
+    password: z.string().min(8).max(128),
+    rememberMe: z.boolean().optional(),
+  })
+  .strict();
 
 const refreshCookieSchema = z.string().min(1);
 const changePasswordSchema = z
@@ -38,7 +43,11 @@ const clearRefreshCookieOptions: CookieOptions = {
   maxAge: 0,
 };
 
-export async function loginController(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function loginController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const payload = loginSchema.parse(req.body);
     const sessionContext = getSessionContext(req);
@@ -64,7 +73,11 @@ export async function loginController(req: Request, res: Response, next: NextFun
   }
 }
 
-export async function refreshController(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function refreshController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const refreshToken = getRefreshTokenFromCookie(req);
     const authResult = await authService.refresh(refreshToken, getSessionContext(req));
@@ -83,7 +96,11 @@ export async function refreshController(req: Request, res: Response, next: NextF
   }
 }
 
-export async function logoutController(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function logoutController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const refreshToken = req.cookies[env.AUTH_REFRESH_COOKIE_NAME] as unknown;
     if (typeof refreshToken === 'string' && refreshToken.length > 0) {
@@ -105,10 +122,7 @@ export async function getCurrentUserController(
   try {
     const authenticatedRequest = req as AuthenticatedRequest;
     const principal = authenticatedRequest.context.principal;
-    sendOk(
-      res,
-      await authService.getCurrentUser(principal.userId, principal.tenantId),
-    );
+    sendOk(res, await authService.getCurrentUser(principal.userId, principal.tenantId));
   } catch (error) {
     next(error);
   }
@@ -169,7 +183,10 @@ function getRefreshTokenFromCookie(req: Request): string {
   return parsed.data;
 }
 
-function getSessionContext(req: Request): { ipAddress: string | undefined; userAgent: string | undefined } {
+function getSessionContext(req: Request): {
+  ipAddress: string | undefined;
+  userAgent: string | undefined;
+} {
   const ipAddress = req.ip || req.socket.remoteAddress;
   const userAgent = req.header('user-agent') ?? undefined;
 

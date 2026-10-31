@@ -5,8 +5,17 @@ import { ClinicModel } from '../../../shared/infrastructure/persistence/mongoose
 import { DoctorModel } from '../../../shared/infrastructure/persistence/mongoose/models/doctor.model';
 import { OrderModel } from '../../../shared/infrastructure/persistence/mongoose/models/order.model';
 import { PatientModel } from '../../../shared/infrastructure/persistence/mongoose/models/patient.model';
-import { type Patient, type PatientListQuery, type PatientUpdatePayload, type PatientWritePayload } from '../domain/patient';
-import { type DoctorReference, type PatientListResult, type PatientRepository } from '../domain/patient-repository';
+import {
+  type Patient,
+  type PatientListQuery,
+  type PatientUpdatePayload,
+  type PatientWritePayload,
+} from '../domain/patient';
+import {
+  type DoctorReference,
+  type PatientListResult,
+  type PatientRepository,
+} from '../domain/patient-repository';
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 
 const patientSortFields: Record<PatientListQuery['sortBy'], string> = {
@@ -29,11 +38,12 @@ export class MongoosePatientRepository implements PatientRepository {
   }
 
   public async findById(patientId: string, scope: DataVisibilityScope): Promise<Patient | null> {
-    const found = await patientModel.findOne({
-      _id: patientId,
-      tenantId: scope.tenantId,
-      ...(await patientScopeFilter(scope)),
-    })
+    const found = await patientModel
+      .findOne({
+        _id: patientId,
+        tenantId: scope.tenantId,
+        ...(await patientScopeFilter(scope)),
+      })
       .lean<PatientRecord | null>()
       .exec();
     return found === null ? null : this.toPatientRecord(found);
@@ -64,7 +74,8 @@ export class MongoosePatientRepository implements PatientRepository {
     const skip = (query.page - 1) * query.pageSize;
 
     const [items, totalItems] = await Promise.all([
-      patientModel.find(filter)
+      patientModel
+        .find(filter)
         .sort({ [sortBy]: sortValue })
         .skip(skip)
         .limit(query.pageSize)
@@ -84,15 +95,16 @@ export class MongoosePatientRepository implements PatientRepository {
     payload: PatientUpdatePayload,
     scope: DataVisibilityScope,
   ): Promise<Patient | null> {
-    const updated = await patientModel.findOneAndUpdate(
-      {
-        _id: patientId,
-        tenantId: scope.tenantId,
-        ...(await patientScopeFilter(scope)),
-      },
-      payload,
-      { new: true },
-    )
+    const updated = await patientModel
+      .findOneAndUpdate(
+        {
+          _id: patientId,
+          tenantId: scope.tenantId,
+          ...(await patientScopeFilter(scope)),
+        },
+        payload,
+        { new: true },
+      )
       .lean<PatientRecord | null>()
       .exec();
 
@@ -100,20 +112,23 @@ export class MongoosePatientRepository implements PatientRepository {
   }
 
   public async delete(patientId: string, scope: DataVisibilityScope): Promise<boolean> {
-    const deleted = await patientModel.findOneAndDelete({
-      _id: patientId,
-      tenantId: scope.tenantId,
-      ...(await patientScopeFilter(scope)),
-    }).exec();
+    const deleted = await patientModel
+      .findOneAndDelete({
+        _id: patientId,
+        tenantId: scope.tenantId,
+        ...(await patientScopeFilter(scope)),
+      })
+      .exec();
 
     return deleted !== null;
   }
 
   public async clinicExists(clinicId: string, scope: DataVisibilityScope): Promise<boolean> {
-    const clinic = await clinicModel.findOne({
-      _id: clinicId,
-      tenantId: scope.tenantId,
-    })
+    const clinic = await clinicModel
+      .findOne({
+        _id: clinicId,
+        tenantId: scope.tenantId,
+      })
       .select('_id')
       .lean()
       .exec();
@@ -121,11 +136,15 @@ export class MongoosePatientRepository implements PatientRepository {
     return clinic !== null;
   }
 
-  public async findDoctorById(doctorId: string, scope: DataVisibilityScope): Promise<DoctorReference | null> {
-    const doctor = await doctorModel.findOne({
-      _id: doctorId,
-      tenantId: scope.tenantId,
-    })
+  public async findDoctorById(
+    doctorId: string,
+    scope: DataVisibilityScope,
+  ): Promise<DoctorReference | null> {
+    const doctor = await doctorModel
+      .findOne({
+        _id: doctorId,
+        tenantId: scope.tenantId,
+      })
       .select('_id name clinicId')
       .lean()
       .exec();
@@ -141,22 +160,30 @@ export class MongoosePatientRepository implements PatientRepository {
     };
   }
 
-  public async findClinicNameById(clinicId: string, scope: DataVisibilityScope): Promise<string | null> {
-    const clinic = await clinicModel.findOne({
-      _id: clinicId,
-      tenantId: scope.tenantId,
-    })
+  public async findClinicNameById(
+    clinicId: string,
+    scope: DataVisibilityScope,
+  ): Promise<string | null> {
+    const clinic = await clinicModel
+      .findOne({
+        _id: clinicId,
+        tenantId: scope.tenantId,
+      })
       .select('name')
       .lean()
       .exec();
     return clinic === null ? null : clinic.name;
   }
 
-  public async findDoctorNameById(doctorId: string, scope: DataVisibilityScope): Promise<string | null> {
-    const doctor = await doctorModel.findOne({
-      _id: doctorId,
-      tenantId: scope.tenantId,
-    })
+  public async findDoctorNameById(
+    doctorId: string,
+    scope: DataVisibilityScope,
+  ): Promise<string | null> {
+    const doctor = await doctorModel
+      .findOne({
+        _id: doctorId,
+        tenantId: scope.tenantId,
+      })
       .select('name')
       .lean()
       .exec();
@@ -201,14 +228,22 @@ interface PatientRecord {
 }
 
 const patientModel = PatientModel as unknown as Model<PatientRecord>;
-const clinicModel = ClinicModel as unknown as Model<{ _id: Types.ObjectId; tenantId: Types.ObjectId; name: string }>;
+const clinicModel = ClinicModel as unknown as Model<{
+  _id: Types.ObjectId;
+  tenantId: Types.ObjectId;
+  name: string;
+}>;
 const doctorModel = DoctorModel as unknown as Model<{
   _id: Types.ObjectId;
   tenantId: Types.ObjectId;
   name: string;
   clinicId: Types.ObjectId;
 }>;
-const orderModel = OrderModel as unknown as Model<{ _id: Types.ObjectId; tenantId: Types.ObjectId; patientId: Types.ObjectId }>;
+const orderModel = OrderModel as unknown as Model<{
+  _id: Types.ObjectId;
+  tenantId: Types.ObjectId;
+  patientId: Types.ObjectId;
+}>;
 
 async function patientScopeFilter(scope: DataVisibilityScope): Promise<Record<string, unknown>> {
   if (scope.isAdmin) {
@@ -231,10 +266,12 @@ async function patientScopeFilter(scope: DataVisibilityScope): Promise<Record<st
     return { _id: { $in: [] as Types.ObjectId[] } };
   }
 
-  const patientIds = await orderModel.distinct('patientId', {
-    tenantId: scope.tenantId,
-    technicianId: scope.userId,
-  }).exec();
+  const patientIds = await orderModel
+    .distinct('patientId', {
+      tenantId: scope.tenantId,
+      technicianId: scope.userId,
+    })
+    .exec();
   return { _id: { $in: patientIds } };
 }
 

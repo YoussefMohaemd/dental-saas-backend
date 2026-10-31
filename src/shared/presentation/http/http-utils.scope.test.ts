@@ -17,9 +17,10 @@ describe('getAuthenticatedDataScope', () => {
     const clinicId = new Types.ObjectId('66f100000000000000000112');
 
     vi.spyOn(UserModel, 'findOne').mockReturnValue(
-      createFindOneChain<{ email?: string; clinicId?: Types.ObjectId } | null, ReturnType<typeof UserModel.findOne>>(
-        { email: 'doctor@example.test' },
-      ),
+      createFindOneChain<
+        { email?: string; clinicId?: Types.ObjectId } | null,
+        ReturnType<typeof UserModel.findOne>
+      >({ email: 'doctor@example.test' }),
     );
     const doctorFindOne = vi.spyOn(DoctorModel, 'findOne').mockReturnValue(
       createFindOneChain<
@@ -38,17 +39,17 @@ describe('getAuthenticatedDataScope', () => {
     expect(scope.clinicId?.toString()).toBe(clinicId.toString());
     expect(scope.isDoctor).toBe(true);
     const doctorQuery = doctorFindOne.mock.calls[0]?.[0] as
-      | { email?: string; status?: string }
-      | undefined;
+      { email?: string; status?: string } | undefined;
     expect(doctorQuery?.email).toBe('doctor@example.test');
     expect(doctorQuery?.status).toBe('Active');
   });
 
   it('rejects doctor access when no active doctor profile is linked', async () => {
     vi.spyOn(UserModel, 'findOne').mockReturnValue(
-      createFindOneChain<{ email?: string; clinicId?: Types.ObjectId } | null, ReturnType<typeof UserModel.findOne>>(
-        { email: 'doctor@example.test' },
-      ),
+      createFindOneChain<
+        { email?: string; clinicId?: Types.ObjectId } | null,
+        ReturnType<typeof UserModel.findOne>
+      >({ email: 'doctor@example.test' }),
     );
     vi.spyOn(DoctorModel, 'findOne').mockReturnValue(
       createFindOneChain<
@@ -66,9 +67,10 @@ describe('getAuthenticatedDataScope', () => {
 
   it('rejects doctor access when the user profile has no email', async () => {
     vi.spyOn(UserModel, 'findOne').mockReturnValue(
-      createFindOneChain<{ email?: string; clinicId?: Types.ObjectId } | null, ReturnType<typeof UserModel.findOne>>(
-        { clinicId: new Types.ObjectId('66f100000000000000000113') },
-      ),
+      createFindOneChain<
+        { email?: string; clinicId?: Types.ObjectId } | null,
+        ReturnType<typeof UserModel.findOne>
+      >({ clinicId: new Types.ObjectId('66f100000000000000000113') }),
     );
     const doctorFindOne = vi.spyOn(DoctorModel, 'findOne');
 

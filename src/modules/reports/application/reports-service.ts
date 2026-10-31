@@ -1,6 +1,9 @@
 import type { PipelineStage, Types } from 'mongoose';
 
-import { buildPaginationMeta, type PaginationQuery } from '../../../shared/application/contracts/pagination';
+import {
+  buildPaginationMeta,
+  type PaginationQuery,
+} from '../../../shared/application/contracts/pagination';
 import { BillingRecordModel } from '../../../shared/infrastructure/persistence/mongoose/models/billing-record.model';
 import { DoctorModel } from '../../../shared/infrastructure/persistence/mongoose/models/doctor.model';
 import { OrderModel } from '../../../shared/infrastructure/persistence/mongoose/models/order.model';
@@ -49,7 +52,9 @@ export async function getDashboardVolume(
   }));
 
   for (const order of orders) {
-    const index = weekRanges.findIndex((range) => order.receivedAt >= range.start && order.receivedAt < range.end);
+    const index = weekRanges.findIndex(
+      (range) => order.receivedAt >= range.start && order.receivedAt < range.end,
+    );
     if (index < 0) {
       continue;
     }
@@ -99,7 +104,13 @@ export async function getReportsOverview(
           ],
           totalOrders: [{ $count: 'count' }],
           turnaround: [
-            { $match: { status: 'Completed', sentAt: { $type: 'date' }, receivedAt: { $type: 'date' } } },
+            {
+              $match: {
+                status: 'Completed',
+                sentAt: { $type: 'date' },
+                receivedAt: { $type: 'date' },
+              },
+            },
             {
               $project: {
                 sentDay: { $dayOfWeek: '$sentAt' },
@@ -205,7 +216,14 @@ export async function getOrdersRangeReport(input: {
     { $match: filter },
     { $lookup: { from: 'patients', localField: 'patientId', foreignField: '_id', as: 'patient' } },
     { $lookup: { from: 'doctors', localField: 'doctorId', foreignField: '_id', as: 'doctor' } },
-    { $lookup: { from: 'scan_centers', localField: 'scanCenterId', foreignField: 'externalId', as: 'scanCenter' } },
+    {
+      $lookup: {
+        from: 'scan_centers',
+        localField: 'scanCenterId',
+        foreignField: 'externalId',
+        as: 'scanCenter',
+      },
+    },
     {
       $addFields: {
         patientName: { $ifNull: [{ $arrayElemAt: ['$patient.name', 0] }, ''] },
@@ -378,9 +396,10 @@ export async function getQuarterlyTargets(
       achievedRevenue: record.achievedRevenue,
       ordersTarget: record.ordersTarget,
       ordersCompleted: record.ordersCompleted,
-      completionRate: record.ordersTarget === 0
-        ? 0
-        : Number(((record.ordersCompleted / record.ordersTarget) * 100).toFixed(1)),
+      completionRate:
+        record.ordersTarget === 0
+          ? 0
+          : Number(((record.ordersCompleted / record.ordersTarget) * 100).toFixed(1)),
     })),
   };
 }
@@ -410,7 +429,16 @@ export async function getTeamPerformance(
     receivedAt: Date;
   }> = await OrderModel.find(filter)
     .select({ technicianId: 1, status: 1, amount: 1, dueDate: 1, sentAt: 1, receivedAt: 1 })
-    .lean<Array<{ technicianId?: Types.ObjectId; status: string; amount: number; dueDate: Date; sentAt?: Date; receivedAt: Date }>>()
+    .lean<
+      Array<{
+        technicianId?: Types.ObjectId;
+        status: string;
+        amount: number;
+        dueDate: Date;
+        sentAt?: Date;
+        receivedAt: Date;
+      }>
+    >()
     .exec();
 
   const technicianIds = orders
@@ -425,7 +453,13 @@ export async function getTeamPerformance(
     .exec();
   const byTechnician = new Map<
     string,
-    { completedOrders: number; revenueCollected: number; onTimeCompleted: number; totalWithSentAt: number; totalTurnaround: number }
+    {
+      completedOrders: number;
+      revenueCollected: number;
+      onTimeCompleted: number;
+      totalWithSentAt: number;
+      totalTurnaround: number;
+    }
   >();
 
   for (const order of orders) {
@@ -462,34 +496,42 @@ export async function getTeamPerformance(
     byTechnician.set(technicianId, aggregate);
   }
 
-  const records = technicians.map((member): {
-    userId: string;
-    type: string;
-    fullName: string;
-    completedOrders: number;
-    revenueCollected: number;
-    avgTurnaroundDays: number;
-    onTimeRate: number;
-    status: 'Active' | 'On Leave';
-  } => {
-    const metrics = byTechnician.get(member._id.toString());
-    const aggregate = metrics;
+  const records = technicians.map(
+    (
+      member,
+    ): {
+      userId: string;
+      type: string;
+      fullName: string;
+      completedOrders: number;
+      revenueCollected: number;
+      avgTurnaroundDays: number;
+      onTimeRate: number;
+      status: 'Active' | 'On Leave';
+    } => {
+      const metrics = byTechnician.get(member._id.toString());
+      const aggregate = metrics;
 
-    return {
-      userId: member._id.toString(),
-      type: member.roles[0] ?? 'technician',
-      fullName: member.fullName,
-      completedOrders: aggregate?.completedOrders ?? 0,
-      revenueCollected: aggregate ? Number(aggregate.revenueCollected.toFixed(2)) : 0,
-      avgTurnaroundDays: aggregate
-        ? Number((aggregate.totalTurnaround / Math.max(1, aggregate.totalWithSentAt)).toFixed(2))
-        : 0,
-      onTimeRate: aggregate
-        ? Number(((aggregate.onTimeCompleted / Math.max(1, aggregate.totalWithSentAt)) * 100).toFixed(1))
-        : 0,
-      status: member.status === 'active' ? 'Active' : 'On Leave',
-    };
-  });
+      return {
+        userId: member._id.toString(),
+        type: member.roles[0] ?? 'technician',
+        fullName: member.fullName,
+        completedOrders: aggregate?.completedOrders ?? 0,
+        revenueCollected: aggregate ? Number(aggregate.revenueCollected.toFixed(2)) : 0,
+        avgTurnaroundDays: aggregate
+          ? Number((aggregate.totalTurnaround / Math.max(1, aggregate.totalWithSentAt)).toFixed(2))
+          : 0,
+        onTimeRate: aggregate
+          ? Number(
+              ((aggregate.onTimeCompleted / Math.max(1, aggregate.totalWithSentAt)) * 100).toFixed(
+                1,
+              ),
+            )
+          : 0,
+        status: member.status === 'active' ? 'Active' : 'On Leave',
+      };
+    },
+  );
 
   return { records };
 }
@@ -553,12 +595,14 @@ export async function getSubOrderReport(input: {
 
   const records = await SubOrderModel.find(subOrderFilter)
     .select({ service: 1, status: 1, priority: 1, dueDate: 1 })
-    .lean<Array<{
-      service: string;
-      status: 'done' | 'in-progress' | 'pending' | 'blocked';
-      priority: string;
-      dueDate: Date;
-    }>>()
+    .lean<
+      Array<{
+        service: string;
+        status: 'done' | 'in-progress' | 'pending' | 'blocked';
+        priority: string;
+        dueDate: Date;
+      }>
+    >()
     .exec();
   const now = new Date();
   const isOverdue = (record: { status: string; dueDate: Date }) =>
@@ -573,12 +617,14 @@ export async function getSubOrderReport(input: {
     overdue: records.filter(isOverdue).length,
     completionRate: 0,
   };
-  summary.completionRate = summary.total === 0
-    ? 0
-    : Number(((summary.completed / summary.total) * 100).toFixed(1));
+  summary.completionRate =
+    summary.total === 0 ? 0 : Number(((summary.completed / summary.total) * 100).toFixed(1));
 
   const serviceGroups = new Map<string, typeof summary & { service: string }>();
-  const priorityGroups = new Map<string, { priority: string; total: number; completed: number; overdue: number }>();
+  const priorityGroups = new Map<
+    string,
+    { priority: string; total: number; completed: number; overdue: number }
+  >();
   for (const record of records) {
     const serviceGroup = serviceGroups.get(record.service) ?? {
       service: record.service,
@@ -596,7 +642,9 @@ export async function getSubOrderReport(input: {
     if (record.status === 'pending') serviceGroup.pending += 1;
     if (record.status === 'blocked') serviceGroup.blocked += 1;
     if (isOverdue(record)) serviceGroup.overdue += 1;
-    serviceGroup.completionRate = Number(((serviceGroup.completed / serviceGroup.total) * 100).toFixed(1));
+    serviceGroup.completionRate = Number(
+      ((serviceGroup.completed / serviceGroup.total) * 100).toFixed(1),
+    );
     serviceGroups.set(record.service, serviceGroup);
 
     const priorityGroup = priorityGroups.get(record.priority) ?? {
@@ -767,9 +815,7 @@ function splitName(fullName: string | undefined): { firstName: string; lastName:
   return { firstName, lastName };
 }
 
-function buildRecentMonthRange(
-  monthCount: number,
-): { start: Date; end: Date; keys: string[] } {
+function buildRecentMonthRange(monthCount: number): { start: Date; end: Date; keys: string[] } {
   const now = new Date();
   const keys: string[] = [];
   for (let index = monthCount - 1; index >= 0; index -= 1) {
@@ -787,7 +833,9 @@ function mapMonthlyRevenueSeries(
   groupedRecords: Array<{ _id: { year: number; month: number }; revenue: number }>,
   monthKeys: string[],
 ): Array<{ month: string; revenue: number }> {
-  const revenueByMonth = new Map(groupedRecords.map((item) => [`${item._id.year}-${item._id.month}`, Number(item.revenue) || 0]));
+  const revenueByMonth = new Map(
+    groupedRecords.map((item) => [`${item._id.year}-${item._id.month}`, Number(item.revenue) || 0]),
+  );
 
   return monthKeys.map((key) => {
     const [yearText, monthText] = key.split('-');
@@ -827,7 +875,9 @@ function buildWeekRanges(
   weeks: number,
 ): Array<{ label: string; start: Date; end: Date }> {
   const ranges: Array<{ label: string; start: Date; end: Date }> = [];
-  const cursor = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate()));
+  const cursor = new Date(
+    Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate()),
+  );
 
   for (let offset = weeks - 1; offset >= 0; offset -= 1) {
     const rangeStart = new Date(cursor);

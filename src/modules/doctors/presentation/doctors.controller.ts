@@ -2,11 +2,19 @@ import { type Request, type Response } from 'express';
 import { Types } from 'mongoose';
 
 import { normalizePaginationQuery } from '../../../shared/application/contracts/pagination';
-import { APPLICATION_ERROR_CODES, ApplicationError } from '../../../shared/application/errors/application-error';
+import {
+  APPLICATION_ERROR_CODES,
+  ApplicationError,
+} from '../../../shared/application/errors/application-error';
 import { sendCreated, sendNoContent, sendOk } from '../../../shared/presentation/http/api-response';
 import { type RequestWithContext } from '../../../shared/presentation/http/request-context';
 import { ensureNonEmptyDoctorUpdate, type DoctorService } from '../application/doctor-service';
-import { createDoctorBodySchema, doctorIdParamsSchema, doctorsListQuerySchema, updateDoctorBodySchema } from './doctors.schemas';
+import {
+  createDoctorBodySchema,
+  doctorIdParamsSchema,
+  doctorsListQuerySchema,
+  updateDoctorBodySchema,
+} from './doctors.schemas';
 import { getAuthenticatedDataScope } from '../../../shared/presentation/http/http-utils';
 
 export class DoctorsController {
@@ -84,10 +92,7 @@ export class DoctorsController {
     const { doctorId } = doctorIdParamsSchema.parse(req.params);
     assertValidObjectId(doctorId, 'doctorId');
 
-    await this.doctorService.deleteDoctor(
-      doctorId,
-      await getAuthenticatedDataScope(req),
-    );
+    await this.doctorService.deleteDoctor(doctorId, await getAuthenticatedDataScope(req));
     sendNoContent(res);
   };
 

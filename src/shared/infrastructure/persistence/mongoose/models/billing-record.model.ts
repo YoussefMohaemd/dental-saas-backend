@@ -51,16 +51,5 @@ billingRecordSchema.index({ tenantId: 1, orderId: 1 }, { unique: true });
 billingRecordSchema.index({ tenantId: 1, status: 1, dueDate: 1 });
 billingRecordSchema.index({ tenantId: 1, invoiceNumber: 1 }, { unique: true, sparse: true });
 
-export const BillingRecordModel: Model<any> = (models.BillingRecord as Model<any> | undefined) ?? model('BillingRecord', billingRecordSchema);
-
-
-
-
-
-
-
-
-
-
-
-
+export const BillingRecordModel: Model<any> =
+  (models.BillingRecord as Model<any> | undefined) ?? model('BillingRecord', billingRecordSchema);

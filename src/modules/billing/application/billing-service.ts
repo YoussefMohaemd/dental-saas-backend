@@ -6,7 +6,10 @@ import {
   APPLICATION_ERROR_CODES,
   ApplicationError,
 } from '../../../shared/application/errors/application-error';
-import { buildPaginationMeta, type PaginationQuery } from '../../../shared/application/contracts/pagination';
+import {
+  buildPaginationMeta,
+  type PaginationQuery,
+} from '../../../shared/application/contracts/pagination';
 import { BILLING_STATUSES } from '../../../shared/domain/entities/dental-data-model';
 import { BillingRecordModel } from '../../../shared/infrastructure/persistence/mongoose/models/billing-record.model';
 import { ClinicModel } from '../../../shared/infrastructure/persistence/mongoose/models/clinic.model';
@@ -61,7 +64,9 @@ const billingPatchSchema = z
     message: 'At least one field is required for billing update',
   });
 
-export function parseBillingStatusFilters(value: unknown): BillingRecordDto['status'][] | undefined {
+export function parseBillingStatusFilters(
+  value: unknown,
+): BillingRecordDto['status'][] | undefined {
   return parseEnumList(value, BILLING_STATUSES);
 }
 
@@ -143,14 +148,36 @@ export async function listBillingRecords(input: BillingListInput): Promise<{
     .exec();
 
   const [orderById, patientById, doctorById, clinicById] = await Promise.all([
-    buildNamedMap(OrderModel, records.map((record) => record.orderId), 'orderNumber', input.tenantId),
-    buildNamedMap(PatientModel, records.map((record) => record.patientId), 'name', input.tenantId),
-    buildNamedMap(DoctorModel, records.map((record) => record.doctorId), 'name', input.tenantId),
-    buildNamedMap(ClinicModel, records.map((record) => record.clinicId), 'name', input.tenantId),
+    buildNamedMap(
+      OrderModel,
+      records.map((record) => record.orderId),
+      'orderNumber',
+      input.tenantId,
+    ),
+    buildNamedMap(
+      PatientModel,
+      records.map((record) => record.patientId),
+      'name',
+      input.tenantId,
+    ),
+    buildNamedMap(
+      DoctorModel,
+      records.map((record) => record.doctorId),
+      'name',
+      input.tenantId,
+    ),
+    buildNamedMap(
+      ClinicModel,
+      records.map((record) => record.clinicId),
+      'name',
+      input.tenantId,
+    ),
   ]);
 
   return {
-    items: records.map((record) => toBillingDto(record, orderById, patientById, doctorById, clinicById)),
+    items: records.map((record) =>
+      toBillingDto(record, orderById, patientById, doctorById, clinicById),
+    ),
     totalItems,
   };
 }
@@ -223,10 +250,7 @@ export async function updateBillingRecord(
 
 export { buildPaginationMeta };
 
-function applyScopeFilter(
-  filter: FilterQuery<BillingRecord>,
-  scope?: DataVisibilityScope,
-): void {
+function applyScopeFilter(filter: FilterQuery<BillingRecord>, scope?: DataVisibilityScope): void {
   if (!scope || scope.isAdmin) {
     return;
   }
@@ -265,9 +289,7 @@ async function buildNamedMap<TDoc extends { _id: Types.ObjectId }>(
     .lean<Array<TDoc & Record<string, string>>>()
     .exec();
 
-  return new Map(
-    records.map((record) => [record._id.toString(), record[nameField] ?? '']),
-  );
+  return new Map(records.map((record) => [record._id.toString(), record[nameField] ?? '']));
 }
 
 function escapeRegex(value: string): string {

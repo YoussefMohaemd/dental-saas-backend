@@ -2,7 +2,10 @@ import { type Request, type Response } from 'express';
 import { Types } from 'mongoose';
 
 import { normalizePaginationQuery } from '../../../shared/application/contracts/pagination';
-import { APPLICATION_ERROR_CODES, ApplicationError } from '../../../shared/application/errors/application-error';
+import {
+  APPLICATION_ERROR_CODES,
+  ApplicationError,
+} from '../../../shared/application/errors/application-error';
 import { sendCreated, sendNoContent, sendOk } from '../../../shared/presentation/http/api-response';
 import { type RequestWithContext } from '../../../shared/presentation/http/request-context';
 import {
@@ -91,10 +94,7 @@ export class OrdersController {
   public deleteOrder = async (req: Request, res: Response): Promise<void> => {
     const { orderId } = orderIdParamsSchema.parse(req.params);
     assertValidObjectId(orderId, 'orderId');
-    await this.ordersService.deleteOrder(
-      orderId,
-      await getAuthenticatedDataScope(req),
-    );
+    await this.ordersService.deleteOrder(orderId, await getAuthenticatedDataScope(req));
     sendNoContent(res);
   };
 

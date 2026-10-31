@@ -51,14 +51,5 @@ authSessionSchema.index({ currentTokenId: 1 }, { unique: true });
 authSessionSchema.index({ userId: 1, revokedAt: 1 });
 authSessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-export const AuthSessionModel: Model<any> = (models.AuthSession as Model<any> | undefined) ?? model('AuthSession', authSessionSchema);
-
-
-
-
-
-
-
-
-
-
+export const AuthSessionModel: Model<any> =
+  (models.AuthSession as Model<any> | undefined) ?? model('AuthSession', authSessionSchema);

@@ -1,4 +1,9 @@
-import { type Order, type OrderListQuery, type OrderUpdatePayload, type OrderWritePayload } from './order';
+import {
+  type Order,
+  type OrderListQuery,
+  type OrderUpdatePayload,
+  type OrderWritePayload,
+} from './order';
 import { type SubOrder, type SubOrderUpdatePayload, type SubOrderWritePayload } from './sub-order';
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 
@@ -44,7 +49,11 @@ export interface OrderRepository {
   ): Promise<Order | null>;
   deleteOrder(orderId: string, scope: DataVisibilityScope): Promise<boolean>;
   deleteOrderWithSubOrders(orderId: string, scope: DataVisibilityScope): Promise<boolean>;
-  isOrderNumberTaken(orderNumber: string, scope: DataVisibilityScope, excludeOrderId?: string): Promise<boolean>;
+  isOrderNumberTaken(
+    orderNumber: string,
+    scope: DataVisibilityScope,
+    excludeOrderId?: string,
+  ): Promise<boolean>;
   findPatientById(patientId: string, scope: DataVisibilityScope): Promise<PatientReference | null>;
   findDoctorById(doctorId: string, scope: DataVisibilityScope): Promise<DoctorReference | null>;
   clinicExists(clinicId: string, scope: DataVisibilityScope): Promise<boolean>;
@@ -52,10 +61,27 @@ export interface OrderRepository {
   changeRequestExists(changeRequestId: string, scope: DataVisibilityScope): Promise<boolean>;
   getNameReferences(orders: Order[], scope: DataVisibilityScope): Promise<NameReferences>;
   listSubOrders(orderId: string, scope: DataVisibilityScope): Promise<SubOrder[]>;
-  findSubOrderById(orderId: string, subOrderId: string, scope: DataVisibilityScope): Promise<SubOrder | null>;
-  createSubOrders(orderId: string, payloads: SubOrderWritePayload[], scope: DataVisibilityScope): Promise<SubOrder[]>;
-  replaceSubOrders(orderId: string, payloads: SubOrderWritePayload[], scope: DataVisibilityScope): Promise<SubOrder[]>;
-  updateSubOrder(orderId: string, subOrderId: string, payload: SubOrderUpdatePayload, scope: DataVisibilityScope): Promise<SubOrder | null>;
+  findSubOrderById(
+    orderId: string,
+    subOrderId: string,
+    scope: DataVisibilityScope,
+  ): Promise<SubOrder | null>;
+  createSubOrders(
+    orderId: string,
+    payloads: SubOrderWritePayload[],
+    scope: DataVisibilityScope,
+  ): Promise<SubOrder[]>;
+  replaceSubOrders(
+    orderId: string,
+    payloads: SubOrderWritePayload[],
+    scope: DataVisibilityScope,
+  ): Promise<SubOrder[]>;
+  updateSubOrder(
+    orderId: string,
+    subOrderId: string,
+    payload: SubOrderUpdatePayload,
+    scope: DataVisibilityScope,
+  ): Promise<SubOrder | null>;
   deleteSubOrder(orderId: string, subOrderId: string, scope: DataVisibilityScope): Promise<boolean>;
   deleteSubOrdersByOrder(orderId: string, scope: DataVisibilityScope): Promise<void>;
 }

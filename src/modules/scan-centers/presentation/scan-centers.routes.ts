@@ -28,54 +28,58 @@ const scanCentersListSchema = z.object({
   status: z.string().optional(),
 });
 
-scanCentersRouter.get('/scan-centers', requireAnyCapability(['scanCenters.read']), async (req, res) => {
-  const query = scanCentersListSchema.parse(req.query);
-  const pagination = parsePaginationQuery(query);
-  const sort = parseSort(
-    query,
-    ['name', 'location', 'operator', 'devices', 'status'],
-    'name',
-  );
-  const statuses = query.status
-    ?.split(',')
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
-  const result = await scanCenterRepository.list(
-    {
-      ...(query.search ? { search: query.search } : {}),
-      ...(statuses ? { statuses } : {}),
-      page: pagination.page,
-      pageSize: pagination.pageSize,
-      sortBy: sort.sortBy as 'name' | 'location' | 'operator' | 'devices' | 'status',
-      sortDirection: sort.sortDirection,
-    },
-    await getAuthenticatedDataScope(req),
-  );
+scanCentersRouter.get(
+  '/scan-centers',
+  requireAnyCapability(['scanCenters.read']),
+  async (req, res) => {
+    const query = scanCentersListSchema.parse(req.query);
+    const pagination = parsePaginationQuery(query);
+    const sort = parseSort(query, ['name', 'location', 'operator', 'devices', 'status'], 'name');
+    const statuses = query.status
+      ?.split(',')
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
+    const result = await scanCenterRepository.list(
+      {
+        ...(query.search ? { search: query.search } : {}),
+        ...(statuses ? { statuses } : {}),
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+        sortBy: sort.sortBy as 'name' | 'location' | 'operator' | 'devices' | 'status',
+        sortDirection: sort.sortDirection,
+      },
+      await getAuthenticatedDataScope(req),
+    );
 
-  sendOk(
-    res,
-    result.items,
-    buildRequestMeta(req, createPaginationMeta(result.totalItems, pagination)),
-  );
-});
+    sendOk(
+      res,
+      result.items,
+      buildRequestMeta(req, createPaginationMeta(result.totalItems, pagination)),
+    );
+  },
+);
 
-scanCentersRouter.get('/scan-centers/:scanCenterId', requireAnyCapability(['scanCenters.read']), async (req, res) => {
-  const params = z.object({ scanCenterId: z.string().trim().min(1) }).parse(req.params);
-  const scanCenter = await scanCenterRepository.findById(
-    params.scanCenterId,
-    await getAuthenticatedDataScope(req),
-  );
+scanCentersRouter.get(
+  '/scan-centers/:scanCenterId',
+  requireAnyCapability(['scanCenters.read']),
+  async (req, res) => {
+    const params = z.object({ scanCenterId: z.string().trim().min(1) }).parse(req.params);
+    const scanCenter = await scanCenterRepository.findById(
+      params.scanCenterId,
+      await getAuthenticatedDataScope(req),
+    );
 
-  if (!scanCenter) {
-    throw new ApplicationError({
-      message: 'Scan center not found',
-      statusCode: 404,
-      code: APPLICATION_ERROR_CODES.NOT_FOUND,
-      expose: true,
-    });
-  }
+    if (!scanCenter) {
+      throw new ApplicationError({
+        message: 'Scan center not found',
+        statusCode: 404,
+        code: APPLICATION_ERROR_CODES.NOT_FOUND,
+        expose: true,
+      });
+    }
 
-  sendOk(res, scanCenter, buildRequestMeta(req));
-});
+    sendOk(res, scanCenter, buildRequestMeta(req));
+  },
+);
 
 export { scanCentersRouter };

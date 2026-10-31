@@ -23,7 +23,8 @@ describe('change request tenant scoping filters', () => {
     expect(filter.status).toEqual({ $in: ['Pending', 'In Review'] });
     expect(filter.priority).toEqual({ $in: ['High'] });
 
-    const orFilters = filter.$or as Array<{ requestNumber?: RegExp; description?: RegExp }> | undefined;
+    const orFilters = filter.$or as
+      Array<{ requestNumber?: RegExp; description?: RegExp }> | undefined;
     expect(orFilters?.length).toBe(2);
 
     const requestRegex = orFilters?.[0]?.requestNumber;

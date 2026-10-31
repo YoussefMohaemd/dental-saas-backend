@@ -8,7 +8,10 @@ import { UserModel } from '../../../shared/infrastructure/persistence/mongoose/m
 import { OrderModel } from '../../../shared/infrastructure/persistence/mongoose/models/order.model';
 import { UserPreferencesModel } from '../../../shared/infrastructure/persistence/mongoose/models/user-preferences.model';
 import { sendOk } from '../../../shared/presentation/http/api-response';
-import { buildRequestMeta, getAuthenticatedDataScope } from '../../../shared/presentation/http/http-utils';
+import {
+  buildRequestMeta,
+  getAuthenticatedDataScope,
+} from '../../../shared/presentation/http/http-utils';
 
 const settingsRouter = Router();
 
@@ -35,89 +38,103 @@ const preferencesSchema = z
   })
   .strict();
 
-settingsRouter.get('/settings/preferences', requireAnyCapability(['settings.read']), async (req, res) => {
-  const scope = await getAuthenticatedDataScope(req);
-  const data = await UserPreferencesModel.findOne({
-    tenantId: scope.tenantId,
-    userId: scope.userId,
-  })
-    .lean()
-    .exec();
+settingsRouter.get(
+  '/settings/preferences',
+  requireAnyCapability(['settings.read']),
+  async (req, res) => {
+    const scope = await getAuthenticatedDataScope(req);
+    const data = await UserPreferencesModel.findOne({
+      tenantId: scope.tenantId,
+      userId: scope.userId,
+    })
+      .lean()
+      .exec();
 
-  sendOk(res, data, buildRequestMeta(req));
-});
+    sendOk(res, data, buildRequestMeta(req));
+  },
+);
 
-settingsRouter.patch('/settings/preferences', requireAnyCapability(['settings.update']), async (req, res) => {
-  const payload = preferencesSchema.parse(req.body);
-  const scope = await getAuthenticatedDataScope(req);
-  const data = await UserPreferencesModel.findOneAndUpdate(
-    { tenantId: scope.tenantId, userId: scope.userId },
-    { $set: payload },
-    { new: true, upsert: true, setDefaultsOnInsert: true },
-  )
-    .lean()
-    .exec();
+settingsRouter.patch(
+  '/settings/preferences',
+  requireAnyCapability(['settings.update']),
+  async (req, res) => {
+    const payload = preferencesSchema.parse(req.body);
+    const scope = await getAuthenticatedDataScope(req);
+    const data = await UserPreferencesModel.findOneAndUpdate(
+      { tenantId: scope.tenantId, userId: scope.userId },
+      { $set: payload },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    )
+      .lean()
+      .exec();
 
-  sendOk(res, data, buildRequestMeta(req));
-});
+    sendOk(res, data, buildRequestMeta(req));
+  },
+);
 
-settingsRouter.get('/settings/reference-data', requireAnyCapability(['settings.read']), async (req, res) => {
-  const query = referenceDataQuerySchema.parse(req.query);
-  const include = query.include
-    ?.split(',')
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
-  const scope = await getAuthenticatedDataScope(req);
-  const [scanCenters, teamMembers] = await Promise.all([
-    ScanCenterModel.find({ tenantId: scope.tenantId })
-      .sort({ name: 1 })
-      .lean<Array<{
-        externalId: string;
-        name: string;
-        location: string;
-        operator: string;
-        devices: number;
-        status: 'Operational' | 'Maintenance';
-      }>>()
-      .exec(),
-    UserModel.find({ tenantId: scope.tenantId, status: 'active' })
-      .sort({ fullName: 1 })
-      .select({ _id: 1, fullName: 1, roles: 1, status: 1 })
-      .lean<Array<{ _id: string; fullName: string; roles: string[]; status: string }>>()
-      .exec(),
-  ]);
-  const countsByScanCenter = await getScanCenterCounts(
-    scope.tenantId,
-    scanCenters.map((scanCenter) => scanCenter.externalId),
-    shouldInclude(include, 'scanCenters'),
-  );
+settingsRouter.get(
+  '/settings/reference-data',
+  requireAnyCapability(['settings.read']),
+  async (req, res) => {
+    const query = referenceDataQuerySchema.parse(req.query);
+    const include = query.include
+      ?.split(',')
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
+    const scope = await getAuthenticatedDataScope(req);
+    const [scanCenters, teamMembers] = await Promise.all([
+      ScanCenterModel.find({ tenantId: scope.tenantId })
+        .sort({ name: 1 })
+        .lean<
+          Array<{
+            externalId: string;
+            name: string;
+            location: string;
+            operator: string;
+            devices: number;
+            status: 'Operational' | 'Maintenance';
+          }>
+        >()
+        .exec(),
+      UserModel.find({ tenantId: scope.tenantId, status: 'active' })
+        .sort({ fullName: 1 })
+        .select({ _id: 1, fullName: 1, roles: 1, status: 1 })
+        .lean<Array<{ _id: string; fullName: string; roles: string[]; status: string }>>()
+        .exec(),
+    ]);
+    const countsByScanCenter = await getScanCenterCounts(
+      scope.tenantId,
+      scanCenters.map((scanCenter) => scanCenter.externalId),
+      shouldInclude(include, 'scanCenters'),
+    );
 
-  const data = {
-    scanCenters: shouldInclude(include, 'scanCenters')
-      ? scanCenters.map((scanCenter) => ({
-          id: scanCenter.externalId,
-          name: scanCenter.name,
-          location: scanCenter.location,
-          operator: scanCenter.operator,
-          devices: scanCenter.devices,
-          activeOrders: countsByScanCenter.get(scanCenter.externalId)?.activeOrders ?? 0,
-          completedToday: countsByScanCenter.get(scanCenter.externalId)?.completedToday ?? 0,
-          status: scanCenter.status,
-        }))
-      : undefined,
-    quarterlyTargets: shouldInclude(include, 'quarterlyTargets') ? [] : undefined,
-    teamMembers: shouldInclude(include, 'teamMembers')
-      ? teamMembers.map((member) => ({
-          userId: member._id,
-          type: member.roles[0] ?? 'staff',
-          fullName: member.fullName,
-          status: member.status === 'active' ? 'Active' : 'On Leave',
-        }))
-      : undefined,
-  };
+    const data = {
+      scanCenters: shouldInclude(include, 'scanCenters')
+        ? scanCenters.map((scanCenter) => ({
+            id: scanCenter.externalId,
+            name: scanCenter.name,
+            location: scanCenter.location,
+            operator: scanCenter.operator,
+            devices: scanCenter.devices,
+            activeOrders: countsByScanCenter.get(scanCenter.externalId)?.activeOrders ?? 0,
+            completedToday: countsByScanCenter.get(scanCenter.externalId)?.completedToday ?? 0,
+            status: scanCenter.status,
+          }))
+        : undefined,
+      quarterlyTargets: shouldInclude(include, 'quarterlyTargets') ? [] : undefined,
+      teamMembers: shouldInclude(include, 'teamMembers')
+        ? teamMembers.map((member) => ({
+            userId: member._id,
+            type: member.roles[0] ?? 'staff',
+            fullName: member.fullName,
+            status: member.status === 'active' ? 'Active' : 'On Leave',
+          }))
+        : undefined,
+    };
 
-  sendOk(res, data, buildRequestMeta(req));
-});
+    sendOk(res, data, buildRequestMeta(req));
+  },
+);
 
 function shouldInclude(selected: string[] | undefined, section: string): boolean {
   if (!selected || selected.length === 0) {

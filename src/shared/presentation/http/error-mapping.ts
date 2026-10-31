@@ -30,7 +30,8 @@ export function mapErrorToHttp(error: unknown): MappedHttpError {
       payload: {
         error: {
           code: error.code,
-          message: error.expose || env.NODE_ENV !== 'production' ? error.message : 'Internal Server Error',
+          message:
+            error.expose || env.NODE_ENV !== 'production' ? error.message : 'Internal Server Error',
           ...(error.details ? { details: error.details } : {}),
         },
       },

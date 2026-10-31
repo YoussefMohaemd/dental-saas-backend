@@ -1,17 +1,41 @@
-import { buildPaginationMeta, type PaginatedResult, type PaginationQuery } from '../../../shared/application/contracts/pagination';
-import { type OrderDetailDto, type OrderDto, type SubOrderCreationDataDto, type SubOrderDto } from '../../../shared/application/contracts/dental-api-contract';
-import { APPLICATION_ERROR_CODES, ApplicationError } from '../../../shared/application/errors/application-error';
+import {
+  buildPaginationMeta,
+  type PaginatedResult,
+  type PaginationQuery,
+} from '../../../shared/application/contracts/pagination';
+import {
+  type OrderDetailDto,
+  type OrderDto,
+  type SubOrderCreationDataDto,
+  type SubOrderDto,
+} from '../../../shared/application/contracts/dental-api-contract';
+import {
+  APPLICATION_ERROR_CODES,
+  ApplicationError,
+} from '../../../shared/application/errors/application-error';
 import { DOMAIN_ERROR_CODES, DomainError } from '../../../shared/domain/errors/domain-error';
-import { type Order, type OrderListQuery, type OrderUpdatePayload, type OrderWritePayload } from '../domain/order';
+import {
+  type Order,
+  type OrderListQuery,
+  type OrderUpdatePayload,
+  type OrderWritePayload,
+} from '../domain/order';
 import { type NameReferences, type OrderRepository } from '../domain/orders-repository';
-import { type SubOrder, type SubOrderUpdatePayload, type SubOrderWritePayload } from '../domain/sub-order';
+import {
+  type SubOrder,
+  type SubOrderUpdatePayload,
+  type SubOrderWritePayload,
+} from '../domain/sub-order';
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 import { assertOrderStatusTransition } from './order-workflow';
 
 export class OrdersService {
   public constructor(private readonly orderRepository: OrderRepository) {}
 
-  public async createOrder(payload: OrderWritePayload, scope: DataVisibilityScope): Promise<OrderDto> {
+  public async createOrder(
+    payload: OrderWritePayload,
+    scope: DataVisibilityScope,
+  ): Promise<OrderDto> {
     await this.ensureOrderRelations(payload.patientId, payload.doctorId, payload.clinicId, scope);
     await this.ensureRelatedReferences(payload, scope);
     await this.ensureUniqueOrderNumber(payload.orderNumber, scope);
@@ -70,7 +94,11 @@ export class OrdersService {
       assertOrderStatusTransition(existing.status, requestedStatus);
     }
 
-    if (payload.patientId !== undefined || payload.doctorId !== undefined || payload.clinicId !== undefined) {
+    if (
+      payload.patientId !== undefined ||
+      payload.doctorId !== undefined ||
+      payload.clinicId !== undefined
+    ) {
       await this.ensureOrderRelations(
         payload.patientId ?? existing.patientId,
         payload.doctorId ?? existing.doctorId,
@@ -216,10 +244,7 @@ export class OrdersService {
     this.assertOrderWritable(order);
   }
 
-  private assertOrderWritable(
-    order: Order,
-    payload?: OrderUpdatePayload,
-  ): void {
+  private assertOrderWritable(order: Order, payload?: OrderUpdatePayload): void {
     if (!order.isLocked) return;
 
     const isUnlockOnly = payload !== undefined && this.isUnlockOnlyPayload(payload);
@@ -243,7 +268,11 @@ export class OrdersService {
     scope: DataVisibilityScope,
     excludeOrderId?: string,
   ): Promise<void> {
-    const exists = await this.orderRepository.isOrderNumberTaken(orderNumber, scope, excludeOrderId);
+    const exists = await this.orderRepository.isOrderNumberTaken(
+      orderNumber,
+      scope,
+      excludeOrderId,
+    );
     if (exists) {
       throw new DomainError(
         `Order number '${orderNumber}' already exists`,
@@ -266,15 +295,23 @@ export class OrdersService {
     ]);
 
     if (!clinicExists) {
-      throw new DomainError(`Clinic ${clinicId} does not exist`, DOMAIN_ERROR_CODES.BUSINESS_RULE_VIOLATION, {
-        field: 'clinicId',
-      });
+      throw new DomainError(
+        `Clinic ${clinicId} does not exist`,
+        DOMAIN_ERROR_CODES.BUSINESS_RULE_VIOLATION,
+        {
+          field: 'clinicId',
+        },
+      );
     }
 
     if (doctor === null) {
-      throw new DomainError(`Doctor ${doctorId} does not exist`, DOMAIN_ERROR_CODES.BUSINESS_RULE_VIOLATION, {
-        field: 'doctorId',
-      });
+      throw new DomainError(
+        `Doctor ${doctorId} does not exist`,
+        DOMAIN_ERROR_CODES.BUSINESS_RULE_VIOLATION,
+        {
+          field: 'doctorId',
+        },
+      );
     }
 
     if (doctor.clinicId !== clinicId) {
@@ -375,7 +412,9 @@ export class OrdersService {
     const clinicName = references.clinicById.get(order.clinicId);
 
     const technicianName =
-      order.technicianId === undefined ? undefined : references.technicianById.get(order.technicianId);
+      order.technicianId === undefined
+        ? undefined
+        : references.technicianById.get(order.technicianId);
 
     return {
       id: order.id,
@@ -419,7 +458,9 @@ export class OrdersService {
       ...(order.creationData !== undefined
         ? {
             creationData: {
-              services: order.creationData.services.map((service) => this.toSubOrderCreationDataDto(service)),
+              services: order.creationData.services.map((service) =>
+                this.toSubOrderCreationDataDto(service),
+              ),
               ...(order.creationData.communication !== undefined
                 ? { communication: this.toCommunicationDto(order.creationData.communication) }
                 : {}),
@@ -502,15 +543,22 @@ export class OrdersService {
   }
 }
 
-export function ensureNonEmptyOrderUpdate<TPayload extends Record<string, unknown>>(payload: TPayload): void {
+export function ensureNonEmptyOrderUpdate<TPayload extends Record<string, unknown>>(
+  payload: TPayload,
+): void {
   ensureNonEmptyUpdatePayload(payload, 'At least one field must be provided for update');
 }
 
-export function ensureNonEmptySubOrderUpdate<TPayload extends Record<string, unknown>>(payload: TPayload): void {
+export function ensureNonEmptySubOrderUpdate<TPayload extends Record<string, unknown>>(
+  payload: TPayload,
+): void {
   ensureNonEmptyUpdatePayload(payload, 'At least one sub-order field must be provided for update');
 }
 
-function ensureNonEmptyUpdatePayload<TPayload extends Record<string, unknown>>(payload: TPayload, message: string): void {
+function ensureNonEmptyUpdatePayload<TPayload extends Record<string, unknown>>(
+  payload: TPayload,
+  message: string,
+): void {
   if (Object.keys(payload).length === 0) {
     throw new ApplicationError({
       message,

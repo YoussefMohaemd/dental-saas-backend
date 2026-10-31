@@ -187,15 +187,5 @@ const subOrderSchema = new Schema(
 subOrderSchema.index({ tenantId: 1, orderId: 1, status: 1 });
 subOrderSchema.index({ tenantId: 1, priority: 1, dueDate: 1 });
 
-export const SubOrderModel: Model<any> = (models.SubOrder as Model<any> | undefined) ?? model('SubOrder', subOrderSchema);
-
-
-
-
-
-
-
-
-
-
-
+export const SubOrderModel: Model<any> =
+  (models.SubOrder as Model<any> | undefined) ?? model('SubOrder', subOrderSchema);

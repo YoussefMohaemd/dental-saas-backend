@@ -2,7 +2,12 @@ import { type FilterQuery, type Model, type SortOrder, Types } from 'mongoose';
 
 import { AuthSessionModel } from '../../../shared/infrastructure/persistence/mongoose/models/auth-session.model';
 import { UserModel } from '../../../shared/infrastructure/persistence/mongoose/models/user.model';
-import { type User, type UserCreatePayload, type UserListQuery, type UserRoleStatusUpdatePayload } from '../domain/user';
+import {
+  type User,
+  type UserCreatePayload,
+  type UserListQuery,
+  type UserRoleStatusUpdatePayload,
+} from '../domain/user';
 import { type UserListResult, type UserRepository } from '../domain/user-repository';
 
 const userSortFields: Record<UserListQuery['sortBy'], string> = {
@@ -31,7 +36,8 @@ export class MongooseUserRepository implements UserRepository {
   }
 
   public async findById(tenantId: string, userId: string): Promise<User | null> {
-    const found = await userModel.findOne({ _id: userId, tenantId })
+    const found = await userModel
+      .findOne({ _id: userId, tenantId })
       .lean<UserRecord | null>()
       .exec();
 
@@ -39,9 +45,7 @@ export class MongooseUserRepository implements UserRepository {
   }
 
   public async findByEmail(tenantId: string, email: string): Promise<User | null> {
-    const found = await userModel.findOne({ tenantId, email })
-      .lean<UserRecord | null>()
-      .exec();
+    const found = await userModel.findOne({ tenantId, email }).lean<UserRecord | null>().exec();
 
     return found === null ? null : this.toUser(found);
   }
@@ -66,7 +70,8 @@ export class MongooseUserRepository implements UserRepository {
     const skip = (query.page - 1) * query.pageSize;
 
     const [items, totalItems] = await Promise.all([
-      userModel.find(filter)
+      userModel
+        .find(filter)
         .sort({ [sortBy]: sortValue })
         .skip(skip)
         .limit(query.pageSize)
@@ -96,11 +101,8 @@ export class MongooseUserRepository implements UserRepository {
       ...(options?.bumpTokenVersion === true ? { $inc: { tokenVersion: 1 } } : {}),
     };
 
-    const updated = await userModel.findOneAndUpdate(
-      { _id: userId, tenantId },
-      updateDocument,
-      { new: true },
-    )
+    const updated = await userModel
+      .findOneAndUpdate({ _id: userId, tenantId }, updateDocument, { new: true })
       .lean<UserRecord | null>()
       .exec();
 
@@ -118,11 +120,8 @@ export class MongooseUserRepository implements UserRepository {
       ...(options?.bumpTokenVersion === true ? { $inc: { tokenVersion: 1 } } : {}),
     };
 
-    const updated = await userModel.findOneAndUpdate(
-      { _id: userId, tenantId },
-      updateDocument,
-      { new: true },
-    )
+    const updated = await userModel
+      .findOneAndUpdate({ _id: userId, tenantId }, updateDocument, { new: true })
       .lean<UserRecord | null>()
       .exec();
 
@@ -130,16 +129,18 @@ export class MongooseUserRepository implements UserRepository {
   }
 
   public async revokeActiveSessions(tenantId: string, userId: string): Promise<void> {
-    await authSessionModel.updateMany(
-      {
-        userId,
-        tenantId,
-        revokedAt: { $exists: false },
-      },
-      {
-        $set: { revokedAt: new Date() },
-      },
-    ).exec();
+    await authSessionModel
+      .updateMany(
+        {
+          userId,
+          tenantId,
+          revokedAt: { $exists: false },
+        },
+        {
+          $set: { revokedAt: new Date() },
+        },
+      )
+      .exec();
   }
 
   private toUser(document: UserRecord): User {

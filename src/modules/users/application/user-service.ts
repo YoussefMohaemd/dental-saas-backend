@@ -1,4 +1,8 @@
-import { buildPaginationMeta, type PaginatedResult, type PaginationQuery } from '../../../shared/application/contracts/pagination';
+import {
+  buildPaginationMeta,
+  type PaginatedResult,
+  type PaginationQuery,
+} from '../../../shared/application/contracts/pagination';
 import { type UserDto } from '../../../shared/application/contracts/dental-api-contract';
 import { DOMAIN_ERROR_CODES, DomainError } from '../../../shared/domain/errors/domain-error';
 import { PasswordHasher } from '../../auth/application/password-hasher';
@@ -24,7 +28,10 @@ interface UserCreateInput {
 export class UserService {
   private readonly passwordHasher: PasswordHasher;
 
-  public constructor(private readonly userRepository: UserRepository, passwordHasher?: PasswordHasher) {
+  public constructor(
+    private readonly userRepository: UserRepository,
+    passwordHasher?: PasswordHasher,
+  ) {
     this.passwordHasher = passwordHasher ?? new PasswordHasher();
   }
 
@@ -74,9 +81,8 @@ export class UserService {
       );
     }
 
-    const passwordHash = payload.password === undefined
-      ? undefined
-      : await this.passwordHasher.hash(payload.password);
+    const passwordHash =
+      payload.password === undefined ? undefined : await this.passwordHasher.hash(payload.password);
 
     const created = await this.userRepository.create({
       tenantId,
@@ -114,9 +120,9 @@ export class UserService {
       }
 
       if (
-        normalizedRoles !== undefined
-        && existing.roles.some((role) => role === 'admin')
-        && !normalizedRoles.includes('admin')
+        normalizedRoles !== undefined &&
+        existing.roles.some((role) => role === 'admin') &&
+        !normalizedRoles.includes('admin')
       ) {
         throw new DomainError(
           'You cannot remove your own admin role',
@@ -143,7 +149,11 @@ export class UserService {
     return this.toUserDto(updated);
   }
 
-  public async deactivateUser(tenantId: string, userId: string, actorUserId: string): Promise<UserDto> {
+  public async deactivateUser(
+    tenantId: string,
+    userId: string,
+    actorUserId: string,
+  ): Promise<UserDto> {
     if (actorUserId === userId) {
       throw new DomainError(
         'You cannot deactivate your own account',
@@ -151,12 +161,9 @@ export class UserService {
       );
     }
 
-    const updated = await this.userRepository.setStatus(
-      tenantId,
-      userId,
-      'disabled',
-      { bumpTokenVersion: true },
-    );
+    const updated = await this.userRepository.setStatus(tenantId, userId, 'disabled', {
+      bumpTokenVersion: true,
+    });
     if (updated === null) {
       throw new DomainError(`User ${userId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
     }
@@ -166,12 +173,9 @@ export class UserService {
   }
 
   public async reactivateUser(tenantId: string, userId: string): Promise<UserDto> {
-    const updated = await this.userRepository.setStatus(
-      tenantId,
-      userId,
-      'active',
-      { bumpTokenVersion: true },
-    );
+    const updated = await this.userRepository.setStatus(tenantId, userId, 'active', {
+      bumpTokenVersion: true,
+    });
     if (updated === null) {
       throw new DomainError(`User ${userId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
     }

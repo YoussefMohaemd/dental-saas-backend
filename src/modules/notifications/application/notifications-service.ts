@@ -5,7 +5,10 @@ import {
   APPLICATION_ERROR_CODES,
   ApplicationError,
 } from '../../../shared/application/errors/application-error';
-import { buildPaginationMeta, type PaginationQuery } from '../../../shared/application/contracts/pagination';
+import {
+  buildPaginationMeta,
+  type PaginationQuery,
+} from '../../../shared/application/contracts/pagination';
 import { NOTIFICATION_TYPES } from '../../../shared/domain/entities/dental-data-model';
 import { NotificationModel } from '../../../shared/infrastructure/persistence/mongoose/models/notification.model';
 import { parseEnumList } from '../../../shared/presentation/http/http-utils';

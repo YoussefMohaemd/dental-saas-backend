@@ -50,16 +50,5 @@ caseSchema.index({ tenantId: 1, caseNumber: 1 }, { unique: true });
 caseSchema.index({ tenantId: 1, status: 1, priority: 1, updatedAt: -1 });
 caseSchema.index({ tenantId: 1, patientId: 1, updatedAt: -1 });
 
-export const CaseModel: Model<any> = (models.Case as Model<any> | undefined) ?? model('Case', caseSchema);
-
-
-
-
-
-
-
-
-
-
-
-
+export const CaseModel: Model<any> =
+  (models.Case as Model<any> | undefined) ?? model('Case', caseSchema);

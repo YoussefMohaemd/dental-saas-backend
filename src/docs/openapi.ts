@@ -99,7 +99,8 @@ const endpoints: EndpointSpec[] = [
               password: { type: 'string', minLength: 8, maxLength: 128 },
               rememberMe: {
                 type: 'boolean',
-                description: 'true keeps a persistent refresh cookie; false issues a session cookie',
+                description:
+                  'true keeps a persistent refresh cookie; false issues a session cookie',
               },
             },
           },
@@ -149,7 +150,13 @@ const endpoints: EndpointSpec[] = [
     summary: 'Get health snapshot',
   },
 
-  { method: 'get', path: '/api/v1/users', tag: 'users', summary: 'List users', authenticated: true },
+  {
+    method: 'get',
+    path: '/api/v1/users',
+    tag: 'users',
+    summary: 'List users',
+    authenticated: true,
+  },
   {
     method: 'get',
     path: '/api/v1/users/{userId}',
@@ -422,7 +429,12 @@ const endpoints: EndpointSpec[] = [
     requestBody: genericBody(),
   },
 
-  { method: 'get', path: '/api/v1/change-requests', tag: 'change-requests', summary: 'List change requests' },
+  {
+    method: 'get',
+    path: '/api/v1/change-requests',
+    tag: 'change-requests',
+    summary: 'List change requests',
+  },
   {
     method: 'get',
     path: '/api/v1/change-requests/{requestId}',
@@ -439,7 +451,12 @@ const endpoints: EndpointSpec[] = [
     requestBody: genericBody(),
   },
 
-  { method: 'get', path: '/api/v1/scan-centers', tag: 'scan-centers', summary: 'List scan centers' },
+  {
+    method: 'get',
+    path: '/api/v1/scan-centers',
+    tag: 'scan-centers',
+    summary: 'List scan centers',
+  },
   {
     method: 'get',
     path: '/api/v1/scan-centers/{scanCenterId}',
@@ -448,8 +465,18 @@ const endpoints: EndpointSpec[] = [
     parameters: [createPathParam('scanCenterId', 'Scan center identifier')],
   },
 
-  { method: 'get', path: '/api/v1/dashboard/volume', tag: 'reports', summary: 'Get dashboard volume metrics' },
-  { method: 'get', path: '/api/v1/reports/overview', tag: 'reports', summary: 'Get reports overview metrics' },
+  {
+    method: 'get',
+    path: '/api/v1/dashboard/volume',
+    tag: 'reports',
+    summary: 'Get dashboard volume metrics',
+  },
+  {
+    method: 'get',
+    path: '/api/v1/reports/overview',
+    tag: 'reports',
+    summary: 'Get reports overview metrics',
+  },
   {
     method: 'get',
     path: '/api/v1/reports/orders-range',
@@ -482,7 +509,12 @@ const endpoints: EndpointSpec[] = [
       },
     ],
   },
-  { method: 'get', path: '/api/v1/reports/team-performance', tag: 'reports', summary: 'Get team performance report' },
+  {
+    method: 'get',
+    path: '/api/v1/reports/team-performance',
+    tag: 'reports',
+    summary: 'Get team performance report',
+  },
   {
     method: 'get',
     path: '/api/v1/reports/sub-orders',
@@ -517,7 +549,12 @@ const endpoints: EndpointSpec[] = [
     successDescription: 'Document deleted successfully.',
   },
 
-  { method: 'get', path: '/api/v1/notifications', tag: 'notifications', summary: 'List notifications' },
+  {
+    method: 'get',
+    path: '/api/v1/notifications',
+    tag: 'notifications',
+    summary: 'List notifications',
+  },
   {
     method: 'post',
     path: '/api/v1/notifications/{notificationId}/read',
@@ -684,7 +721,11 @@ function createOperation(endpoint: EndpointSpec): OpenApiObject {
     );
   }
 
-  if (endpoint.path === '/api/v1/cases' || endpoint.path === '/api/v1/billing' || endpoint.path === '/api/v1/change-requests') {
+  if (
+    endpoint.path === '/api/v1/cases' ||
+    endpoint.path === '/api/v1/billing' ||
+    endpoint.path === '/api/v1/change-requests'
+  ) {
     parameters.push(commonParameters.status);
   }
 

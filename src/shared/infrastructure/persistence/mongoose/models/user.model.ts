@@ -51,15 +51,5 @@ const userSchema = new Schema(
 userSchema.index({ tenantId: 1, email: 1 }, { unique: true });
 userSchema.index({ tenantId: 1, status: 1 });
 
-export const UserModel: Model<any> = (models.User as Model<any> | undefined) ?? model('User', userSchema);
-
-
-
-
-
-
-
-
-
-
-
+export const UserModel: Model<any> =
+  (models.User as Model<any> | undefined) ?? model('User', userSchema);
