@@ -28,11 +28,20 @@ export interface NameReferences {
   scanCenterById: Map<string, string>;
 }
 
+export interface UpdateOrderConstraints {
+  expectedCurrentStatuses?: readonly Order['status'][];
+}
+
 export interface OrderRepository {
   createOrder(payload: OrderWritePayload, scope: DataVisibilityScope): Promise<Order>;
   findOrderById(orderId: string, scope: DataVisibilityScope): Promise<Order | null>;
   listOrders(query: OrderListQuery): Promise<OrderListResult>;
-  updateOrder(orderId: string, payload: OrderUpdatePayload, scope: DataVisibilityScope): Promise<Order | null>;
+  updateOrder(
+    orderId: string,
+    payload: OrderUpdatePayload,
+    scope: DataVisibilityScope,
+    constraints?: UpdateOrderConstraints,
+  ): Promise<Order | null>;
   deleteOrder(orderId: string, scope: DataVisibilityScope): Promise<boolean>;
   deleteOrderWithSubOrders(orderId: string, scope: DataVisibilityScope): Promise<boolean>;
   isOrderNumberTaken(orderNumber: string, scope: DataVisibilityScope, excludeOrderId?: string): Promise<boolean>;

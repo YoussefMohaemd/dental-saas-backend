@@ -2,8 +2,9 @@ import { Types } from 'mongoose';
 import { describe, expect, it } from 'vitest';
 
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
-import { type Order, type OrderWritePayload } from '../domain/order';
-import { type OrderRepository } from '../domain/orders-repository';
+import { DOMAIN_ERROR_CODES, DomainError } from '../../../shared/domain/errors/domain-error';
+import { type Order, type OrderUpdatePayload, type OrderWritePayload } from '../domain/order';
+import { type OrderRepository, type UpdateOrderConstraints } from '../domain/orders-repository';
 import { type SubOrder, type SubOrderUpdatePayload } from '../domain/sub-order';
 import { OrdersService } from './orders-service';
 
@@ -24,6 +25,53 @@ describe('OrdersService authorization scope', () => {
     expect(repository.createScope).toBe(scope);
     expect(repository.referenceScope).toBe(scope);
   });
+
+  it('passes expected current status when updating order status', async () => {
+    const scope: DataVisibilityScope = {
+      tenantId: new Types.ObjectId('66f100000000000000000002'),
+      userId: new Types.ObjectId('66f100000000000000000003'),
+      isAdmin: true,
+    };
+    const repository = new RecordingOrdersRepository();
+    const existing = buildOrder();
+    const updated = buildOrder({ status: 'Review' });
+    repository.findOrderByIdResults = [existing];
+    repository.updateOrderResult = updated;
+    const service = new OrdersService(repository);
+
+    const result = await service.updateOrder(existing.id, { status: 'Review' }, scope);
+
+    expect(repository.updateConstraints).toEqual({
+      expectedCurrentStatuses: ['New'],
+    });
+    expect(result.status).toBe('Review');
+  });
+
+  it('returns a conflict when the status changes concurrently', async () => {
+    const scope: DataVisibilityScope = {
+      tenantId: new Types.ObjectId('66f100000000000000000002'),
+      userId: new Types.ObjectId('66f100000000000000000003'),
+      isAdmin: true,
+    };
+    const repository = new RecordingOrdersRepository();
+    const existing = buildOrder();
+    repository.findOrderByIdResults = [existing, buildOrder({ status: 'Design' })];
+    repository.updateOrderResult = null;
+    const service = new OrdersService(repository);
+
+    try {
+      await service.updateOrder(existing.id, { status: 'Review' }, scope);
+      expect.fail('Expected status update conflict');
+    } catch (error) {
+      expect(error).toBeInstanceOf(DomainError);
+      expect((error as DomainError).code).toBe(DOMAIN_ERROR_CODES.ENTITY_CONFLICT);
+      expect((error as DomainError).details).toMatchObject({
+        expectedCurrentStatuses: ['New'],
+        currentStatus: 'Design',
+        requestedStatus: 'Review',
+      });
+    }
+  });
 });
 
 class RecordingOrdersRepository implements OrderRepository {
@@ -31,6 +79,9 @@ class RecordingOrdersRepository implements OrderRepository {
   public uniqueScope: DataVisibilityScope | undefined;
   public createScope: DataVisibilityScope | undefined;
   public referenceScope: DataVisibilityScope | undefined;
+  public findOrderByIdResults: Array<Order | null> = [];
+  public updateOrderResult: Order | null = null;
+  public updateConstraints: UpdateOrderConstraints | undefined;
 
   public async createOrder(_payload: OrderWritePayload, scope: DataVisibilityScope): Promise<Order> {
     await Promise.resolve();
@@ -40,7 +91,7 @@ class RecordingOrdersRepository implements OrderRepository {
 
   public async findOrderById(): Promise<Order | null> {
     await Promise.resolve();
-    return null;
+    return this.findOrderByIdResults.shift() ?? null;
   }
 
   public async listOrders(): Promise<{ items: Order[]; totalItems: number }> {
@@ -48,9 +99,18 @@ class RecordingOrdersRepository implements OrderRepository {
     return { items: [], totalItems: 0 };
   }
 
-  public async updateOrder(): Promise<Order | null> {
+  public async updateOrder(
+    _orderId: string,
+    _payload: OrderUpdatePayload,
+    _scope: DataVisibilityScope,
+    constraints?: UpdateOrderConstraints,
+  ): Promise<Order | null> {
+    void _orderId;
+    void _payload;
+    void _scope;
     await Promise.resolve();
-    return null;
+    this.updateConstraints = constraints;
+    return this.updateOrderResult;
   }
 
   public async deleteOrder(): Promise<boolean> {
@@ -186,11 +246,12 @@ function buildOrderPayload(): OrderWritePayload {
   };
 }
 
-function buildOrder(): Order {
+function buildOrder(overrides: Partial<Order> = {}): Order {
   return {
     ...buildOrderPayload(),
     id: '66f100000000000000000013',
     createdAt: new Date('2026-01-01'),
     updatedAt: new Date('2026-01-01'),
+    ...overrides,
   };
 }

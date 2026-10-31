@@ -15,6 +15,7 @@ import {
   type OrderListResult,
   type OrderRepository,
   type PatientReference,
+  type UpdateOrderConstraints,
 } from '../domain/orders-repository';
 import {
   type SubOrder,
@@ -88,9 +89,23 @@ export class MongooseOrdersRepository implements OrderRepository {
     orderId: string,
     payload: OrderUpdatePayload,
     scope: DataVisibilityScope,
+    constraints?: UpdateOrderConstraints,
   ): Promise<Order | null> {
+    const filter: FilterQuery<OrderRecord> = {
+      _id: orderId,
+      tenantId: scope.tenantId,
+      ...orderScopeFilter(scope),
+    };
+
+    if (
+      constraints?.expectedCurrentStatuses !== undefined &&
+      constraints.expectedCurrentStatuses.length > 0
+    ) {
+      filter.status = { $in: [...constraints.expectedCurrentStatuses] };
+    }
+
     const updated = await orderModel.findOneAndUpdate(
-      { _id: orderId, tenantId: scope.tenantId, ...orderScopeFilter(scope) },
+      filter,
       this.toOrderDocumentPayload(payload),
       { new: true },
     )

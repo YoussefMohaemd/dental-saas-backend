@@ -20,10 +20,7 @@ export class OrdersService {
   }
 
   public async getOrderById(orderId: string, scope: DataVisibilityScope): Promise<OrderDetailDto> {
-    const order = await this.orderRepository.findOrderById(orderId, scope);
-    if (order === null) {
-      throw new DomainError(`Order ${orderId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
-    }
+    const order = await this.ensureOrderExists(orderId, scope);
 
     const [orderDto, subOrders] = await Promise.all([
       this.toOrderDto(order, scope),
@@ -64,15 +61,13 @@ export class OrdersService {
       await this.ensureUniqueOrderNumber(payload.orderNumber, scope, orderId);
     }
 
-    const existing = await this.orderRepository.findOrderById(orderId, scope);
-    if (existing === null) {
-      throw new DomainError(`Order ${orderId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
-    }
+    const existing = await this.ensureOrderExists(orderId, scope);
 
     this.assertOrderWritable(existing, payload);
 
-    if (payload.status !== undefined) {
-      assertOrderStatusTransition(existing.status, payload.status);
+    const requestedStatus = payload.status;
+    if (requestedStatus !== undefined) {
+      assertOrderStatusTransition(existing.status, requestedStatus);
     }
 
     if (payload.patientId !== undefined || payload.doctorId !== undefined || payload.clinicId !== undefined) {
@@ -85,24 +80,47 @@ export class OrdersService {
     }
     await this.ensureRelatedReferences(payload, scope);
 
-    const updated = await this.orderRepository.updateOrder(orderId, payload, scope);
+    const updateConstraints =
+      requestedStatus !== undefined
+        ? { expectedCurrentStatuses: [existing.status] as const }
+        : undefined;
+    const updated = await this.orderRepository.updateOrder(
+      orderId,
+      payload,
+      scope,
+      updateConstraints,
+    );
     if (updated === null) {
-      throw new DomainError(`Order ${orderId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
+      if (requestedStatus !== undefined) {
+        const latest = await this.orderRepository.findOrderById(orderId, scope);
+        if (latest === null) {
+          this.throwOrderNotFound(orderId);
+        }
+
+        throw new DomainError(
+          `Order ${orderId} status changed from '${existing.status}' to '${latest.status}' before the update could be applied`,
+          DOMAIN_ERROR_CODES.ENTITY_CONFLICT,
+          {
+            expectedCurrentStatuses: [existing.status],
+            currentStatus: latest.status,
+            requestedStatus,
+          },
+        );
+      }
+
+      this.throwOrderNotFound(orderId);
     }
 
     return this.toOrderDto(updated, scope);
   }
 
   public async deleteOrder(orderId: string, scope: DataVisibilityScope): Promise<void> {
-    const existing = await this.orderRepository.findOrderById(orderId, scope);
-    if (existing === null) {
-      throw new DomainError(`Order ${orderId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
-    }
+    const existing = await this.ensureOrderExists(orderId, scope);
     this.assertOrderWritable(existing);
 
     const deleted = await this.orderRepository.deleteOrderWithSubOrders(orderId, scope);
     if (!deleted) {
-      throw new DomainError(`Order ${orderId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
+      this.throwOrderNotFound(orderId);
     }
   }
 
@@ -118,9 +136,9 @@ export class OrdersService {
     scope: DataVisibilityScope,
   ): Promise<SubOrderDto[]> {
     await this.ensureOrderWritable(orderId, scope);
-    payloads.forEach((payload) => this.assertSubOrderProgress(payload));
+    this.validateSubOrderPayloads(payloads);
     const created = await this.orderRepository.createSubOrders(orderId, payloads, scope);
-    return created.map((subOrder) => this.toSubOrderDto(subOrder));
+    return this.toSubOrderDtos(created);
   }
 
   public async replaceSubOrders(
@@ -129,9 +147,9 @@ export class OrdersService {
     scope: DataVisibilityScope,
   ): Promise<SubOrderDto[]> {
     await this.ensureOrderWritable(orderId, scope);
-    payloads.forEach((payload) => this.assertSubOrderProgress(payload));
+    this.validateSubOrderPayloads(payloads);
     const replaced = await this.orderRepository.replaceSubOrders(orderId, payloads, scope);
-    return replaced.map((subOrder) => this.toSubOrderDto(subOrder));
+    return this.toSubOrderDtos(replaced);
   }
 
   public async updateSubOrder(
@@ -185,18 +203,16 @@ export class OrdersService {
     }
   }
 
-  private async ensureOrderExists(orderId: string, scope: DataVisibilityScope): Promise<void> {
+  private async ensureOrderExists(orderId: string, scope: DataVisibilityScope): Promise<Order> {
     const order = await this.orderRepository.findOrderById(orderId, scope);
     if (order === null) {
-      throw new DomainError(`Order ${orderId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
+      this.throwOrderNotFound(orderId);
     }
+    return order;
   }
 
   private async ensureOrderWritable(orderId: string, scope: DataVisibilityScope): Promise<void> {
-    const order = await this.orderRepository.findOrderById(orderId, scope);
-    if (order === null) {
-      throw new DomainError(`Order ${orderId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
-    }
+    const order = await this.ensureOrderExists(orderId, scope);
     this.assertOrderWritable(order);
   }
 
@@ -206,18 +222,20 @@ export class OrdersService {
   ): void {
     if (!order.isLocked) return;
 
-    const payloadKeys = payload
-      ? Object.keys(payload).filter((key) => payload[key as keyof OrderUpdatePayload] !== undefined)
-      : [];
-    const isUnlockOnly =
-      payloadKeys.length === 1 &&
-      payload?.isLocked === false;
+    const isUnlockOnly = payload !== undefined && this.isUnlockOnlyPayload(payload);
     if (isUnlockOnly) return;
 
     throw new DomainError(
       'Locked orders cannot be modified. Unlock the order first.',
       DOMAIN_ERROR_CODES.BUSINESS_RULE_VIOLATION,
     );
+  }
+
+  private isUnlockOnlyPayload(payload: OrderUpdatePayload): boolean {
+    const definedKeys = Object.entries(payload)
+      .filter(([, value]) => value !== undefined)
+      .map(([key]) => key);
+    return definedKeys.length === 1 && payload.isLocked === false;
   }
 
   private async ensureUniqueOrderNumber(
@@ -325,27 +343,25 @@ export class OrdersService {
     scansComplete?: number | undefined;
     scansTotal?: number | undefined;
   }): void {
-    if (
-      payload.formsComplete !== undefined &&
-      payload.formsTotal !== undefined &&
-      payload.formsComplete > payload.formsTotal
-    ) {
-      throw new DomainError(
-        'formsComplete cannot exceed formsTotal',
-        DOMAIN_ERROR_CODES.BUSINESS_RULE_VIOLATION,
-      );
-    }
+    this.assertProgressWithinTotal(payload.formsComplete, payload.formsTotal, 'forms');
+    this.assertProgressWithinTotal(payload.scansComplete, payload.scansTotal, 'scans');
+  }
 
-    if (
-      payload.scansComplete !== undefined &&
-      payload.scansTotal !== undefined &&
-      payload.scansComplete > payload.scansTotal
-    ) {
-      throw new DomainError(
-        'scansComplete cannot exceed scansTotal',
-        DOMAIN_ERROR_CODES.BUSINESS_RULE_VIOLATION,
-      );
-    }
+  private assertProgressWithinTotal(
+    complete: number | undefined,
+    total: number | undefined,
+    field: 'forms' | 'scans',
+  ): void {
+    if (complete === undefined || total === undefined || complete <= total) return;
+
+    throw new DomainError(
+      `${field}Complete cannot exceed ${field}Total`,
+      DOMAIN_ERROR_CODES.BUSINESS_RULE_VIOLATION,
+    );
+  }
+
+  private validateSubOrderPayloads(payloads: SubOrderWritePayload[]): void {
+    payloads.forEach((payload) => this.assertSubOrderProgress(payload));
   }
 
   private async toOrderDto(order: Order, scope: DataVisibilityScope): Promise<OrderDto> {
@@ -437,6 +453,14 @@ export class OrdersService {
     };
   }
 
+  private toSubOrderDtos(subOrders: SubOrder[]): SubOrderDto[] {
+    return subOrders.map((subOrder) => this.toSubOrderDto(subOrder));
+  }
+
+  private throwOrderNotFound(orderId: string): never {
+    throw new DomainError(`Order ${orderId} was not found`, DOMAIN_ERROR_CODES.ENTITY_NOT_FOUND);
+  }
+
   private toSubOrderCreationDataDto(input: {
     serviceId: string;
     serviceDetails: Record<string, string>;
@@ -479,20 +503,17 @@ export class OrdersService {
 }
 
 export function ensureNonEmptyOrderUpdate<TPayload extends Record<string, unknown>>(payload: TPayload): void {
-  if (Object.keys(payload).length === 0) {
-    throw new ApplicationError({
-      message: 'At least one field must be provided for update',
-      statusCode: 400,
-      code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
-      expose: true,
-    });
-  }
+  ensureNonEmptyUpdatePayload(payload, 'At least one field must be provided for update');
 }
 
 export function ensureNonEmptySubOrderUpdate<TPayload extends Record<string, unknown>>(payload: TPayload): void {
+  ensureNonEmptyUpdatePayload(payload, 'At least one sub-order field must be provided for update');
+}
+
+function ensureNonEmptyUpdatePayload<TPayload extends Record<string, unknown>>(payload: TPayload, message: string): void {
   if (Object.keys(payload).length === 0) {
     throw new ApplicationError({
-      message: 'At least one sub-order field must be provided for update',
+      message,
       statusCode: 400,
       code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
       expose: true,

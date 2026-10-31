@@ -196,6 +196,7 @@ Transition rules:
   - `Ready -> Completed`
 - `Cancelled` is allowed from any non-terminal status.
 - Backend rejects no-op transitions (`toStatus === currentStatus`) with `409`.
+- Backend enforces compare-and-set semantics on status changes; if another write changes the current status before `PATCH /orders/{orderId}` is applied, the API returns `409` with the current/requested statuses.
 - Backend rejects invalid jumps with `422` and includes allowed next statuses in error details.
 - Backend should write transition audit metadata (`from`, `to`, `actor`, `at`, `reason?`).
 
