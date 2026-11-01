@@ -1,0 +1,53 @@
+services:
+  vllm-inference:
+    image: vllm/vllm-openai:v0.17.0
+    container_name: dental-ai-vllm
+    restart: unless-stopped
+    environment:
+      HUGGING_FACE_HUB_TOKEN: ${HUGGING_FACE_HUB_TOKEN:-}
+    command:
+      - "--model"
+      - "Qwen/Qwen3.5-9B"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8000"
+      - "--max-model-len"
+      - "${VLLM_MAX_MODEL_LEN:-8192}"
+      - "--gpu-memory-utilization"
+      - "${VLLM_GPU_MEMORY_UTILIZATION:-0.9}"
+      - "--max-num-seqs"
+      - "${VLLM_MAX_NUM_SEQS:-16}"
+      - "--enable-auto-tool-choice"
+      - "--tool-call-parser"
+      - "qwen3_coder"
+      - "--reasoning-parser"
+      - "qwen3"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    expose:
+      - "8000"
+    volumes:
+      - hf-cache:/root/.cache/huggingface
+    networks:
+      - assistant-private
+    deploy:
+      resources:
+        limits:
+          memory: 48g
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  hf-cache:
+
+networks:
+  assistant-private:
+    driver: bridge

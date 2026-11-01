@@ -2,6 +2,7 @@
 
 import { requireAuthenticated } from './auth/presentation/auth.middleware';
 import { authRouter } from './auth/presentation/auth.routes';
+import { assistantRouter } from './assistant/presentation/assistant.routes';
 import { billingRouter } from './billing/presentation/billing.routes';
 import { casesRouter } from './cases/presentation/cases.routes';
 import { changeRequestsRouter } from './change-requests/presentation/change-requests.routes';
@@ -23,6 +24,7 @@ const v1Router = Router();
 moduleRouter.use(authRouter);
 moduleRouter.use(healthRouter);
 v1Router.use(requireAuthenticated);
+v1Router.use(assistantRouter);
 v1Router.use(clinicsRouter);
 v1Router.use(doctorsRouter);
 v1Router.use(patientsRouter);

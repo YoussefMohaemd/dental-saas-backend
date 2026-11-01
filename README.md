@@ -36,6 +36,16 @@ Copy `.env.example` to `.env` and adjust values as needed.
 - `AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_ACCOUNT` maximum login attempts allowed per tenant/email account key in each window (default falls back to `AUTH_RATE_LIMIT_MAX_ATTEMPTS`, then `20`)
 - `AUTH_RATE_LIMIT_MAX_ATTEMPTS` backward-compatible fallback for per-account attempts when `AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_ACCOUNT` is not set
 - `MONGODB_URI` MongoDB connection URI used by app startup and seed script
+- `AI_ASSISTANT_PROVIDER` (`mock` | `vllm`)
+- `AI_ASSISTANT_MODEL` (default `Qwen/Qwen3.5-9B`)
+- `AI_ASSISTANT_VLLM_BASE_URL` internal OpenAI-compatible vLLM endpoint (default `http://127.0.0.1:8000/v1`)
+- `AI_ASSISTANT_VLLM_API_KEY` optional internal service token for vLLM gateway
+- `AI_ASSISTANT_TIMEOUT_MS` provider request timeout
+- `AI_ASSISTANT_MAX_ACTIONS_PER_MESSAGE`
+- `AI_ASSISTANT_MAX_PLANNING_ROUNDS`
+- `AI_ASSISTANT_MAX_INPUT_CHARS`
+- `AI_ASSISTANT_CONFIRMATION_TTL_SECONDS`
+- `AI_ASSISTANT_PLANNER_PROMPT_VERSION`
 
 ## Included baseline
 
@@ -55,6 +65,12 @@ Copy `.env.example` to `.env` and adjust values as needed.
     a server-derived permission list for role-based frontend UX.
   - `POST /api/auth/sessions/revoke` (protected, requires `auth.sessions.revoke` capability)
   - No public registration endpoint is exposed
+- Assistant foundation endpoints (protected, under `/api/v1`):
+  - `GET /api/v1/assistant/suggestions`
+  - `POST /api/v1/assistant/conversations`
+  - `GET /api/v1/assistant/conversations/:id`
+  - `POST /api/v1/assistant/conversations/:id/messages`
+  - `POST /api/v1/assistant/actions/:id/confirm`
 - User/role provisioning endpoints under `/api/v1`:
   - `GET /api/v1/users` (protected)
   - `GET /api/v1/users/:userId` (protected)
@@ -99,6 +115,7 @@ remediation, validation results, and remaining release concerns.
 
 - `Dockerfile` provides `dev` and `runtime` targets.
 - `docker-compose.yml` runs backend + MongoDB for local development.
+- `deploy/ai-inference/docker-compose.yml` provisions private Qwen3.5-9B vLLM inference runtime for assistant integration.
 - Runbook: `docs/dev-runbook.md`.
 
 ## Development login bootstrap
