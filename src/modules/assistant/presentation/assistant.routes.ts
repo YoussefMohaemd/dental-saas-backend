@@ -12,5 +12,10 @@ assistantRouter.post('/assistant/conversations', assistantController.createConve
 assistantRouter.get('/assistant/conversations/:conversationId', assistantController.getConversation);
 assistantRouter.post('/assistant/conversations/:conversationId/messages', assistantController.postMessage);
 assistantRouter.post('/assistant/actions/:actionId/confirm', assistantController.confirmAction);
+assistantRouter.get('/ai/suggestions', assistantController.getSuggestions);
+assistantRouter.post('/ai/conversations', assistantController.createConversation);
+assistantRouter.get('/ai/conversations/:conversationId', assistantController.getConversation);
+assistantRouter.post('/ai/conversations/:conversationId/messages', assistantController.postMessage);
+assistantRouter.post('/ai/actions/:actionId/confirm', assistantController.confirmAction);
 
 export { assistantRouter };

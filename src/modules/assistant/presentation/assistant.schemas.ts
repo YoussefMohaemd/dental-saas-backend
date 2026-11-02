@@ -16,7 +16,7 @@ export const assistantCreateConversationBodySchema = z
 
 export const assistantMessageBodySchema = z
   .object({
-    content: z.string().trim().min(1).max(8_000),
+    content: z.string().trim().min(1).max(4_000),
   })
   .strict();
 

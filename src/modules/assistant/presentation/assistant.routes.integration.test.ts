@@ -23,4 +23,11 @@ describe('assistant routes integration', () => {
     expect(response.status).toBe(401);
     expect(response.body).toHaveProperty('error.code', 'UNAUTHORIZED');
   });
+
+  it('exposes ai alias routes with same authentication requirement', async () => {
+    const response = await request(app).get('/api/v1/ai/suggestions');
+
+    expect(response.status).toBe(401);
+    expect(response.body).toHaveProperty('error.code', 'UNAUTHORIZED');
+  });
 });

@@ -27,4 +27,9 @@ describe('assistant.schemas', () => {
   it('requires confirmation token', () => {
     expect(() => assistantConfirmBodySchema.parse({})).toThrow();
   });
+
+  it('rejects message content longer than service contract limit', () => {
+    const content = 'a'.repeat(4_001);
+    expect(() => assistantMessageBodySchema.parse({ content })).toThrow();
+  });
 });
