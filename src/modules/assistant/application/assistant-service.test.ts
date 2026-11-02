@@ -147,4 +147,75 @@ describe('AssistantService', () => {
       },
     ]);
   });
+
+  it('executes confirmed write actions and blocks replay', async () => {
+    const service = AssistantService.createForTests({
+      providerReply: {
+        reply: 'Preparing update',
+        actions: [
+          {
+            id: 'a1',
+            tool: 'update_order',
+            arguments: { orderId: 'ord-1', status: 'Review' },
+            dependsOn: [],
+          },
+        ],
+      },
+    });
+
+    const conversation = await service.createConversation({
+      tenantId: '66f100000000000000000001',
+      userId: '66f1000000000000000000aa',
+      roles: ['staff'],
+      title: 'Write execution',
+    });
+
+    const messageResponse = await service.postMessage(
+      {
+        tenantId: '66f100000000000000000001',
+        userId: '66f1000000000000000000aa',
+        roles: ['staff'],
+      },
+      {
+        conversationId: conversation.id,
+        content: 'Update order status',
+      },
+    );
+
+    if (messageResponse.result.type !== 'confirmation') {
+      throw new Error('Expected confirmation result');
+    }
+    const pending = messageResponse.result.pendingActions[0];
+    if (!pending) {
+      throw new Error('Expected pending action');
+    }
+
+    const confirm = await service.confirmAction(
+      {
+        tenantId: '66f100000000000000000001',
+        userId: '66f1000000000000000000aa',
+        roles: ['staff'],
+      },
+      {
+        actionId: pending.actionId,
+        confirmationToken: pending.confirmationToken,
+      },
+    );
+
+    expect(confirm.message).toContain('executed');
+
+    await expect(
+      service.confirmAction(
+        {
+          tenantId: '66f100000000000000000001',
+          userId: '66f1000000000000000000aa',
+          roles: ['staff'],
+        },
+        {
+          actionId: pending.actionId,
+          confirmationToken: pending.confirmationToken,
+        },
+      ),
+    ).rejects.toThrow('already confirmed');
+  });
 });

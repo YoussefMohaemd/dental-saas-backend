@@ -394,16 +394,23 @@ export class AssistantService {
       },
     });
 
+    const execution = this.dependencies.actionExecutor.executeConfirmedWriteAction({
+      actionId: confirmedAction.actionId,
+      toolName: confirmedAction.toolName,
+      payload: confirmedAction.payload,
+    });
+
     await this.dependencies.conversationService.appendMessage({
       conversationId: confirmedAction.conversationId,
       tenantId: principal.tenantId,
       userId: principal.userId,
       role: 'assistant',
-      text: 'Confirmation accepted. Write execution will run in write phase rollout.',
+      text: `Confirmation accepted. Executed write action: ${execution.tool}.`,
       resultType: 'confirmation',
       metadata: {
-        actionId: confirmedAction.actionId,
-        tool: confirmedAction.toolName,
+        actionId: execution.actionId,
+        tool: execution.tool,
+        status: execution.status,
         executionId: randomUUID(),
       },
     });
@@ -419,7 +426,7 @@ export class AssistantService {
       actionId: confirmedAction.actionId,
       conversationId: confirmedAction.conversationId,
       status: 'confirmed',
-      message: 'Action confirmed and queued for write-phase executor.',
+      message: `Action confirmed and executed: ${execution.tool}.`,
     };
   }
 }
