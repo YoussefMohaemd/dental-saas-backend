@@ -394,6 +394,30 @@ export class AssistantService {
       },
     });
 
+    const effectiveCapabilities = new Set(resolveRoleCapabilities(principal.roles));
+    const tool = this.dependencies.toolRegistry.get(confirmedAction.toolName);
+    try {
+      this.dependencies.permissionGuard.assertCapabilities(
+        effectiveCapabilities,
+        tool.requiredCapabilities,
+        tool.capabilityMatchMode,
+      );
+    } catch (error) {
+      await this.dependencies.auditService.recordEvent({
+        tenantId: principal.tenantId,
+        userId: principal.userId,
+        conversationId: confirmedAction.conversationId,
+        actionId: confirmedAction.actionId,
+        eventType: 'assistant.permission.denied',
+        status: 'denied',
+        details: {
+          tool: confirmedAction.toolName,
+          stage: 'confirm',
+        },
+      });
+      throw error;
+    }
+
     const execution = this.dependencies.actionExecutor.executeConfirmedWriteAction({
       actionId: confirmedAction.actionId,
       toolName: confirmedAction.toolName,

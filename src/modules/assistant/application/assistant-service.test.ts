@@ -218,4 +218,61 @@ describe('AssistantService', () => {
       ),
     ).rejects.toThrow('already confirmed');
   });
+
+  it('re-validates capabilities at confirmation time', async () => {
+    const service = AssistantService.createForTests({
+      providerReply: {
+        reply: 'Preparing update',
+        actions: [
+          {
+            id: 'a1',
+            tool: 'update_order',
+            arguments: { orderId: 'ord-2', status: 'Production' },
+            dependsOn: [],
+          },
+        ],
+      },
+    });
+
+    const conversation = await service.createConversation({
+      tenantId: '66f100000000000000000001',
+      userId: '66f1000000000000000000aa',
+      roles: ['staff'],
+      title: 'Confirm policy',
+    });
+
+    const messageResponse = await service.postMessage(
+      {
+        tenantId: '66f100000000000000000001',
+        userId: '66f1000000000000000000aa',
+        roles: ['staff'],
+      },
+      {
+        conversationId: conversation.id,
+        content: 'Update order status',
+      },
+    );
+
+    if (messageResponse.result.type !== 'confirmation') {
+      throw new Error('Expected confirmation result');
+    }
+    const pending = messageResponse.result.pendingActions[0];
+    if (!pending) {
+      throw new Error('Expected pending action');
+    }
+
+    await expect(
+      service.confirmAction(
+        {
+          tenantId: '66f100000000000000000001',
+          userId: '66f1000000000000000000aa',
+          roles: ['manager'],
+        },
+        {
+          actionId: pending.actionId,
+          confirmationToken: pending.confirmationToken,
+        },
+      ),
+    ).rejects.toThrow('Assistant tool permission denied');
+  });
 });
