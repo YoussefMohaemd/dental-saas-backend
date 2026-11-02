@@ -14,6 +14,6 @@ export interface AssistantLlmCompletionResult {
 }
 
 export interface AssistantLlmProvider {
-  name: 'mock' | 'vllm';
+  name: 'mock' | 'vllm' | 'gemini';
   completePlan(request: AssistantLlmCompletionRequest): Promise<AssistantLlmCompletionResult>;
 }

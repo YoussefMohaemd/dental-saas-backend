@@ -12,6 +12,8 @@ export function createAssistantService(): AssistantService {
     timeoutMs: env.AI_ASSISTANT_TIMEOUT_MS,
     vllmBaseUrl: env.AI_ASSISTANT_VLLM_BASE_URL,
     vllmApiKey: env.AI_ASSISTANT_VLLM_API_KEY,
+    geminiApiKey: env.AI_ASSISTANT_GEMINI_API_KEY,
+    geminiBaseUrl: env.AI_ASSISTANT_GEMINI_BASE_URL,
     plannerPromptVersion: env.AI_ASSISTANT_PLANNER_PROMPT_VERSION,
   });
 
