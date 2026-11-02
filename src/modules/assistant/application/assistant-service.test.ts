@@ -100,4 +100,51 @@ describe('AssistantService', () => {
       ),
     ).rejects.toThrow('Delete operations are blocked');
   });
+
+  it('returns deterministic execution envelope for read actions', async () => {
+    const service = AssistantService.createForTests({
+      providerReply: {
+        reply: 'Here is the matching order.',
+        actions: [
+          {
+            id: 'a1',
+            tool: 'search_orders',
+            arguments: { search: '24580' },
+            dependsOn: [],
+          },
+        ],
+      },
+    });
+
+    const conversation = await service.createConversation({
+      tenantId: '66f100000000000000000001',
+      userId: '66f1000000000000000000aa',
+      roles: ['staff'],
+      title: 'Read execution',
+    });
+
+    const response = await service.postMessage(
+      {
+        tenantId: '66f100000000000000000001',
+        userId: '66f1000000000000000000aa',
+        roles: ['staff'],
+      },
+      {
+        conversationId: conversation.id,
+        content: 'Find order 24580',
+      },
+    );
+
+    expect(response.result.type).toBe('text');
+    if (response.result.type !== 'text') {
+      throw new Error('Expected text result');
+    }
+    expect(response.result.executions).toEqual([
+      {
+        actionId: 'a1',
+        tool: 'search_orders',
+        status: 'executed',
+      },
+    ]);
+  });
 });

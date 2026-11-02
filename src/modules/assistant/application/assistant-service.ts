@@ -7,6 +7,10 @@ import {
 } from '../../../shared/application/errors/application-error';
 import { ActionPlanner } from './action-planner';
 import {
+  AssistantActionExecutor,
+  type AssistantActionExecutionSummary,
+} from './assistant-action-executor';
+import {
   type AssistantAuditRepository,
   type AssistantConversationRepository,
   type AssistantPendingActionRepository,
@@ -45,6 +49,7 @@ interface AssistantServiceDependencies {
   promptCatalogService: PromptCatalogService;
   permissionGuard: PermissionGuard;
   actionPlanner: ActionPlanner;
+  actionExecutor: AssistantActionExecutor;
   conversationService: ConversationService;
   confirmationService: ConfirmationService;
   auditService: AssistantAuditService;
@@ -71,6 +76,7 @@ export interface AssistantMessageResultText {
   type: 'text';
   text: string;
   plannedActions: number;
+  executions: AssistantActionExecutionSummary[];
 }
 
 export interface AssistantMessageResultConfirmation {
@@ -131,6 +137,7 @@ export class AssistantService {
       params.pendingActionRepository,
       params.options.confirmationTtlSeconds,
     );
+    const actionExecutor = new AssistantActionExecutor();
     const auditService = new AssistantAuditService(params.auditRepository);
 
     return new AssistantService({
@@ -139,6 +146,7 @@ export class AssistantService {
       promptCatalogService,
       permissionGuard,
       actionPlanner,
+      actionExecutor,
       conversationService,
       confirmationService,
       auditService,
@@ -261,8 +269,10 @@ export class AssistantService {
     }).actions;
 
     const pendingActions = [];
+    const toolByActionId = new Map<string, ReturnType<AssistantToolRegistry['get']>>();
     for (const action of actions) {
       const tool = this.dependencies.toolRegistry.get(action.tool);
+      toolByActionId.set(action.id, tool);
       this.dependencies.permissionGuard.assertCapabilities(
         effectiveCapabilities,
         tool.requiredCapabilities,
@@ -292,6 +302,7 @@ export class AssistantService {
       }
     }
 
+    const executions = this.dependencies.actionExecutor.executeReadActions(actions, toolByActionId);
     const result: AssistantMessageResult =
       pendingActions.length > 0
         ? {
@@ -307,6 +318,7 @@ export class AssistantService {
               llmCompletion.reply ||
               buildReadOnlyFallbackText(actions),
             plannedActions: actions.length,
+            executions,
           };
 
     const assistantMessage = await this.dependencies.conversationService.appendMessage({
