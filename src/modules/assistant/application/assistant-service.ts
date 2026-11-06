@@ -6,6 +6,11 @@ import {
   ApplicationError,
 } from '../../../shared/application/errors/application-error';
 import { ActionPlanner } from './action-planner';
+import { formatExecutionsAsMarkdown } from './assistant-result-formatter';
+import {
+  type AssistantCatalogRepository,
+  EmptyAssistantCatalogRepository,
+} from './assistant-catalog';
 import {
   AssistantActionExecutor,
   type AssistantActionExecutionSummary,
@@ -32,6 +37,8 @@ import { type AssistantPlanAction } from '../domain/assistant.types';
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 import { type OrdersService } from '../../orders/application/orders-service';
 import { type PatientService } from '../../patients/application/patient-service';
+import { type DoctorService } from '../../doctors/application/doctor-service';
+import { type ClinicService } from '../../clinics/application/clinic-service';
 
 interface AssistantOptions {
   maxActionsPerMessage: number;
@@ -125,6 +132,8 @@ export class AssistantService {
       auditRepository,
       ordersService: new NoopOrdersServiceForTests() as unknown as OrdersService,
       patientService: new NoopPatientsServiceForTests() as unknown as PatientService,
+      doctorService: {} as unknown as DoctorService,
+      clinicService: {} as unknown as ClinicService,
       options: {
         maxActionsPerMessage: 8,
         maxPlanningRounds: 4,
@@ -141,6 +150,9 @@ export class AssistantService {
     auditRepository: AssistantAuditRepository;
     ordersService: OrdersService;
     patientService: PatientService;
+    doctorService: DoctorService;
+    clinicService: ClinicService;
+    catalogRepository?: AssistantCatalogRepository;
     options: AssistantOptions;
   }): AssistantService {
     const promptCatalogService = new PromptCatalogService();
@@ -157,6 +169,9 @@ export class AssistantService {
     const actionExecutor = new AssistantActionExecutor({
       ordersService: params.ordersService,
       patientService: params.patientService,
+      doctorService: params.doctorService,
+      clinicService: params.clinicService,
+      catalogRepository: params.catalogRepository ?? new EmptyAssistantCatalogRepository(),
     });
     const auditService = new AssistantAuditService(params.auditRepository);
 
@@ -299,16 +314,12 @@ export class AssistantService {
     });
 
     const effectiveCapabilities = new Set(resolveRoleCapabilities(principal.roles));
-    const llmCompletion = await this.dependencies.provider.completePlan({
-      userMessage: content,
-      systemPrompt: buildSystemPrompt(),
-      tools: this.dependencies.toolRegistry.list(),
-      languageHint: detectLanguageHint(content),
-    });
+    const llmCompletion = await this.completePlanWithFallback(content);
 
+    const plannedActions = applyCatalogFallbackActions(content, llmCompletion.actions);
     const actions = this.dependencies.actionPlanner.validatePlan({
-      intent: llmCompletion.actions.length > 1 ? 'multiple_actions' : 'single_action',
-      actions: llmCompletion.actions,
+      intent: plannedActions.length > 1 ? 'multiple_actions' : 'single_action',
+      actions: plannedActions,
     }).actions;
 
     const pendingActions = [];
@@ -343,10 +354,12 @@ export class AssistantService {
           },
         });
       }
+
     }
 
     const executions = await this.dependencies.actionExecutor.executeReadActions(actions, toolByActionId, {
       scope: principal.scope,
+      tenantId: principal.tenantId,
     });
     const result: AssistantMessageResult =
       pendingActions.length > 0
@@ -359,9 +372,7 @@ export class AssistantService {
           }
         : {
             type: 'text',
-            text:
-              llmCompletion.reply ||
-              buildReadOnlyFallbackText(actions),
+            text: composeReadReply(llmCompletion.reply, executions, actions),
             plannedActions: actions.length,
             executions,
           };
@@ -406,6 +417,33 @@ export class AssistantService {
       messageId: assistantMessage.id,
       result,
     };
+  }
+
+  private async completePlanWithFallback(
+    content: string,
+  ): Promise<AssistantLlmCompletionResult> {
+    try {
+      return await this.dependencies.provider.completePlan({
+        userMessage: content,
+        systemPrompt: buildSystemPrompt(),
+        tools: this.dependencies.toolRegistry.list(),
+        languageHint: detectLanguageHint(content),
+      });
+    } catch (error) {
+      if (!isAssistantTimeoutError(error)) {
+        throw error;
+      }
+
+      const fallbackActions = buildTimeoutFallbackActions(content);
+      if (fallbackActions.length === 0) {
+        throw error;
+      }
+
+      return {
+        reply: 'Model timed out, so I used direct data tools.',
+        actions: fallbackActions,
+      };
+    }
   }
 
   public async confirmAction(
@@ -469,15 +507,17 @@ export class AssistantService {
       payload: confirmedAction.payload,
       context: {
         scope: principal.scope,
+        tenantId: principal.tenantId,
       },
     });
+    const confirmationText = buildWriteConfirmationText(execution);
 
     await this.dependencies.conversationService.appendMessage({
       conversationId: confirmedAction.conversationId,
       tenantId: principal.tenantId,
       userId: principal.userId,
       role: 'assistant',
-      text: `Confirmation accepted. Executed write action: ${execution.tool}.`,
+      text: confirmationText,
       resultType: 'confirmation',
       metadata: {
         actionId: execution.actionId,
@@ -498,7 +538,7 @@ export class AssistantService {
       actionId: confirmedAction.actionId,
       conversationId: confirmedAction.conversationId,
       status: 'confirmed',
-      message: `Action confirmed and executed: ${execution.tool}.`,
+      message: confirmationText,
     };
   }
 }
@@ -547,6 +587,20 @@ class NoopPatientsServiceForTests {
   }
 }
 
+function composeReadReply(
+  reply: string,
+  executions: Parameters<typeof formatExecutionsAsMarkdown>[0],
+  actions: AssistantPlanAction[],
+): string {
+  const data = formatExecutionsAsMarkdown(executions);
+  const intro = reply.trim();
+  if (data.length === 0) {
+    return intro || buildReadOnlyFallbackText(actions);
+  }
+
+  return intro ? `${intro}\n\n${data}` : data;
+}
+
 function buildReadOnlyFallbackText(actions: AssistantPlanAction[]): string {
   if (actions.length === 0) {
     return 'No executable actions were planned for this message.';
@@ -567,12 +621,169 @@ function detectLanguageHint(content: string): 'ar' | 'en' | 'mixed' {
 
 function buildSystemPrompt(): string {
   return [
-    'You are Dental SaaS assistant.',
+    'You are the Dental SaaS assistant for a dental laboratory platform.',
+    'Reply in the same language the user writes in (Arabic, English or mixed).',
     'Never execute delete operations.',
     'Respect authenticated user capabilities and tenant scope.',
+    'NEVER invent company facts, services, prices, orders, patients, doctors or clinics. All of them come from tools.',
+    'For questions about the company, call get_company_info. For services or prices, call list_services.',
+    'All authenticated users can call list_services and get_company_info.',
+    'For orders, patients, doctors or clinics, call the matching search/details tool.',
+    'When creating a patient, you may pass clinicName/doctorName if ids are unavailable; the system can auto-resolve or create missing clinic/doctor with safe defaults.',
+    'The system appends the tool results to your reply automatically, so keep "reply" to one short sentence and do not repeat or retype the data.',
+    'If the request needs no tool (greeting, general help), answer briefly in "reply" with an empty actions array.',
     'Return strict JSON object: {"reply":string,"actions":[{"id":string,"tool":string,"arguments":object,"dependsOn":string[]}]}',
     'Do not include chain of thought.',
   ].join('\n');
+}
+
+function applyCatalogFallbackActions(
+  content: string,
+  actions: AssistantPlanAction[],
+): AssistantPlanAction[] {
+  if (actions.some((action) => action.tool === 'list_services')) {
+    return actions;
+  }
+
+  if (!isServiceCatalogQuery(content)) {
+    return actions;
+  }
+
+  return [
+    ...actions,
+    {
+      id: 'auto-list-services',
+      tool: 'list_services',
+      arguments: {},
+      dependsOn: [],
+    },
+  ];
+}
+
+function isServiceCatalogQuery(content: string): boolean {
+  const normalized = content.toLowerCase();
+  return (
+    normalized.includes('service') ||
+    normalized.includes('services') ||
+    normalized.includes('price') ||
+    normalized.includes('pricing') ||
+    /[\u0600-\u06FF]/u.test(content) &&
+      (content.includes('خدم') || content.includes('سعر'))
+  );
+}
+
+function isAssistantTimeoutError(error: unknown): boolean {
+  return (
+    error instanceof ApplicationError &&
+    error.statusCode === 504 &&
+    error.message.toLowerCase().includes('timed out')
+  );
+}
+
+function buildTimeoutFallbackActions(content: string): AssistantPlanAction[] {
+  const orderCode = content.match(/[A-Z]{2,}-\d{3,}/i)?.[0];
+  if (orderCode && isOrderDetailsQuery(content)) {
+    return [
+      {
+        id: 'fallback-order-details',
+        tool: 'get_order_details',
+        arguments: { orderId: orderCode },
+        dependsOn: [],
+      },
+    ];
+  }
+
+  const doctorName = extractDoctorName(content);
+  if (doctorName) {
+    return [
+      {
+        id: 'fallback-search-orders-doctor',
+        tool: 'search_orders',
+        arguments: { search: doctorName },
+        dependsOn: [],
+      },
+    ];
+  }
+
+  if (orderCode) {
+    return [
+      {
+        id: 'fallback-search-orders-code',
+        tool: 'search_orders',
+        arguments: { search: orderCode },
+        dependsOn: [],
+      },
+    ];
+  }
+
+  if (isServiceCatalogQuery(content)) {
+    return [
+      {
+        id: 'fallback-list-services',
+        tool: 'list_services',
+        arguments: {},
+        dependsOn: [],
+      },
+    ];
+  }
+
+  return [];
+}
+
+function isOrderDetailsQuery(content: string): boolean {
+  const normalized = content.toLowerCase();
+  return (
+    normalized.includes('show data') ||
+    normalized.includes('order details') ||
+    normalized.includes('details for order') ||
+    content.includes('بيانات') ||
+    content.includes('تفاصيل')
+  );
+}
+
+function extractDoctorName(content: string): string | null {
+  const latinDoctor = content.match(/(?:doctor|dr\.?|دكتور)\s+([A-Za-z][A-Za-z\s'-]{1,80})/i)?.[1];
+  if (latinDoctor) {
+    return latinDoctor.trim();
+  }
+
+  return null;
+}
+
+function buildWriteConfirmationText(
+  execution: AssistantActionExecutionSummary,
+): string {
+  if (execution.tool === 'create_patient') {
+    const result = execution.result as
+      | {
+          patient?: { id?: string; name?: string };
+          provisioning?: {
+            createdDoctor?: { id: string; name: string };
+            createdClinic?: { id: string; name: string };
+          };
+        }
+      | undefined;
+    const lines = ['✅ Patient has been created successfully.'];
+    if (result?.patient?.name) {
+      lines.push(`- **Patient:** ${result.patient.name}`);
+    }
+    if (result?.patient?.id) {
+      lines.push(`- **Patient ID:** \`${result.patient.id}\``);
+    }
+    if (result?.provisioning?.createdClinic) {
+      lines.push(
+        `- **New clinic created:** ${result.provisioning.createdClinic.name} (\`${result.provisioning.createdClinic.id}\`)`,
+      );
+    }
+    if (result?.provisioning?.createdDoctor) {
+      lines.push(
+        `- **New doctor created:** ${result.provisioning.createdDoctor.name} (\`${result.provisioning.createdDoctor.id}\`)`,
+      );
+    }
+    return lines.join('\n');
+  }
+
+  return `Action confirmed and executed: ${execution.tool}.`;
 }
 
 function toConversationView(record: {

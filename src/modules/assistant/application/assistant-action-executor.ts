@@ -6,6 +6,11 @@ import {
   ApplicationError,
 } from '../../../shared/application/errors/application-error';
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
+import { type ClinicService } from '../../clinics/application/clinic-service';
+import { type DoctorService } from '../../doctors/application/doctor-service';
+import { createClinicBodySchema } from '../../clinics/presentation/clinics.schemas';
+import { createDoctorBodySchema } from '../../doctors/presentation/doctors.schemas';
+import { createPatientBodySchema } from '../../patients/presentation/patients.schemas';
 import { type OrdersService } from '../../orders/application/orders-service';
 import { type PatientService } from '../../patients/application/patient-service';
 import {
@@ -13,6 +18,7 @@ import {
   ORDER_LIST_SORT_FIELDS,
   ORDER_STATUS_VALUES,
 } from '../../orders/domain/order';
+import { type AssistantCatalogRepository } from './assistant-catalog';
 import { type AssistantPlanAction, type AssistantToolDefinition } from '../domain/assistant.types';
 
 export interface AssistantActionExecutionSummary {
@@ -25,11 +31,40 @@ export interface AssistantActionExecutionSummary {
 interface AssistantActionExecutorDependencies {
   ordersService: OrdersService;
   patientService: PatientService;
+  doctorService: DoctorService;
+  clinicService: ClinicService;
+  catalogRepository: AssistantCatalogRepository;
 }
 
 interface AssistantExecutionContext {
   scope: DataVisibilityScope;
+  tenantId: string;
 }
+
+const emptyArgsSchema = z.object({}).strict();
+
+const searchClinicsArgsSchema = z
+  .object({
+    search: z.string().trim().min(1).optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    pageSize: z.coerce.number().int().min(1).max(100).optional(),
+  })
+  .strict();
+
+const searchDoctorsArgsSchema = z
+  .object({
+    search: z.string().trim().min(1).optional(),
+    clinicId: z.string().trim().min(1).optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    pageSize: z.coerce.number().int().min(1).max(100).optional(),
+  })
+  .strict();
+
+const createEntityArgsSchema = z
+  .object({
+    payload: z.record(z.string(), z.unknown()),
+  })
+  .strict();
 
 const paginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -86,6 +121,31 @@ const updateOrderArgsSchema = z
     payload: z.record(z.string(), z.unknown()),
   })
   .strict();
+const objectIdRegex = /^[a-f0-9]{24}$/i;
+const createPatientAssistantPayloadSchema = z
+  .object({
+    name: z.string().trim().min(1),
+    dob: z.coerce.date(),
+    gender: z.enum(['M', 'F']),
+    phone: z.string().trim().min(1),
+    email: z.string().trim().email().transform((value) => value.toLowerCase()),
+    clinicId: z.string().trim().min(1).optional(),
+    clinicName: z.string().trim().min(1).optional(),
+    clinicCity: z.string().trim().min(1).optional(),
+    clinicAddress: z.string().trim().min(1).optional(),
+    clinicPhone: z.string().trim().min(1).optional(),
+    clinicEmail: z.string().trim().email().transform((value) => value.toLowerCase()).optional(),
+    accountManager: z.string().trim().min(1).optional(),
+    doctorId: z.string().trim().min(1).optional(),
+    doctorName: z.string().trim().min(1).optional(),
+    doctorSpecialty: z.string().trim().min(1).optional(),
+    doctorPhone: z.string().trim().min(1).optional(),
+    doctorEmail: z.string().trim().email().transform((value) => value.toLowerCase()).optional(),
+    doctorGender: z.enum(['M', 'F']).optional(),
+    status: z.enum(['Active', 'Inactive']).default('Active'),
+    lastVisit: z.coerce.date().optional(),
+  })
+  .strict();
 
 export class AssistantActionExecutor {
   public constructor(private readonly dependencies: AssistantActionExecutorDependencies) {}
@@ -127,6 +187,14 @@ export class AssistantActionExecutor {
 
     if (input.toolName === 'update_order') {
       return this.executeUpdateOrder(input);
+    }
+
+    if (
+      input.toolName === 'create_patient' ||
+      input.toolName === 'create_doctor' ||
+      input.toolName === 'create_clinic'
+    ) {
+      return this.executeCreateEntity(input);
     }
 
     throw new ApplicationError({
@@ -175,7 +243,11 @@ export class AssistantActionExecutor {
         action.arguments,
         action.tool,
       );
-      const result = await this.dependencies.ordersService.getOrderById(args.orderId, context.scope);
+      const resolvedOrderId = await this.resolveOrderIdForDetails(args.orderId, context);
+      const result = await this.dependencies.ordersService.getOrderById(
+        resolvedOrderId,
+        context.scope,
+      );
       return {
         actionId: action.id,
         tool: action.tool,
@@ -227,6 +299,59 @@ export class AssistantActionExecutor {
       };
     }
 
+    if (action.tool === 'list_services') {
+      this.parseStrictToolArgs(emptyArgsSchema, action.arguments, action.tool);
+      const services = await this.dependencies.catalogRepository.listServices(context.tenantId);
+      return { actionId: action.id, tool: action.tool, status: 'executed', result: { services } };
+    }
+
+    if (action.tool === 'get_company_info') {
+      this.parseStrictToolArgs(emptyArgsSchema, action.arguments, action.tool);
+      const profile = await this.dependencies.catalogRepository.getCompanyProfile(context.tenantId);
+      return { actionId: action.id, tool: action.tool, status: 'executed', result: { profile } };
+    }
+
+    if (action.tool === 'search_clinics') {
+      const args = this.parseStrictToolArgs(searchClinicsArgsSchema, action.arguments, action.tool);
+      const result = await this.dependencies.clinicService.listClinics(
+        {
+          scope: context.scope,
+          ...(args.search ? { search: args.search } : {}),
+          sortBy: 'name',
+          sortDirection: 'asc',
+          statuses: [],
+        },
+        this.resolvePagination({ page: args.page, pageSize: args.pageSize }),
+      );
+      return {
+        actionId: action.id,
+        tool: action.tool,
+        status: 'executed',
+        result: { items: result.items, meta: result.meta },
+      };
+    }
+
+    if (action.tool === 'search_doctors') {
+      const args = this.parseStrictToolArgs(searchDoctorsArgsSchema, action.arguments, action.tool);
+      const result = await this.dependencies.doctorService.listDoctors(
+        {
+          scope: context.scope,
+          ...(args.search ? { search: args.search } : {}),
+          ...(args.clinicId ? { clinicId: args.clinicId } : {}),
+          sortBy: 'name',
+          sortDirection: 'asc',
+          statuses: [],
+        },
+        this.resolvePagination({ page: args.page, pageSize: args.pageSize }),
+      );
+      return {
+        actionId: action.id,
+        tool: action.tool,
+        status: 'executed',
+        result: { items: result.items, meta: result.meta },
+      };
+    }
+
     throw new ApplicationError({
       message: 'Read action is not supported by assistant executor',
       statusCode: 400,
@@ -234,6 +359,68 @@ export class AssistantActionExecutor {
       expose: true,
       details: { tool: action.tool },
     });
+  }
+
+  private async executeCreateEntity(input: {
+    actionId: string;
+    toolName: string;
+    payload: Record<string, unknown>;
+    context: AssistantExecutionContext;
+  }): Promise<AssistantActionExecutionSummary> {
+    const args = this.parseStrictToolArgs(createEntityArgsSchema, input.payload, input.toolName);
+    const { scope } = input.context;
+
+    if (input.toolName === 'create_patient') {
+      const payload = this.parseStrictToolArgs(
+        createPatientAssistantPayloadSchema,
+        args.payload,
+        'create_patient.payload',
+      );
+      const { clinicId, createdClinic } = await this.resolveClinicForPatientPayload(payload, scope);
+      const { doctorId, createdDoctor } = await this.resolveDoctorForPatientPayload(
+        payload,
+        clinicId,
+        scope,
+      );
+      const body = this.parseStrictToolArgs(
+        createPatientBodySchema,
+        {
+          name: payload.name,
+          dob: payload.dob,
+          gender: payload.gender,
+          phone: payload.phone,
+          email: payload.email,
+          clinicId,
+          doctorId,
+          status: payload.status,
+          lastVisit: payload.lastVisit ?? new Date(),
+        },
+        'create_patient.payload',
+      );
+      const result = await this.dependencies.patientService.createPatient(body, scope);
+      return {
+        actionId: input.actionId,
+        tool: input.toolName,
+        status: 'executed',
+        result: {
+          patient: result,
+          provisioning: {
+            ...(createdClinic ? { createdClinic } : {}),
+            ...(createdDoctor ? { createdDoctor } : {}),
+          },
+        },
+      };
+    }
+
+    if (input.toolName === 'create_doctor') {
+      const body = this.parseStrictToolArgs(createDoctorBodySchema, args.payload, 'create_doctor.payload');
+      const result = await this.dependencies.doctorService.createDoctor(body, scope);
+      return { actionId: input.actionId, tool: input.toolName, status: 'executed', result };
+    }
+
+    const body = this.parseStrictToolArgs(createClinicBodySchema, args.payload, 'create_clinic.payload');
+    const result = await this.dependencies.clinicService.createClinic(body, scope);
+    return { actionId: input.actionId, tool: input.toolName, status: 'executed', result };
   }
 
   private async executeCreateOrder(input: {
@@ -292,6 +479,40 @@ export class AssistantActionExecutor {
       page: parsed.page,
       pageSize: parsed.pageSize,
     };
+  }
+
+  private async resolveOrderIdForDetails(
+    orderIdOrNumber: string,
+    context: AssistantExecutionContext,
+  ): Promise<string> {
+    if (objectIdRegex.test(orderIdOrNumber)) {
+      return orderIdOrNumber;
+    }
+
+    const candidates = await this.dependencies.ordersService.listOrders(
+      {
+        scope: context.scope,
+        search: orderIdOrNumber,
+        sortBy: 'createdAt',
+        sortDirection: 'desc',
+        statuses: [],
+        serviceIds: [],
+      },
+      { page: 1, pageSize: 20 },
+    );
+    const exactMatch = candidates.items.find(
+      (item) => item.orderNumber.toLowerCase() === orderIdOrNumber.toLowerCase(),
+    );
+    if (exactMatch) {
+      return exactMatch.id;
+    }
+
+    throw new ApplicationError({
+      message: `Order '${orderIdOrNumber}' was not found`,
+      statusCode: 404,
+      code: APPLICATION_ERROR_CODES.NOT_FOUND,
+      expose: true,
+    });
   }
 
   private parseCreateOrderPayload(payload: Record<string, unknown>) {
@@ -441,6 +662,118 @@ export class AssistantActionExecutor {
       },
     });
   }
+
+  private async resolveClinicForPatientPayload(
+    payload: z.infer<typeof createPatientAssistantPayloadSchema>,
+    scope: DataVisibilityScope,
+  ): Promise<{ clinicId: string; createdClinic?: { id: string; name: string } }> {
+    if (payload.clinicId) {
+      return { clinicId: payload.clinicId };
+    }
+
+    if (!payload.clinicName) {
+      throw new ApplicationError({
+        message: 'create_patient requires clinicId or clinicName',
+        statusCode: 400,
+        code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+        expose: true,
+      });
+    }
+
+    const clinics = await this.dependencies.clinicService.listClinics(
+      {
+        scope,
+        search: payload.clinicName,
+        sortBy: 'name',
+        sortDirection: 'asc',
+        statuses: [],
+      },
+      { page: 1, pageSize: 20 },
+    );
+    const exact = clinics.items.find(
+      (clinic) => clinic.name.toLowerCase() === payload.clinicName?.toLowerCase(),
+    );
+    if (exact) {
+      return { clinicId: exact.id };
+    }
+
+    const created = await this.dependencies.clinicService.createClinic(
+      {
+        name: payload.clinicName,
+        address: payload.clinicAddress ?? `Address pending for ${payload.clinicName}`,
+        city: payload.clinicCity ?? 'Unknown',
+        phone: payload.clinicPhone ?? '+200000000000',
+        email:
+          payload.clinicEmail ??
+          buildPlaceholderEmail(payload.clinicName, 'clinic'),
+        status: 'Active',
+        accountManager: payload.accountManager ?? 'AI Assistant',
+      },
+      scope,
+    );
+    return {
+      clinicId: created.id,
+      createdClinic: { id: created.id, name: created.name },
+    };
+  }
+
+  private async resolveDoctorForPatientPayload(
+    payload: z.infer<typeof createPatientAssistantPayloadSchema>,
+    clinicId: string,
+    scope: DataVisibilityScope,
+  ): Promise<{ doctorId: string; createdDoctor?: { id: string; name: string } }> {
+    if (payload.doctorId) {
+      return { doctorId: payload.doctorId };
+    }
+
+    if (!payload.doctorName) {
+      throw new ApplicationError({
+        message: 'create_patient requires doctorId or doctorName',
+        statusCode: 400,
+        code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+        expose: true,
+      });
+    }
+
+    const doctors = await this.dependencies.doctorService.listDoctors(
+      {
+        scope,
+        search: payload.doctorName,
+        clinicId,
+        sortBy: 'name',
+        sortDirection: 'asc',
+        statuses: [],
+      },
+      { page: 1, pageSize: 20 },
+    );
+    const exact = doctors.items.find(
+      (doctor) => doctor.name.toLowerCase() === payload.doctorName?.toLowerCase(),
+    );
+    if (exact) {
+      return { doctorId: exact.id };
+    }
+
+    const created = await this.dependencies.doctorService.createDoctor(
+      {
+        name: payload.doctorName,
+        clinicId,
+        specialty: payload.doctorSpecialty ?? 'General Dentistry',
+        email:
+          payload.doctorEmail ??
+          buildPlaceholderEmail(payload.doctorName, 'doctor'),
+        phone: payload.doctorPhone ?? '+200000000000',
+        gender: payload.doctorGender ?? 'M',
+        status: 'Active',
+        joinedDate: new Date(),
+        avatar: '',
+      },
+      scope,
+    );
+    return {
+      doctorId: created.id,
+      createdDoctor: { id: created.id, name: created.name },
+    };
+  }
 }
 
 function containsDeleteOperation(toolName: string): boolean {
@@ -451,4 +784,13 @@ function stripUndefined<T extends Record<string, unknown>>(value: T): T {
   return Object.fromEntries(
     Object.entries(value).filter(([, propertyValue]) => propertyValue !== undefined),
   ) as T;
+}
+
+function buildPlaceholderEmail(name: string, kind: 'clinic' | 'doctor'): string {
+  const normalized = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  const suffix = Date.now().toString().slice(-6);
+  return `${kind}-${normalized || 'entity'}-${suffix}@autogen.example.com`;
 }

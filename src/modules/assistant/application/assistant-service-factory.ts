@@ -6,6 +6,11 @@ import { MongooseAssistantPendingActionRepository } from '../infrastructure/pers
 import { createAssistantLlmProvider } from '../infrastructure/providers/llm-provider-factory';
 import { OrdersService } from '../../orders/application/orders-service';
 import { MongooseOrdersRepository } from '../../orders/infrastructure/mongoose-orders-repository';
+import { ClinicService } from '../../clinics/application/clinic-service';
+import { MongooseClinicRepository } from '../../clinics/infrastructure/mongoose-clinic-repository';
+import { DoctorService } from '../../doctors/application/doctor-service';
+import { MongooseDoctorRepository } from '../../doctors/infrastructure/mongoose-doctor-repository';
+import { MongooseAssistantCatalogRepository } from '../infrastructure/persistence/mongoose/mongoose-assistant-catalog-repository';
 import { PatientService } from '../../patients/application/patient-service';
 import { MongoosePatientRepository } from '../../patients/infrastructure/mongoose-patient-repository';
 
@@ -28,6 +33,9 @@ export function createAssistantService(): AssistantService {
     auditRepository: new MongooseAssistantAuditRepository(),
     ordersService: new OrdersService(new MongooseOrdersRepository()),
     patientService: new PatientService(new MongoosePatientRepository()),
+    doctorService: new DoctorService(new MongooseDoctorRepository()),
+    clinicService: new ClinicService(new MongooseClinicRepository()),
+    catalogRepository: new MongooseAssistantCatalogRepository(),
     options: {
       maxActionsPerMessage: env.AI_ASSISTANT_MAX_ACTIONS_PER_MESSAGE,
       maxPlanningRounds: env.AI_ASSISTANT_MAX_PLANNING_ROUNDS,

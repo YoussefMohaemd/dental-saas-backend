@@ -1,6 +1,10 @@
 import { Types } from 'mongoose';
 import { describe, expect, it } from 'vitest';
 
+import {
+  APPLICATION_ERROR_CODES,
+  ApplicationError,
+} from '../../../shared/application/errors/application-error';
 import { AssistantService } from './assistant-service';
 
 function principal(roles: string[]) {
@@ -237,5 +241,229 @@ describe('AssistantService', () => {
         confirmationToken: pending.confirmationToken,
       }),
     ).rejects.toThrow('Assistant tool permission denied');
+  });
+
+  it('forces list_services execution when user asks for services/prices and model returns no actions', async () => {
+    const service = AssistantService.create({
+      provider: {
+        name: 'mock',
+        completePlan: async () => ({
+          reply: 'Here is what I can help with.',
+          actions: [],
+        }),
+      },
+      conversationRepository: {
+        create: async () => ({
+          conversationId: 'conv-1',
+          tenantId: '66f100000000000000000001',
+          userId: '66f1000000000000000000aa',
+          title: 'New conversation',
+          status: 'active',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          messages: [
+            {
+              id: 'welcome',
+              role: 'assistant',
+              text: 'Welcome',
+              resultType: 'text',
+              createdAt: new Date(),
+            },
+          ],
+        }),
+        findOwnedConversation: async () => ({
+          conversationId: 'conv-1',
+          tenantId: '66f100000000000000000001',
+          userId: '66f1000000000000000000aa',
+          title: 'New conversation',
+          status: 'active',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          messages: [],
+        }),
+        appendMessage: async () => undefined,
+        listOwnedConversations: async () => [],
+        updateStatus: async () => undefined,
+      },
+      pendingActionRepository: {
+        create: async () => {
+          throw new Error('not used in this test');
+        },
+        findOwnedPendingAction: async () => null,
+        markConfirmed: async () => undefined,
+      },
+      auditRepository: {
+        create: async () => undefined,
+      },
+      ordersService: {
+        listOrders: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        getOrderById: async () => ({}),
+      } as never,
+      patientService: {
+        listPatients: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        getPatientById: async () => ({}),
+      } as never,
+      doctorService: {
+        listDoctors: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+      } as never,
+      clinicService: {
+        listClinics: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+      } as never,
+      catalogRepository: {
+        listServices: async () => [
+          {
+            serviceId: 'svc-1',
+            name: 'Implant Planning',
+            description: 'Digital planning service',
+            basePrice: 450,
+            turnaroundDays: 5,
+            scanRequirements: [],
+          },
+        ],
+        getCompanyProfile: async () => null,
+      },
+      options: {
+        maxActionsPerMessage: 8,
+        maxPlanningRounds: 4,
+        maxInputChars: 4000,
+        confirmationTtlSeconds: 900,
+      },
+    });
+
+    const conversation = await service.createConversation({
+      tenantId: '66f100000000000000000001',
+      userId: '66f1000000000000000000aa',
+      roles: ['admin'],
+    });
+
+    const response = await service.postMessage(principal(['admin']), {
+      conversationId: conversation.id,
+      content: 'show all services and prices',
+    });
+
+    expect(response.result.type).toBe('text');
+    if (response.result.type !== 'text') {
+      throw new Error('Expected text response');
+    }
+    expect(response.result.plannedActions).toBe(1);
+    expect(response.result.executions[0]?.tool).toBe('list_services');
+    expect(response.result.text).toContain('Implant Planning');
+  });
+
+  it('falls back to deterministic order search when model times out', async () => {
+    const service = AssistantService.create({
+      provider: {
+        name: 'groq',
+        completePlan: async () => {
+          throw new ApplicationError({
+            message: 'Assistant model request timed out',
+            statusCode: 504,
+            code: APPLICATION_ERROR_CODES.INTERNAL_ERROR,
+            expose: true,
+          });
+        },
+      },
+      conversationRepository: {
+        create: async () => ({
+          conversationId: 'conv-2',
+          tenantId: '66f100000000000000000001',
+          userId: '66f1000000000000000000aa',
+          title: 'New conversation',
+          status: 'active',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          messages: [
+            {
+              id: 'welcome',
+              role: 'assistant',
+              text: 'Welcome',
+              resultType: 'text',
+              createdAt: new Date(),
+            },
+          ],
+        }),
+        findOwnedConversation: async () => ({
+          conversationId: 'conv-2',
+          tenantId: '66f100000000000000000001',
+          userId: '66f1000000000000000000aa',
+          title: 'New conversation',
+          status: 'active',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          messages: [],
+        }),
+        appendMessage: async () => undefined,
+        listOwnedConversations: async () => [],
+        updateStatus: async () => undefined,
+      },
+      pendingActionRepository: {
+        create: async () => {
+          throw new Error('not used in this test');
+        },
+        findOwnedPendingAction: async () => null,
+        markConfirmed: async () => undefined,
+      },
+      auditRepository: {
+        create: async () => undefined,
+      },
+      ordersService: {
+        listOrders: async () => ({
+          items: [
+            {
+              id: '66f100000000000000000123',
+              orderNumber: 'DL-026015',
+              patientName: 'Sara Ahmed',
+              doctorName: 'Omar Khalil',
+              clinicName: 'Downtown Clinic',
+              status: 'Review',
+              restoration: 'Crown',
+              amount: 900,
+              dueDate: '2026-11-20T00:00:00.000Z',
+            },
+          ],
+          meta: { totalItems: 1, page: 1, pageSize: 20, totalPages: 1 },
+        }),
+        getOrderById: async () => ({}),
+      } as never,
+      patientService: {
+        listPatients: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        getPatientById: async () => ({}),
+      } as never,
+      doctorService: {
+        listDoctors: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+      } as never,
+      clinicService: {
+        listClinics: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+      } as never,
+      catalogRepository: {
+        listServices: async () => [],
+        getCompanyProfile: async () => null,
+      },
+      options: {
+        maxActionsPerMessage: 8,
+        maxPlanningRounds: 4,
+        maxInputChars: 4000,
+        confirmationTtlSeconds: 900,
+      },
+    });
+
+    const conversation = await service.createConversation({
+      tenantId: '66f100000000000000000001',
+      userId: '66f1000000000000000000aa',
+      roles: ['admin'],
+    });
+
+    const response = await service.postMessage(principal(['admin']), {
+      conversationId: conversation.id,
+      content: 'هاتلي الاوردرات الي عند دكتور Omar Khalil',
+    });
+
+    expect(response.result.type).toBe('text');
+    if (response.result.type !== 'text') {
+      throw new Error('Expected text response');
+    }
+    expect(response.result.plannedActions).toBe(1);
+    expect(response.result.executions[0]?.tool).toBe('search_orders');
+    expect(response.result.text).toContain('DL-026015');
   });
 });

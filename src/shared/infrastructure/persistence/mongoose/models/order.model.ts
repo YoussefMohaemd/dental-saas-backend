@@ -44,6 +44,7 @@ const orderSchema = new Schema(
     patientId: objectIdRef('Patient'),
     doctorId: objectIdRef('Doctor'),
     clinicId: objectIdRef('Clinic'),
+    createdBy: objectIdRef('User'),
     scanCenterId: {
       type: String,
       trim: true,
@@ -165,6 +166,7 @@ orderSchema.index({ tenantId: 1, status: 1, priority: 1, dueDate: 1 });
 orderSchema.index({ tenantId: 1, patientId: 1, receivedAt: -1 });
 orderSchema.index({ tenantId: 1, clinicId: 1, updatedAt: -1 });
 orderSchema.index({ tenantId: 1, technicianId: 1, status: 1 });
+orderSchema.index({ tenantId: 1, createdBy: 1, updatedAt: -1 });
 
 export const OrderModel: Model<any> =
   (models.Order as Model<any> | undefined) ?? model('Order', orderSchema);

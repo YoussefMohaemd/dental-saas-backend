@@ -1,0 +1,12 @@
+{
+  "name": "<company name>",
+  "about": "<short company overview>",
+  "email": "<contact email>",
+  "phone": "<phone>",
+  "address": "<address>",
+  "workingHours": "<e.g. Sun-Thu 9:00-17:00>",
+  "submissionStandards": [
+    "<standard 1>",
+    "<standard 2>"
+  ]
+}

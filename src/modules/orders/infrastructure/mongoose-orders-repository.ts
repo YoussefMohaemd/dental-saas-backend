@@ -60,6 +60,7 @@ export class MongooseOrdersRepository implements OrderRepository {
     const created = await orderModel.create({
       ...this.toOrderDocumentPayload(payload),
       tenantId: scope.tenantId,
+      createdBy: scope.userId,
     });
     return this.toOrder(created.toObject());
   }
@@ -949,7 +950,9 @@ function buildOrderOwnershipFilter(scope: DataVisibilityScope): Record<string, u
   }
 
   if (scope.isDoctor && scope.doctorId) {
-    return { doctorId: scope.doctorId };
+    return {
+      $or: [{ doctorId: scope.doctorId }, { createdBy: scope.userId }],
+    };
   }
 
   if (scope.isTechnician) {
