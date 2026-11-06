@@ -142,30 +142,54 @@ export class MongooseOrdersRepository implements OrderRepository {
     orderId: string,
     scope: DataVisibilityScope,
   ): Promise<boolean> {
-    return runInTransaction(async (session) => {
-      const deleted = await orderModel
-        .findOneAndDelete({
-          _id: orderId,
-          tenantId: scope.tenantId,
-          ...orderScopeFilter(scope),
-        })
-        .session(session)
-        .exec();
+    return runInTransactionWithFallback(
+      async (session) => {
+        const deleted = await orderModel
+          .findOneAndDelete({
+            _id: orderId,
+            tenantId: scope.tenantId,
+            ...orderScopeFilter(scope),
+          })
+          .session(session)
+          .exec();
 
-      if (!deleted) {
-        return false;
-      }
+        if (!deleted) {
+          return false;
+        }
 
-      await subOrderModel
-        .deleteMany({
-          tenantId: scope.tenantId,
-          orderId: new Types.ObjectId(orderId),
-        })
-        .session(session)
-        .exec();
+        await subOrderModel
+          .deleteMany({
+            tenantId: scope.tenantId,
+            orderId: new Types.ObjectId(orderId),
+          })
+          .session(session)
+          .exec();
 
-      return true;
-    });
+        return true;
+      },
+      async () => {
+        const deleted = await orderModel
+          .findOneAndDelete({
+            _id: orderId,
+            tenantId: scope.tenantId,
+            ...orderScopeFilter(scope),
+          })
+          .exec();
+
+        if (!deleted) {
+          return false;
+        }
+
+        await subOrderModel
+          .deleteMany({
+            tenantId: scope.tenantId,
+            orderId: new Types.ObjectId(orderId),
+          })
+          .exec();
+
+        return true;
+      },
+    );
   }
 
   public async isOrderNumberTaken(
@@ -408,28 +432,51 @@ export class MongooseOrdersRepository implements OrderRepository {
     payloads: SubOrderWritePayload[],
     scope: DataVisibilityScope,
   ): Promise<SubOrder[]> {
-    return runInTransaction(async (session) => {
-      await subOrderModel
-        .deleteMany({
-          tenantId: scope.tenantId,
-          orderId: new Types.ObjectId(orderId),
-        })
-        .session(session)
-        .exec();
+    return runInTransactionWithFallback(
+      async (session) => {
+        await subOrderModel
+          .deleteMany({
+            tenantId: scope.tenantId,
+            orderId: new Types.ObjectId(orderId),
+          })
+          .session(session)
+          .exec();
 
-      if (payloads.length === 0) {
-        return [];
-      }
+        if (payloads.length === 0) {
+          return [];
+        }
 
-      const created = await subOrderModel.insertMany(
-        payloads.map((payload) => ({
-          ...this.toSubOrderDocumentPayload(orderId, payload),
-          tenantId: scope.tenantId,
-        })),
-        { ordered: true, session },
-      );
-      return created.map((item) => this.toSubOrder(item.toObject() as SubOrderRecord));
-    });
+        const created = await subOrderModel.insertMany(
+          payloads.map((payload) => ({
+            ...this.toSubOrderDocumentPayload(orderId, payload),
+            tenantId: scope.tenantId,
+          })),
+          { ordered: true, session },
+        );
+        return created.map((item) => this.toSubOrder(item.toObject() as SubOrderRecord));
+      },
+      async () => {
+        await subOrderModel
+          .deleteMany({
+            tenantId: scope.tenantId,
+            orderId: new Types.ObjectId(orderId),
+          })
+          .exec();
+
+        if (payloads.length === 0) {
+          return [];
+        }
+
+        const created = await subOrderModel.insertMany(
+          payloads.map((payload) => ({
+            ...this.toSubOrderDocumentPayload(orderId, payload),
+            tenantId: scope.tenantId,
+          })),
+          { ordered: true },
+        );
+        return created.map((item) => this.toSubOrder(item.toObject() as SubOrderRecord));
+      },
+    );
   }
 
   public async updateSubOrder(
@@ -937,6 +984,35 @@ async function runInTransaction<T>(work: (session: ClientSession) => Promise<T>)
   } finally {
     await session.endSession();
   }
+}
+
+async function runInTransactionWithFallback<T>(
+  work: (session: ClientSession) => Promise<T>,
+  fallback: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await runInTransaction(work);
+  } catch (error) {
+    if (isTransactionUnsupportedError(error)) {
+      return fallback();
+    }
+
+    throw error;
+  }
+}
+
+function isTransactionUnsupportedError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const maybeCode = (error as { code?: unknown }).code;
+  const maybeCodeName = (error as { codeName?: unknown }).codeName;
+  return (
+    maybeCode === 20 &&
+    maybeCodeName === 'IllegalOperation' &&
+    error.message.includes('Transaction numbers are only allowed on a replica set member or mongos')
+  );
 }
 
 function uniqueObjectIds(ids: string[]): Types.ObjectId[] {

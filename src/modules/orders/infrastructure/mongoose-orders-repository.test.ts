@@ -1,13 +1,22 @@
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { findOneAndUpdateMock } = vi.hoisted(() => ({
+const { findOneAndUpdateMock, findOneAndDeleteMock, deleteManyMock } = vi.hoisted(() => ({
   findOneAndUpdateMock: vi.fn(),
+  findOneAndDeleteMock: vi.fn(),
+  deleteManyMock: vi.fn(),
 }));
 
 vi.mock('../../../shared/infrastructure/persistence/mongoose/models/order.model', () => ({
   OrderModel: {
     findOneAndUpdate: findOneAndUpdateMock,
+    findOneAndDelete: findOneAndDeleteMock,
+  },
+}));
+
+vi.mock('../../../shared/infrastructure/persistence/mongoose/models/sub-order.model', () => ({
+  SubOrderModel: {
+    deleteMany: deleteManyMock,
   },
 }));
 
@@ -62,6 +71,46 @@ describe('MongooseOrdersRepository status-precondition filter', () => {
     const { filter } = capturedFindOneAndUpdateCall();
     expect(filter).not.toHaveProperty('status');
   });
+
+  it('falls back to non-transactional delete when MongoDB transactions are unsupported', async () => {
+    const scope = adminScope();
+    const repository = new MongooseOrdersRepository();
+
+    const transactionError = Object.assign(
+      new Error('Transaction numbers are only allowed on a replica set member or mongos'),
+      { code: 20, codeName: 'IllegalOperation' },
+    );
+
+    const orderDeleteExecMock = vi
+      .fn()
+      .mockRejectedValueOnce(transactionError)
+      .mockResolvedValueOnce({ _id: orderId });
+    const subOrderDeleteExecMock = vi.fn().mockResolvedValue({ acknowledged: true, deletedCount: 2 });
+
+    findOneAndDeleteMock.mockImplementation(() => ({
+      session: () => ({ exec: orderDeleteExecMock }),
+      exec: orderDeleteExecMock,
+    }));
+    deleteManyMock.mockImplementation(() => ({
+      session: () => ({ exec: subOrderDeleteExecMock }),
+      exec: subOrderDeleteExecMock,
+    }));
+
+    const withTransaction = vi.fn(async (work: () => Promise<void>) => {
+      await work();
+    });
+    const endSession = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(mongoose, 'startSession').mockResolvedValue({
+      withTransaction,
+      endSession,
+    } as never);
+
+    await expect(repository.deleteOrderWithSubOrders(orderId, scope)).resolves.toBe(true);
+    expect(withTransaction).toHaveBeenCalledTimes(1);
+    expect(endSession).toHaveBeenCalledTimes(1);
+    expect(findOneAndDeleteMock).toHaveBeenCalledTimes(2);
+    expect(deleteManyMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 function adminScope(): DataVisibilityScope {
@@ -92,9 +141,22 @@ function capturedFindOneAndUpdateCall(): CapturedFindOneAndUpdateCall {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.restoreAllMocks();
   findOneAndUpdateMock.mockImplementation(() => ({
     lean: () => ({
       exec: () => Promise.resolve(null),
     }),
+  }));
+  findOneAndDeleteMock.mockImplementation(() => ({
+    session: () => ({
+      exec: () => Promise.resolve({ _id: orderId }),
+    }),
+    exec: () => Promise.resolve({ _id: orderId }),
+  }));
+  deleteManyMock.mockImplementation(() => ({
+    session: () => ({
+      exec: () => Promise.resolve({ acknowledged: true, deletedCount: 0 }),
+    }),
+    exec: () => Promise.resolve({ acknowledged: true, deletedCount: 0 }),
   }));
 });
