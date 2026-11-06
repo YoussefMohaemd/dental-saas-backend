@@ -19,6 +19,7 @@ export interface AssistantPlan {
 export interface AssistantToolDefinition {
   name: string;
   description: string;
+  argumentsHint: string;
   operationType: AssistantOperationType;
   requiredCapabilities: DentalCapability[];
   capabilityMatchMode: CapabilityMatchMode;

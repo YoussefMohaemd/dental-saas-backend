@@ -8,6 +8,7 @@ const WINDOW_MS = env.AUTH_RATE_LIMIT_WINDOW_SECONDS * 1000;
 const MAX_ATTEMPTS_PER_IP = env.AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_IP;
 const MAX_ATTEMPTS_PER_ACCOUNT = env.AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_ACCOUNT;
 const MIN_DATE = new Date(0);
+const RATE_LIMIT_STORE_TIMEOUT_MS = 750;
 
 export const authRateLimit: RequestHandler = async (req, res, next) => {
   try {
@@ -70,7 +71,7 @@ async function incrementRateLimitCounter(
   now: Date,
   resetAt: Date,
 ): Promise<{ count: number; resetAt: Date } | null> {
-  return AuthRateLimitModel.findOneAndUpdate(
+  const queryPromise = AuthRateLimitModel.findOneAndUpdate(
     { key },
     [
       {
@@ -94,6 +95,8 @@ async function incrementRateLimitCounter(
     .select({ count: 1, resetAt: 1 })
     .lean<{ count: number; resetAt: Date } | null>()
     .exec();
+
+  return withTimeout(queryPromise, RATE_LIMIT_STORE_TIMEOUT_MS, 'Rate-limit store timeout');
 }
 
 function buildIpRateLimitKey(req: Request): string {
@@ -132,4 +135,25 @@ function extractBodyString(value: unknown, field: string): string | undefined {
 
   const normalized = raw.trim().toLowerCase();
   return normalized.length > 0 ? normalized : undefined;
+}
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  timeoutMessage: string,
+): Promise<T> {
+  let timeoutHandle: NodeJS.Timeout | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(() => {
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
+  }
 }

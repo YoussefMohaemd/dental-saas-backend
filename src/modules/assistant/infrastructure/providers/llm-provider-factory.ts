@@ -1,16 +1,16 @@
 import { type AssistantLlmProvider } from '../../application/llm-provider';
-import { GeminiAssistantLlmProvider } from './gemini-llm-provider';
+import { GroqAssistantLlmProvider } from './groq-llm-provider';
 import { MockAssistantLlmProvider } from './mock-llm-provider';
 import { VllmAssistantLlmProvider } from './vllm-llm-provider';
 
 export interface AssistantLlmProviderConfig {
-  provider: 'mock' | 'vllm' | 'gemini';
+  provider: 'mock' | 'vllm' | 'groq';
   model: string;
   timeoutMs: number;
   vllmBaseUrl: string;
   vllmApiKey: string | undefined;
-  geminiApiKey: string | undefined;
-  geminiBaseUrl: string | undefined;
+  groqApiKey: string | undefined;
+  groqBaseUrl: string | undefined;
   plannerPromptVersion: string;
 }
 
@@ -30,12 +30,17 @@ export function createAssistantLlmProvider(
     });
   }
 
-  if (config.provider === 'gemini') {
-    return new GeminiAssistantLlmProvider({
+
+  if (config.provider === 'groq') {
+    if (!config.groqApiKey) {
+      throw new Error('Groq provider requires AI_ASSISTANT_GROQ_API_KEY');
+    }
+
+    return new GroqAssistantLlmProvider({
       model: config.model,
       timeoutMs: config.timeoutMs,
-      ...(config.geminiApiKey ? { apiKey: config.geminiApiKey } : {}),
-      ...(config.geminiBaseUrl ? { baseUrl: config.geminiBaseUrl } : {}),
+      apiKey: config.groqApiKey,
+      ...(config.groqBaseUrl ? { baseUrl: config.groqBaseUrl } : {}),
     });
   }
 

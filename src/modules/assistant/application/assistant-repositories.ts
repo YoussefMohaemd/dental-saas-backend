@@ -33,6 +33,11 @@ export interface AssistantConversationRepository {
     tenantId: string;
     userId: string;
   }): Promise<AssistantConversationRecord | null>;
+  listOwnedConversations(params: {
+    tenantId: string;
+    userId: string;
+    limit: number;
+  }): Promise<AssistantConversationRecord[]>;
   appendMessage(params: {
     conversationId: string;
     tenantId: string;

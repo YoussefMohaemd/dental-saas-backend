@@ -50,6 +50,23 @@ export class MongooseAssistantConversationRepository implements AssistantConvers
     return toConversationRecord(found);
   }
 
+  public async listOwnedConversations(params: {
+    tenantId: string;
+    userId: string;
+    limit: number;
+  }): Promise<AssistantConversationRecord[]> {
+    const rows = await AssistantConversationModel.find({
+      tenantId: new Types.ObjectId(params.tenantId),
+      userId: new Types.ObjectId(params.userId),
+    })
+      .sort({ updatedAt: -1 })
+      .limit(params.limit)
+      .lean<AssistantConversationPersistence[]>()
+      .exec();
+
+    return rows.map((row) => toConversationRecord(row));
+  }
+
   public async appendMessage(params: {
     conversationId: string;
     tenantId: string;
@@ -96,16 +113,30 @@ function toConversationRecord(
     userId: raw.userId.toHexString(),
     title: raw.title,
     status: raw.status,
-    messages: raw.messages.map((message): AssistantConversationMessageRecord => ({
-      id: message.id,
-      role: message.role,
-      text: message.text,
-      createdAt: new Date(message.createdAt),
-      resultType: normalizeResultType(message.resultType),
-      ...(isRecord(message.metadata) ? { metadata: message.metadata } : {}),
-    })),
+    messages: raw.messages.map((message) => toConversationMessageRecord(message)),
     createdAt: new Date(raw.createdAt),
     updatedAt: new Date(raw.updatedAt),
+  };
+}
+
+function toConversationMessageRecord(rawMessage: unknown): AssistantConversationMessageRecord {
+  const message = rawMessage as {
+    id: unknown;
+    role: unknown;
+    text: unknown;
+    createdAt: unknown;
+    resultType: unknown;
+    metadata?: unknown;
+  };
+  const metadata = normalizeMetadata(message.metadata);
+
+  return {
+    id: String(message.id),
+    role: message.role === 'assistant' ? 'assistant' : 'user',
+    text: String(message.text),
+    createdAt: new Date(String(message.createdAt)),
+    resultType: normalizeResultType(String(message.resultType)),
+    ...(metadata ? { metadata } : {}),
   };
 }
 
@@ -130,4 +161,8 @@ function normalizeResultType(value: string): AssistantConversationMessageRecord[
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function normalizeMetadata(value: unknown): Record<string, unknown> | undefined {
+  return isRecord(value) ? value : undefined;
 }

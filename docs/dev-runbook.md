@@ -80,6 +80,9 @@ The Postman collection uses the Platform Admin account by default. Run
 ownership filtering. The `Advance order workflow (New to Review)` request
 demonstrates the valid status transition; subsequent transitions must follow
 the order `Review`, `Design`, `Production`, `Quality Check`, `Ready`, `Completed`.
+For assistant and AI alias endpoints, create a conversation first, then set
+`conversationId` and (when required) `actionId` from responses before running
+message/confirmation requests.
 
 ## 5) Quality and build checks
 

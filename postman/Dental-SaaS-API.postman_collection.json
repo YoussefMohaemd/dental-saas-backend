@@ -162,6 +162,21 @@
       "value": "d25a4c612bc50eac2fe6fd7f",
       "type": "string",
       "description": "Seeded doctor user used by user-management examples."
+    },
+    {
+      "key": "conversationId",
+      "value": "",
+      "description": "Assistant conversation id returned from create conversation requests."
+    },
+    {
+      "key": "actionId",
+      "value": "",
+      "description": "Assistant action id returned from assistant message responses."
+    },
+    {
+      "key": "assistantPrompt",
+      "value": "Summarize pending dental orders for today",
+      "description": "Prompt text used for assistant message requests."
     }
   ],
   "item": [
@@ -186,8 +201,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "login"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ],
               "query": [],
               "variable": []
             },
@@ -246,8 +267,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "login"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ],
               "query": [],
               "variable": []
             },
@@ -297,8 +324,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/auth/refresh",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "refresh"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "refresh"
+              ],
               "query": [],
               "variable": []
             },
@@ -319,8 +352,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/auth/logout",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "logout"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ],
               "query": [],
               "variable": []
             },
@@ -347,8 +386,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/auth/me",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "me"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "me"
+              ],
               "query": [],
               "variable": []
             },
@@ -375,12 +420,480 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/auth/sessions/revoke",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "sessions", "revoke"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "sessions",
+                "revoke"
+              ],
               "query": [],
               "variable": []
             },
             "description": "Required roles: admin."
+          },
+          "response": []
+        },
+        {
+          "name": "Change current user password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "password"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Changes password for the authenticated user.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"{{adminPassword}}\",\n  \"newPassword\": \"ChangeMe123!New\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "assistant",
+      "item": [
+        {
+          "name": "Get assistant suggestions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assistant/suggestions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assistant",
+                "suggestions"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Returns assistant suggestions."
+          },
+          "response": []
+        },
+        {
+          "name": "List assistant conversations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assistant/conversations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assistant",
+                "conversations"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Lists assistant conversations."
+          },
+          "response": []
+        },
+        {
+          "name": "Create assistant conversation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assistant/conversations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assistant",
+                "conversations"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Creates a new assistant conversation.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman assistant chat\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get assistant conversation",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assistant/conversations/{{conversationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assistant",
+                "conversations",
+                "{{conversationId}}"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Gets assistant conversation details by id."
+          },
+          "response": []
+        },
+        {
+          "name": "Send assistant message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assistant/conversations/{{conversationId}}/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assistant",
+                "conversations",
+                "{{conversationId}}",
+                "messages"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Posts a message to an assistant conversation.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"{{assistantPrompt}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm assistant action",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assistant/actions/{{actionId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assistant",
+                "actions",
+                "{{actionId}}",
+                "confirm"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Confirms an assistant action requiring explicit approval."
+          },
+          "response": []
+        },
+        {
+          "name": "Get AI suggestions (alias)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/suggestions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "suggestions"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Alias endpoint for assistant suggestions."
+          },
+          "response": []
+        },
+        {
+          "name": "List AI conversations (alias)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/conversations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "conversations"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Alias endpoint for listing assistant conversations."
+          },
+          "response": []
+        },
+        {
+          "name": "Create AI conversation (alias)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/conversations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "conversations"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Alias endpoint for creating assistant conversations.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman assistant chat alias\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get AI conversation (alias)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/conversations/{{conversationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "conversations",
+                "{{conversationId}}"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Alias endpoint for assistant conversation details."
+          },
+          "response": []
+        },
+        {
+          "name": "Send AI message (alias)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/conversations/{{conversationId}}/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "conversations",
+                "{{conversationId}}",
+                "messages"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Alias endpoint for posting assistant messages.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"{{assistantPrompt}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm AI action (alias)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/actions/{{actionId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "actions",
+                "{{actionId}}",
+                "confirm"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Alias endpoint for confirming assistant actions."
           },
           "response": []
         }
@@ -408,8 +921,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/billing",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "billing"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing"
+              ],
               "query": [
                 {
                   "key": "search",
@@ -478,8 +997,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/billing/:recordId",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "billing", ":recordId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                ":recordId"
+              ],
               "query": [],
               "variable": [
                 {
@@ -516,8 +1042,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/billing/:recordId",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "billing", ":recordId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                ":recordId"
+              ],
               "query": [],
               "variable": [
                 {
@@ -563,8 +1096,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/cases",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "cases"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cases"
+              ],
               "query": [
                 {
                   "key": "search",
@@ -623,8 +1162,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/cases/:caseId",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "cases", ":caseId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cases",
+                ":caseId"
+              ],
               "query": [],
               "variable": [
                 {
@@ -634,6 +1180,48 @@
               ]
             },
             "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Create case",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cases",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cases"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Creates a new case using the cases.create schema.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"caseNumber\": \"CASE-1001\",\n  \"title\": \"Initial restorative treatment plan\",\n  \"patientId\": \"{{patientId}}\",\n  \"doctorId\": \"{{doctorId}}\",\n  \"clinicId\": \"{{clinicId}}\",\n  \"status\": \"Open\",\n  \"priority\": \"Normal\",\n  \"notes\": \"Created from Postman collection.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
           },
           "response": []
         }
@@ -661,8 +1249,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/change-requests",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "change-requests"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "change-requests"
+              ],
               "query": [
                 {
                   "key": "search",
@@ -721,8 +1315,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/change-requests/:requestId",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "change-requests", ":requestId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "change-requests",
+                ":requestId"
+              ],
               "query": [],
               "variable": [
                 {
@@ -759,8 +1360,16 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/change-requests/:requestId/status",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "change-requests", ":requestId", "status"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "change-requests",
+                ":requestId",
+                "status"
+              ],
               "query": [],
               "variable": [
                 {
@@ -806,8 +1415,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/clinics",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "clinics"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clinics"
+              ],
               "query": [
                 {
                   "key": "search",
@@ -865,8 +1480,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/clinics",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "clinics"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clinics"
+              ],
               "query": [],
               "variable": []
             },
@@ -902,8 +1523,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/clinics/:clinicId",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "clinics", ":clinicId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clinics",
+                ":clinicId"
+              ],
               "query": [],
               "variable": [
                 {
@@ -940,8 +1568,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/clinics/:clinicId",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "clinics", ":clinicId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clinics",
+                ":clinicId"
+              ],
               "query": [],
               "variable": [
                 {
@@ -982,8 +1617,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/clinics/:clinicId",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "clinics", ":clinicId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clinics",
+                ":clinicId"
+              ],
               "query": [],
               "variable": [
                 {
@@ -1020,8 +1662,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/doctors",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "doctors"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "doctors"
+              ],
               "query": [
                 {
                   "key": "search",
@@ -1079,8 +1727,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/doctors",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "doctors"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "doctors"
+              ],
               "query": [],
               "variable": []
             },
@@ -1116,8 +1770,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/doctors/:doctorId",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "doctors", ":doctorId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "doctors",
+                ":doctorId"
+              ],
               "query": [],
               "variable": [
                 {
@@ -1154,8 +1815,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/doctors/:doctorId",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "doctors", ":doctorId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "doctors",
+                ":doctorId"
+              ],
               "query": [],
               "variable": [
                 {
@@ -1196,8 +1864,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/doctors/:doctorId",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "doctors", ":doctorId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "doctors",
+                ":doctorId"
+              ],
               "query": [],
               "variable": [
                 {
@@ -1234,8 +1909,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/documents",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "documents"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "documents"
+              ],
               "query": [
                 {
                   "key": "search",
@@ -1293,8 +1974,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/documents",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "documents"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "documents"
+              ],
               "query": [],
               "variable": []
             },
@@ -1330,8 +2017,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/documents/:documentId",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "documents", ":documentId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "documents",
+                ":documentId"
+              ],
               "query": [],
               "variable": [
                 {
@@ -1363,8 +2057,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/documents/:documentId",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "documents", ":documentId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "documents",
+                ":documentId"
+              ],
               "query": [],
               "variable": [
                 {
@@ -1395,8 +2096,13 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/health",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "health"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ],
               "query": [],
               "variable": []
             },
@@ -1434,8 +2140,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/notifications",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "notifications"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications"
+              ],
               "query": [
                 {
                   "key": "search",
@@ -1505,8 +2217,16 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/notifications/:notificationId/read",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "notifications", ":notificationId", "read"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                ":notificationId",
+                "read"
+              ],
               "query": [],
               "variable": [
                 {
@@ -1544,8 +2264,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/notifications/read-all",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "notifications", "read-all"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "read-all"
+              ],
               "query": [],
               "variable": []
             },
@@ -1577,8 +2304,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/orders",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "orders"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders"
+              ],
               "query": [
                 {
                   "key": "search",
@@ -1636,8 +2369,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/orders",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "orders"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders"
+              ],
               "query": [],
               "variable": []
             },
@@ -1673,8 +2412,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/orders/:orderId",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "orders", ":orderId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                ":orderId"
+              ],
               "query": [],
               "variable": [
                 {
@@ -1711,8 +2457,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/orders/:orderId",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "orders", ":orderId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                ":orderId"
+              ],
               "query": [],
               "variable": [
                 {
@@ -1753,8 +2506,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/orders/:orderId",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "orders", ":orderId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                ":orderId"
+              ],
               "query": [],
               "variable": [
                 {
@@ -1791,8 +2551,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/patients",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "patients"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "patients"
+              ],
               "query": [
                 {
                   "key": "search",
@@ -1850,8 +2616,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/patients",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "patients"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "patients"
+              ],
               "query": [],
               "variable": []
             },
@@ -1887,8 +2659,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/patients/:patientId",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "patients", ":patientId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "patients",
+                ":patientId"
+              ],
               "query": [],
               "variable": [
                 {
@@ -1925,8 +2704,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/patients/:patientId",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "patients", ":patientId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "patients",
+                ":patientId"
+              ],
               "query": [],
               "variable": [
                 {
@@ -1967,8 +2753,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/patients/:patientId",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "patients", ":patientId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "patients",
+                ":patientId"
+              ],
               "query": [],
               "variable": [
                 {
@@ -2005,8 +2798,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/dashboard/volume",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "dashboard", "volume"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "dashboard",
+                "volume"
+              ],
               "query": [],
               "variable": []
             },
@@ -2033,8 +2833,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/reports/overview",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "reports", "overview"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "overview"
+              ],
               "query": [],
               "variable": []
             },
@@ -2061,8 +2868,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/reports/orders-range",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "reports", "orders-range"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "orders-range"
+              ],
               "query": [
                 {
                   "key": "search",
@@ -2125,8 +2939,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/reports/quarterly-targets",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "reports", "quarterly-targets"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "quarterly-targets"
+              ],
               "query": [
                 {
                   "key": "year",
@@ -2164,8 +2985,17 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/reports/quarterly-targets/:year/:quarter",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "reports", "quarterly-targets", ":year", ":quarter"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "quarterly-targets",
+                ":year",
+                ":quarter"
+              ],
               "query": [],
               "variable": [
                 {
@@ -2201,12 +3031,90 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/reports/team-performance",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "reports", "team-performance"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "team-performance"
+              ],
               "query": [],
               "variable": []
             },
             "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get reporting seed payload",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reports/seed",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "seed"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Returns seed values helpful for running report requests."
+          },
+          "response": []
+        },
+        {
+          "name": "Get sub-orders report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reports/sub-orders?from={{from}}&to={{to}}&status={{status}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "sub-orders"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "{{from}}"
+                },
+                {
+                  "key": "to",
+                  "value": "{{to}}"
+                },
+                {
+                  "key": "status",
+                  "value": "{{status}}"
+                }
+              ],
+              "variable": []
+            },
+            "description": "Returns sub-orders reporting data with optional date/status filters."
           },
           "response": []
         }
@@ -2234,8 +3142,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/scan-centers",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "scan-centers"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "scan-centers"
+              ],
               "query": [
                 {
                   "key": "search",
@@ -2288,8 +3202,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/scan-centers/:scanCenterId",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "scan-centers", ":scanCenterId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "scan-centers",
+                ":scanCenterId"
+              ],
               "query": [],
               "variable": [
                 {
@@ -2320,8 +3241,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/settings/reference-data",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "settings", "reference-data"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "settings",
+                "reference-data"
+              ],
               "query": [
                 {
                   "key": "include",
@@ -2333,6 +3261,78 @@
               "variable": []
             },
             "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get current user preferences",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/settings/preferences",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "settings",
+                "preferences"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Returns persisted preferences for the authenticated user."
+          },
+          "response": []
+        },
+        {
+          "name": "Update current user preferences",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/settings/preferences",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "settings",
+                "preferences"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Updates persisted preferences for the authenticated user.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"density\": \"Default\",\n  \"theme\": \"dark\",\n  \"language\": \"en\",\n  \"timeZone\": \"Africa/Cairo\",\n  \"dateFormat\": \"YYYY-MM-DD\",\n  \"notificationPrefs\": {\n    \"orderUpdates\": true,\n    \"changeRequests\": true,\n    \"billingAlerts\": true,\n    \"systemAlerts\": true,\n    \"weeklySummary\": false\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
           },
           "response": []
         }
@@ -2360,8 +3360,16 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/orders/:orderId/sub-orders",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "orders", ":orderId", "sub-orders"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                ":orderId",
+                "sub-orders"
+              ],
               "query": [],
               "variable": [
                 {
@@ -2398,8 +3406,16 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/orders/:orderId/sub-orders",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "orders", ":orderId", "sub-orders"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                ":orderId",
+                "sub-orders"
+              ],
               "query": [],
               "variable": [
                 {
@@ -2445,8 +3461,16 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/orders/:orderId/sub-orders",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "orders", ":orderId", "sub-orders"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                ":orderId",
+                "sub-orders"
+              ],
               "query": [],
               "variable": [
                 {
@@ -2487,8 +3511,17 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/orders/:orderId/sub-orders/:subOrderId",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "orders", ":orderId", "sub-orders", ":subOrderId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                ":orderId",
+                "sub-orders",
+                ":subOrderId"
+              ],
               "query": [],
               "variable": [
                 {
@@ -2529,8 +3562,17 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/orders/:orderId/sub-orders/:subOrderId",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "orders", ":orderId", "sub-orders", ":subOrderId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                ":orderId",
+                "sub-orders",
+                ":subOrderId"
+              ],
               "query": [],
               "variable": [
                 {
@@ -2575,8 +3617,17 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/orders/:orderId/sub-orders/:subOrderId",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "orders", ":orderId", "sub-orders", ":subOrderId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                ":orderId",
+                "sub-orders",
+                ":subOrderId"
+              ],
               "query": [],
               "variable": [
                 {
@@ -2623,8 +3674,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/users",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "users"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ],
               "query": [
                 {
                   "key": "search",
@@ -2688,8 +3745,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/users",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "users"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ],
               "query": [],
               "variable": []
             },
@@ -2731,8 +3794,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/:userId",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "users", ":userId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                ":userId"
+              ],
               "query": [],
               "variable": [
                 {
@@ -2775,8 +3845,16 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/:userId/role-status",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "users", ":userId", "role-status"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                ":userId",
+                "role-status"
+              ],
               "query": [],
               "variable": [
                 {
@@ -2823,8 +3901,16 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/:userId/deactivate",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "users", ":userId", "deactivate"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                ":userId",
+                "deactivate"
+              ],
               "query": [],
               "variable": [
                 {
@@ -2862,8 +3948,16 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/:userId/reactivate",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "users", ":userId", "reactivate"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                ":userId",
+                "reactivate"
+              ],
               "query": [],
               "variable": [
                 {

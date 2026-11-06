@@ -54,7 +54,7 @@ async function loadRateLimitMiddleware(params?: {
     },
   }));
 
-  const module = await import('./auth-rate-limit');
+  const module = await import('./auth-rate-limit.js');
   return {
     authRateLimit: module.authRateLimit,
     findOneAndUpdate,
@@ -81,7 +81,8 @@ describe('authRateLimit middleware', () => {
 
     expect(findOneAndUpdate).toHaveBeenCalledTimes(1);
     expect(next).toHaveBeenCalledWith();
-    expect(res.status).not.toHaveBeenCalled();
+    const responseView = res as unknown as { status: { mock: { calls: unknown[] } } };
+    expect(responseView.status.mock.calls.length).toBe(0);
   });
 
   it('fails open when the rate-limit store is unavailable', async () => {
@@ -106,7 +107,8 @@ describe('authRateLimit middleware', () => {
     await authRateLimit(req, res, next);
 
     expect(next).toHaveBeenCalledWith();
-    expect(res.status).not.toHaveBeenCalled();
+    const responseView = res as unknown as { status: { mock: { calls: unknown[] } } };
+    expect(responseView.status.mock.calls.length).toBe(0);
     expect(loggerWarn).toHaveBeenCalledTimes(1);
   });
 });

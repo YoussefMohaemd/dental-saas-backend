@@ -14,6 +14,12 @@ export const assistantCreateConversationBodySchema = z
   })
   .strict();
 
+export const assistantListConversationsQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+  })
+  .strict();
+
 export const assistantMessageBodySchema = z
   .object({
     content: z.string().trim().min(1).max(4_000),

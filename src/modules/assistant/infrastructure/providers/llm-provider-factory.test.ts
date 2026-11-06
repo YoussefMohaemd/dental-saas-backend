@@ -10,8 +10,8 @@ describe('createAssistantLlmProvider', () => {
       timeoutMs: 15_000,
       vllmBaseUrl: 'http://localhost:8000/v1',
       vllmApiKey: undefined,
-      geminiApiKey: undefined,
-      geminiBaseUrl: undefined,
+      groqApiKey: undefined,
+      groqBaseUrl: undefined,
       plannerPromptVersion: 'v1',
     });
 
@@ -26,8 +26,8 @@ describe('createAssistantLlmProvider', () => {
         timeoutMs: 15_000,
         vllmBaseUrl: 'http://localhost:8000/v1',
         vllmApiKey: undefined,
-        geminiApiKey: undefined,
-        geminiBaseUrl: undefined,
+        groqApiKey: undefined,
+        groqBaseUrl: undefined,
         plannerPromptVersion: 'v1',
       }),
     ).toThrow('Unsupported assistant LLM provider');
@@ -40,8 +40,8 @@ describe('createAssistantLlmProvider', () => {
       timeoutMs: 15_000,
       vllmBaseUrl: 'http://localhost:8000/v1',
       vllmApiKey: undefined,
-      geminiApiKey: undefined,
-      geminiBaseUrl: undefined,
+      groqApiKey: undefined,
+      groqBaseUrl: undefined,
       plannerPromptVersion: 'v1',
     });
 
@@ -61,18 +61,34 @@ describe('createAssistantLlmProvider', () => {
     );
   });
 
-  it('builds gemini provider when configured', () => {
+  it('builds groq provider when configured', () => {
     const provider = createAssistantLlmProvider({
-      provider: 'gemini',
-      model: 'gemini-3.8-flash',
+      provider: 'groq',
+      model: 'qwen/qwen3-32b',
       timeoutMs: 15_000,
       vllmBaseUrl: 'http://localhost:8000/v1',
       vllmApiKey: undefined,
-      geminiApiKey: 'test-key',
-      geminiBaseUrl: undefined,
+      groqApiKey: 'test-key',
+      groqBaseUrl: undefined,
       plannerPromptVersion: 'v1',
     });
 
-    expect(provider.name).toBe('gemini');
+    expect(provider.name).toBe('groq');
   });
+
+  it('throws when groq provider is configured without API key', () => {
+    expect(() =>
+      createAssistantLlmProvider({
+        provider: 'groq',
+        model: 'qwen/qwen3-32b',
+        timeoutMs: 15_000,
+        vllmBaseUrl: 'http://localhost:8000/v1',
+        vllmApiKey: undefined,
+        groqApiKey: undefined,
+        groqBaseUrl: undefined,
+        plannerPromptVersion: 'v1',
+      }),
+    ).toThrow('Groq provider requires AI_ASSISTANT_GROQ_API_KEY');
+  });
+
 });

@@ -52,6 +52,14 @@ export class ConversationService {
     });
   }
 
+  public listOwnedConversations(params: {
+    tenantId: string;
+    userId: string;
+    limit: number;
+  }): Promise<AssistantConversationRecord[]> {
+    return this.conversationRepository.listOwnedConversations(params);
+  }
+
   public async appendMessage(params: {
     conversationId: string;
     tenantId: string;

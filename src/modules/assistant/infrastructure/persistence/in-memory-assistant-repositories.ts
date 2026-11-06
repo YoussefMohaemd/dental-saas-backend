@@ -49,6 +49,19 @@ export class InMemoryAssistantConversationRepository implements AssistantConvers
     return Promise.resolve(cloneConversation(record));
   }
 
+  public listOwnedConversations(params: {
+    tenantId: string;
+    userId: string;
+    limit: number;
+  }): Promise<AssistantConversationRecord[]> {
+    const records = [...this.conversations.values()]
+      .filter((record) => record.tenantId === params.tenantId && record.userId === params.userId)
+      .sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime())
+      .slice(0, params.limit)
+      .map((record) => cloneConversation(record));
+    return Promise.resolve(records);
+  }
+
   public appendMessage(params: {
     conversationId: string;
     tenantId: string;

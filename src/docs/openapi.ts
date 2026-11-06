@@ -168,6 +168,13 @@ const endpoints: EndpointSpec[] = [
   },
   {
     method: 'get',
+    path: '/api/v1/assistant/conversations',
+    tag: 'assistant',
+    summary: 'List assistant conversations',
+    authenticated: true,
+  },
+  {
+    method: 'get',
     path: '/api/v1/assistant/conversations/{conversationId}',
     tag: 'assistant',
     summary: 'Get assistant conversation',
@@ -208,6 +215,13 @@ const endpoints: EndpointSpec[] = [
     requestBody: genericBody(),
     successStatus: 201,
     successDescription: 'Assistant conversation created successfully.',
+  },
+  {
+    method: 'get',
+    path: '/api/v1/ai/conversations',
+    tag: 'assistant',
+    summary: 'List assistant conversations (AI alias)',
+    authenticated: true,
   },
   {
     method: 'get',

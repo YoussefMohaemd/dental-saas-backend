@@ -4,6 +4,10 @@ import { MongooseAssistantAuditRepository } from '../infrastructure/persistence/
 import { MongooseAssistantConversationRepository } from '../infrastructure/persistence/mongoose/mongoose-assistant-conversation-repository';
 import { MongooseAssistantPendingActionRepository } from '../infrastructure/persistence/mongoose/mongoose-assistant-pending-action-repository';
 import { createAssistantLlmProvider } from '../infrastructure/providers/llm-provider-factory';
+import { OrdersService } from '../../orders/application/orders-service';
+import { MongooseOrdersRepository } from '../../orders/infrastructure/mongoose-orders-repository';
+import { PatientService } from '../../patients/application/patient-service';
+import { MongoosePatientRepository } from '../../patients/infrastructure/mongoose-patient-repository';
 
 export function createAssistantService(): AssistantService {
   const provider = createAssistantLlmProvider({
@@ -12,8 +16,8 @@ export function createAssistantService(): AssistantService {
     timeoutMs: env.AI_ASSISTANT_TIMEOUT_MS,
     vllmBaseUrl: env.AI_ASSISTANT_VLLM_BASE_URL,
     vllmApiKey: env.AI_ASSISTANT_VLLM_API_KEY,
-    geminiApiKey: env.AI_ASSISTANT_GEMINI_API_KEY,
-    geminiBaseUrl: env.AI_ASSISTANT_GEMINI_BASE_URL,
+    groqApiKey: env.AI_ASSISTANT_GROQ_API_KEY,
+    groqBaseUrl: env.AI_ASSISTANT_GROQ_BASE_URL,
     plannerPromptVersion: env.AI_ASSISTANT_PLANNER_PROMPT_VERSION,
   });
 
@@ -22,6 +26,8 @@ export function createAssistantService(): AssistantService {
     conversationRepository: new MongooseAssistantConversationRepository(),
     pendingActionRepository: new MongooseAssistantPendingActionRepository(),
     auditRepository: new MongooseAssistantAuditRepository(),
+    ordersService: new OrdersService(new MongooseOrdersRepository()),
+    patientService: new PatientService(new MongoosePatientRepository()),
     options: {
       maxActionsPerMessage: env.AI_ASSISTANT_MAX_ACTIONS_PER_MESSAGE,
       maxPlanningRounds: env.AI_ASSISTANT_MAX_PLANNING_ROUNDS,

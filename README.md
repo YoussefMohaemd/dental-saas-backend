@@ -9,7 +9,7 @@ Production-oriented Node.js (LTS) + TypeScript + Express backend scaffold.
 - `npm run typecheck` - run TypeScript type checks
 - `npm run test` - run Vitest test suite (includes Supertest API integration checks)
 - `npm run build` - compile to `dist/`
-- `npm run start` - run compiled server
+- `npm run start` - build then run compiled server
 - `npm run seed:dev` - seed local development data from backend `seed-data` JSON files (non-production)
 
 ## Environment
@@ -36,10 +36,12 @@ Copy `.env.example` to `.env` and adjust values as needed.
 - `AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_ACCOUNT` maximum login attempts allowed per tenant/email account key in each window (default falls back to `AUTH_RATE_LIMIT_MAX_ATTEMPTS`, then `20`)
 - `AUTH_RATE_LIMIT_MAX_ATTEMPTS` backward-compatible fallback for per-account attempts when `AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_ACCOUNT` is not set
 - `MONGODB_URI` MongoDB connection URI used by app startup and seed script
-- `AI_ASSISTANT_PROVIDER` (`mock` | `vllm`)
-- `AI_ASSISTANT_MODEL` (default `Qwen/Qwen3.5-9B`)
+- `AI_ASSISTANT_PROVIDER` (`mock` | `vllm` | `groq`, default `mock`)
+- `AI_ASSISTANT_MODEL` (default `qwen/qwen3.8-27b`)
 - `AI_ASSISTANT_VLLM_BASE_URL` internal OpenAI-compatible vLLM endpoint (default `http://127.0.0.1:8000/v1`)
 - `AI_ASSISTANT_VLLM_API_KEY` optional internal service token for vLLM gateway
+- `AI_ASSISTANT_GROQ_API_KEY` required when `AI_ASSISTANT_PROVIDER=groq`
+- `AI_ASSISTANT_GROQ_BASE_URL` optional Groq API base URL override
 - `AI_ASSISTANT_TIMEOUT_MS` provider request timeout
 - `AI_ASSISTANT_MAX_ACTIONS_PER_MESSAGE`
 - `AI_ASSISTANT_MAX_PLANNING_ROUNDS`

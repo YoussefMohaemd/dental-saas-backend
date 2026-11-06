@@ -29,6 +29,9 @@ import {
 } from '../infrastructure/persistence/in-memory-assistant-repositories';
 import { MockAssistantLlmProvider } from '../infrastructure/providers/mock-llm-provider';
 import { type AssistantPlanAction } from '../domain/assistant.types';
+import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
+import { type OrdersService } from '../../orders/application/orders-service';
+import { type PatientService } from '../../patients/application/patient-service';
 
 interface AssistantOptions {
   maxActionsPerMessage: number;
@@ -41,6 +44,7 @@ export interface AssistantPrincipalContext {
   tenantId: string;
   userId: string;
   roles: string[];
+  scope: DataVisibilityScope;
 }
 
 interface AssistantServiceDependencies {
@@ -70,6 +74,15 @@ export interface AssistantConversationView {
     createdAt: string;
     metadata?: Record<string, unknown>;
   }>;
+}
+
+export interface AssistantConversationSummaryView {
+  id: string;
+  title: string;
+  status: 'active' | 'pending_confirmation';
+  createdAt: string;
+  updatedAt: string;
+  preview: string;
 }
 
 export interface AssistantMessageResultText {
@@ -110,6 +123,8 @@ export class AssistantService {
       conversationRepository,
       pendingActionRepository,
       auditRepository,
+      ordersService: new NoopOrdersServiceForTests() as unknown as OrdersService,
+      patientService: new NoopPatientsServiceForTests() as unknown as PatientService,
       options: {
         maxActionsPerMessage: 8,
         maxPlanningRounds: 4,
@@ -124,6 +139,8 @@ export class AssistantService {
     conversationRepository: AssistantConversationRepository;
     pendingActionRepository: AssistantPendingActionRepository;
     auditRepository: AssistantAuditRepository;
+    ordersService: OrdersService;
+    patientService: PatientService;
     options: AssistantOptions;
   }): AssistantService {
     const promptCatalogService = new PromptCatalogService();
@@ -137,7 +154,10 @@ export class AssistantService {
       params.pendingActionRepository,
       params.options.confirmationTtlSeconds,
     );
-    const actionExecutor = new AssistantActionExecutor();
+    const actionExecutor = new AssistantActionExecutor({
+      ordersService: params.ordersService,
+      patientService: params.patientService,
+    });
     const auditService = new AssistantAuditService(params.auditRepository);
 
     return new AssistantService({
@@ -185,6 +205,29 @@ export class AssistantService {
     });
 
     return toConversationView(created);
+  }
+
+  public async listConversations(
+    principal: AssistantPrincipalContext,
+    input?: {
+      limit?: number;
+    },
+  ): Promise<AssistantConversationSummaryView[]> {
+    const limit = Math.min(Math.max(input?.limit ?? 25, 1), 100);
+    const records = await this.dependencies.conversationService.listOwnedConversations({
+      tenantId: principal.tenantId,
+      userId: principal.userId,
+      limit,
+    });
+
+    return records.map((record) => ({
+      id: record.conversationId,
+      title: record.title,
+      status: record.status,
+      createdAt: record.createdAt.toISOString(),
+      updatedAt: record.updatedAt.toISOString(),
+      preview: record.messages.at(-1)?.text ?? '',
+    }));
   }
 
   public async getConversation(
@@ -302,7 +345,9 @@ export class AssistantService {
       }
     }
 
-    const executions = this.dependencies.actionExecutor.executeReadActions(actions, toolByActionId);
+    const executions = await this.dependencies.actionExecutor.executeReadActions(actions, toolByActionId, {
+      scope: principal.scope,
+    });
     const result: AssistantMessageResult =
       pendingActions.length > 0
         ? {
@@ -418,10 +463,13 @@ export class AssistantService {
       throw error;
     }
 
-    const execution = this.dependencies.actionExecutor.executeConfirmedWriteAction({
+    const execution = await this.dependencies.actionExecutor.executeConfirmedWriteAction({
       actionId: confirmedAction.actionId,
       toolName: confirmedAction.toolName,
       payload: confirmedAction.payload,
+      context: {
+        scope: principal.scope,
+      },
     });
 
     await this.dependencies.conversationService.appendMessage({
@@ -462,6 +510,40 @@ class DeterministicTestProvider implements AssistantLlmProvider {
 
   public completePlan(): Promise<AssistantLlmCompletionResult> {
     return Promise.resolve(this.reply);
+  }
+}
+
+class NoopOrdersServiceForTests {
+  public listOrders(): Promise<{ items: unknown[]; meta: unknown }> {
+    return Promise.resolve({
+      items: [],
+      meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+    });
+  }
+
+  public getOrderById(): Promise<Record<string, never>> {
+    return Promise.resolve({});
+  }
+
+  public createOrder(payload: unknown): Promise<unknown> {
+    return Promise.resolve(payload);
+  }
+
+  public updateOrder(_orderId: string, payload: unknown): Promise<unknown> {
+    return Promise.resolve(payload);
+  }
+}
+
+class NoopPatientsServiceForTests {
+  public listPatients(): Promise<{ items: unknown[]; meta: unknown }> {
+    return Promise.resolve({
+      items: [],
+      meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+    });
+  }
+
+  public getPatientById(): Promise<Record<string, never>> {
+    return Promise.resolve({});
   }
 }
 

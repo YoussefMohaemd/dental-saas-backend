@@ -94,7 +94,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   findOneAndUpdateMock.mockImplementation(() => ({
     lean: () => ({
-      exec: async () => null,
+      exec: () => Promise.resolve(null),
     }),
   }));
 });
