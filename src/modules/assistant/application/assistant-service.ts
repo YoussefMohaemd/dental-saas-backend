@@ -320,7 +320,7 @@ export class AssistantService {
     });
 
     const effectiveCapabilities = new Set(resolveRoleCapabilities(principal.roles));
-    const llmCompletion = await this.completePlan(content, history);
+    const llmCompletion = await this.completePlanWithFallback(content, history);
 
     const plannedActions =
       llmCompletion.actions.length > 0
@@ -347,7 +347,7 @@ export class AssistantService {
       );
 
       if (tool.requiresConfirmation) {
-        await this.dependencies.actionExecutor.validateWriteActionDraft({
+        const normalizedPayload = await this.dependencies.actionExecutor.validateWriteActionDraft({
           toolName: tool.name,
           payload: action.arguments,
           context: {
@@ -361,7 +361,7 @@ export class AssistantService {
           tenantId: principal.tenantId,
           userId: principal.userId,
           toolName: tool.name,
-          payload: action.arguments,
+          payload: normalizedPayload,
         });
         pendingActions.push(pendingAction);
         await this.dependencies.auditService.recordEvent({
@@ -445,13 +445,84 @@ export class AssistantService {
     content: string,
     history: AssistantLlmCompletionRequest['history'],
   ): Promise<AssistantLlmCompletionResult> {
-    return this.dependencies.provider.completePlan({
+    const request: AssistantLlmCompletionRequest = {
       userMessage: content,
       history,
       systemPrompt: buildSystemPrompt(new Date()),
       tools: this.dependencies.toolRegistry.list(),
       languageHint: detectLanguageHint(content),
-    });
+    };
+
+    try {
+      return await this.dependencies.provider.completePlan(request);
+    } catch (error) {
+      const hasHistory = (history?.length ?? 0) > 0;
+
+      if (isStructuredOutputError(error)) {
+        try {
+          return await this.dependencies.provider.completePlan({
+            ...request,
+            userMessage: `${content}\n\nReturn valid strict JSON only. No prose outside JSON.`,
+          });
+        } catch (retryError) {
+          if (hasHistory && shouldRetryWithoutHistory(retryError)) {
+            return this.completePlanWithoutHistory(content, request.systemPrompt, request.tools);
+          }
+          throw retryError;
+        }
+      }
+
+      if (hasHistory && shouldRetryWithoutHistory(error)) {
+        return this.completePlanWithoutHistory(content, request.systemPrompt, request.tools);
+      }
+      throw error;
+    }
+  }
+
+  private async completePlanWithFallback(
+    content: string,
+    history: AssistantLlmCompletionRequest['history'],
+  ): Promise<AssistantLlmCompletionResult> {
+    try {
+      return await this.completePlan(content, history);
+    } catch (error) {
+      const fallbackActions = buildCatalogFallbackActions(content);
+      if (fallbackActions.length > 0 && isRateLimitError(error)) {
+        return {
+          reply:
+            'The assistant is currently busy, so I fetched the catalog data directly.',
+          actions: fallbackActions,
+        };
+      }
+      throw error;
+    }
+  }
+
+  private async completePlanWithoutHistory(
+    content: string,
+    systemPrompt: string,
+    tools: AssistantLlmCompletionRequest['tools'],
+  ): Promise<AssistantLlmCompletionResult> {
+    const requestWithoutHistory: AssistantLlmCompletionRequest = {
+      userMessage: content,
+      history: [],
+      systemPrompt,
+      tools,
+      languageHint: detectLanguageHint(content),
+    };
+
+    try {
+      return await this.dependencies.provider.completePlan(requestWithoutHistory);
+    } catch (error) {
+      if (!isStructuredOutputError(error)) {
+        throw error;
+      }
+
+      return this.dependencies.provider.completePlan({
+        ...requestWithoutHistory,
+        userMessage: `${content}\n\nReturn valid strict JSON only. No prose outside JSON.`,
+      });
+    }
   }
 
   public async confirmAction(
@@ -564,8 +635,11 @@ class DeterministicTestProvider implements AssistantLlmProvider {
 class NoopOrdersServiceForTests {
   public listOrders(): Promise<{ items: unknown[]; meta: unknown }> {
     return Promise.resolve({
-      items: [],
-      meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+      items: [
+        { id: '66f100000000000000000901', orderNumber: 'ord-1' },
+        { id: '66f100000000000000000902', orderNumber: 'ord-2' },
+      ],
+      meta: { totalItems: 2, page: 1, pageSize: 20, totalPages: 1 },
     });
   }
 
@@ -682,6 +756,9 @@ function buildReadOnlyFallbackText(actions: AssistantPlanAction[]): string {
 
 function buildCatalogFallbackActions(content: string): AssistantPlanAction[] {
   const normalized = content.toLowerCase();
+  const isOperationalWritePrompt =
+    /(create|update|change|add|edit|new)\s+(order|patient|doctor|clinic|workflow|scan)/u.test(normalized) ||
+    /(انشاء|إنشاء|تحديث|تعديل|اضافة|إضافة|طلب|مريض|دكتور|عيادة)/u.test(normalized);
   const asksServicePricing =
     /(pricing|prices?|price list|cost|fees?|الاسعار|الأسعار|السعر)/u.test(
       normalized,
@@ -689,7 +766,8 @@ function buildCatalogFallbackActions(content: string): AssistantPlanAction[] {
   const asksServiceCatalog =
     /(services?|service catalog|catalog|offerings|الخدمات|الخدمه|الخدمة)/u.test(normalized);
   const asksCompanyProfile =
-    /(about|company|profile|contact|working hours|address|phone|email|who are you|about us|من نحن|الشركة|الملف|العنوان|التواصل|ساعات العمل)/u.test(
+    !isOperationalWritePrompt &&
+    /(about|company|profile|contact|working hours|address|who are you|about us|من نحن|الشركة|الملف|العنوان|التواصل|ساعات العمل)/u.test(
       normalized,
     );
   const asksSubmissionStandards =
@@ -773,7 +851,7 @@ function buildSystemPrompt(now: Date): string {
     'For submission standards only, call get_submission_standards.',
     'All authenticated users can call list_services, list_service_prices, get_submission_standards and get_company_info.',
     'For orders, patients, doctors or clinics, call the matching search/details tool.',
-    'When creating a patient, you may pass clinicName/doctorName if ids are unavailable; the system can auto-resolve or create missing clinic/doctor with safe defaults.',
+    'When creating a patient, you may pass clinicName/doctorName if ids are unavailable; the system resolves exact existing matches only and returns validation errors for missing or ambiguous matches.',
     'The system appends the tool results to your reply automatically, so keep "reply" to one short sentence and do not repeat or retype the data.',
     'If the request needs no tool (greeting, general help), answer briefly in "reply" with an empty actions array.',
     'Return strict JSON object: {"reply":string,"actions":[{"id":string,"tool":string,"arguments":object,"dependsOn":string[]}]}',
@@ -815,6 +893,32 @@ function buildWriteConfirmationText(
   }
 
   return `Action confirmed and executed: ${execution.tool}.`;
+}
+
+function isStructuredOutputError(error: unknown): boolean {
+  return (
+    error instanceof ApplicationError &&
+    /valid JSON object|structured assistant completion payload/i.test(error.message)
+  );
+}
+
+function shouldRetryWithoutHistory(error: unknown): boolean {
+  return (
+    error instanceof ApplicationError &&
+    (error.statusCode === 400 ||
+      error.statusCode === 413 ||
+      error.statusCode === 429 ||
+      error.statusCode === 502)
+  );
+}
+
+function isRateLimitError(error: unknown): boolean {
+  if (!(error instanceof ApplicationError)) {
+    return false;
+  }
+
+  const upstreamStatus = Number(error.details?.status);
+  return error.statusCode === 429 || upstreamStatus === 429;
 }
 
 function toConversationView(record: {

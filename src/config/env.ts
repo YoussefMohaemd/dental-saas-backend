@@ -90,7 +90,7 @@ const envSchema = z.object({
   AI_ASSISTANT_GROQ_API_KEY: optionalString,
   AI_ASSISTANT_GROQ_BASE_URL: optionalString,
   AI_ASSISTANT_GROQ_MAX_COMPLETION_TOKENS: z.coerce.number().int().min(64).max(2000).default(900),
-  AI_ASSISTANT_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(15_000),
+  AI_ASSISTANT_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(30_000),
   AI_ASSISTANT_MAX_ACTIONS_PER_MESSAGE: z.coerce.number().int().min(1).max(20).default(8),
   AI_ASSISTANT_MAX_PLANNING_ROUNDS: z.coerce.number().int().min(1).max(12).default(4),
   AI_ASSISTANT_MAX_INPUT_CHARS: z.coerce.number().int().min(256).max(32_000).default(4_000),

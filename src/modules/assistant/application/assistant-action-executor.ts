@@ -14,11 +14,15 @@ import { createPatientBodySchema, updatePatientBodySchema } from '../../patients
 import { type OrdersService } from '../../orders/application/orders-service';
 import { type PatientService } from '../../patients/application/patient-service';
 import {
+  type OrderArch,
   ORDER_DURATION_VALUES,
   ORDER_LIST_SORT_FIELDS,
   ORDER_STATUS_VALUES,
+  type OrderUpdatePayload,
+  type OrderRestoration,
   type OrderWritePayload,
 } from '../../orders/domain/order';
+import { type SubOrderWritePayload } from '../../orders/domain/sub-order';
 import { type AssistantCatalogRepository } from './assistant-catalog';
 import { type AssistantPlanAction, type AssistantToolDefinition } from '../domain/assistant.types';
 
@@ -181,7 +185,7 @@ export class AssistantActionExecutor {
     toolName: string;
     payload: Record<string, unknown>;
     context: AssistantExecutionContext;
-  }): Promise<void> {
+  }): Promise<Record<string, unknown>> {
     if (containsDeleteOperation(input.toolName)) {
       throw new ApplicationError({
         message: 'Delete operations are blocked',
@@ -194,13 +198,13 @@ export class AssistantActionExecutor {
 
     if (input.toolName === 'create_order') {
       const args = this.parseStrictToolArgs(createOrderArgsSchema, input.payload, input.toolName);
-      await this.parseCreateOrderPayload(args.payload, input.context);
-      return;
+      const normalizedPayload = await this.parseCreateOrderPayload(args.payload, input.context);
+      return { payload: normalizedPayload };
     }
 
     if (input.toolName === 'update_order') {
-      const args = this.parseStrictToolArgs(updateOrderArgsSchema, input.payload, input.toolName);
-      const payload = this.parseUpdateOrderPayload(args.payload);
+      const normalized = await this.normalizeUpdateOrderArgs(input.payload, input.context);
+      const payload = normalized.payload;
       if (Object.keys(payload).length === 0) {
         throw new ApplicationError({
           message: 'Update order payload must contain at least one field',
@@ -209,7 +213,7 @@ export class AssistantActionExecutor {
           expose: true,
         });
       }
-      return;
+      return normalized;
     }
 
     if (input.toolName === 'create_patient') {
@@ -240,19 +244,19 @@ export class AssistantActionExecutor {
         },
         'create_patient.payload',
       );
-      return;
+      return input.payload;
     }
 
     if (input.toolName === 'create_doctor') {
       const args = this.parseStrictToolArgs(createEntityArgsSchema, input.payload, input.toolName);
       this.parseStrictToolArgs(createDoctorBodySchema, args.payload, 'create_doctor.payload');
-      return;
+      return input.payload;
     }
 
     if (input.toolName === 'create_clinic') {
       const args = this.parseStrictToolArgs(createEntityArgsSchema, input.payload, input.toolName);
       this.parseStrictToolArgs(createClinicBodySchema, args.payload, 'create_clinic.payload');
-      return;
+      return input.payload;
     }
 
     if (input.toolName === 'update_patient') {
@@ -266,7 +270,7 @@ export class AssistantActionExecutor {
           expose: true,
         });
       }
-      return;
+      return input.payload;
     }
 
     if (input.toolName === 'update_doctor') {
@@ -280,7 +284,7 @@ export class AssistantActionExecutor {
           expose: true,
         });
       }
-      return;
+      return input.payload;
     }
 
     if (input.toolName === 'update_clinic') {
@@ -294,7 +298,7 @@ export class AssistantActionExecutor {
           expose: true,
         });
       }
-      return;
+      return input.payload;
     }
 
     throw new ApplicationError({
@@ -641,6 +645,7 @@ export class AssistantActionExecutor {
     const args = this.parseStrictToolArgs(createOrderArgsSchema, input.payload, input.toolName);
     const payload = await this.parseCreateOrderPayload(args.payload, input.context);
     const result = await this.dependencies.ordersService.createOrder(payload, input.context.scope);
+    await this.createAssistantSubOrdersIfNeeded(result.id, payload, input.context);
     return {
       actionId: input.actionId,
       tool: input.toolName,
@@ -655,8 +660,8 @@ export class AssistantActionExecutor {
     payload: Record<string, unknown>;
     context: AssistantExecutionContext;
   }): Promise<AssistantActionExecutionSummary> {
-    const args = this.parseStrictToolArgs(updateOrderArgsSchema, input.payload, input.toolName);
-    const payload = this.parseUpdateOrderPayload(args.payload);
+    const normalized = await this.normalizeUpdateOrderArgs(input.payload, input.context);
+    const payload = await this.withDerivedUpdateOrderDefaults(normalized.payload, input.context);
     if (Object.keys(payload).length === 0) {
       throw new ApplicationError({
         message: 'Update order payload must contain at least one field',
@@ -667,10 +672,11 @@ export class AssistantActionExecutor {
     }
 
     const result = await this.dependencies.ordersService.updateOrder(
-      args.orderId,
+      normalized.orderId,
       payload,
       input.context.scope,
     );
+    await this.replaceAssistantSubOrdersIfNeeded(normalized.orderId, payload, result, input.context);
     return {
       actionId: input.actionId,
       tool: input.toolName,
@@ -809,12 +815,12 @@ export class AssistantActionExecutor {
             'Partial Denture',
             'Complete Denture',
           ])
-          .default('Crown'),
+          .optional(),
         arch: z.enum(['Maxilla', 'Mandible', 'Both']).default('Both'),
         format: z.string().trim().min(1).default('STL'),
         shade: z.string().trim().min(1).default('A2'),
-        units: z.coerce.number().int().min(1).default(1),
-        amount: z.coerce.number().min(0).default(0),
+        units: z.coerce.number().int().min(1).optional(),
+        amount: z.coerce.number().min(0).optional(),
         billed: z.boolean().default(false),
         billedAmount: z.coerce.number().min(0).optional(),
         billTo: z.string().trim().min(1).default('doctor'),
@@ -872,8 +878,8 @@ export class AssistantActionExecutor {
     const patientClinicId =
       typeof patient.clinicId === 'string' ? patient.clinicId.trim() : '';
     const doctorId = await this.resolveDoctorId(
-      patientDoctorId || parsed.doctorId,
-      patientDoctorId ? undefined : parsed.doctorName,
+      parsed.doctorId || patientDoctorId,
+      parsed.doctorId || patientDoctorId ? undefined : parsed.doctorName,
       context.scope,
     );
     const doctor = await this.dependencies.doctorService.getDoctorById(doctorId, context.scope);
@@ -887,6 +893,7 @@ export class AssistantActionExecutor {
       context.scope,
     );
     await this.dependencies.clinicService.getClinicById(clinicId, context.scope);
+    const defaults = await this.deriveAssistantOrderDefaults(parsed.creationData?.services, context.tenantId);
 
     return stripUndefined({
       ...parsed,
@@ -894,6 +901,9 @@ export class AssistantActionExecutor {
       doctorId,
       clinicId,
       orderNumber: parsed.orderNumber ?? this.buildAssistantOrderNumber(now),
+      restoration: parsed.restoration ?? defaults.restoration,
+      units: parsed.units ?? defaults.units,
+      amount: parsed.amount ?? defaults.amount,
       hasNotes: parsed.hasNotes ?? parsed.notes.trim().length > 0,
       receivedAt: parsed.receivedAt ?? now,
       dueDate: parsed.dueDate ?? defaultDueDate,
@@ -901,11 +911,182 @@ export class AssistantActionExecutor {
   }
 
   private buildAssistantOrderNumber(now: Date): string {
-    const stamp = now.toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
-    const random = Math.floor(Math.random() * 10_000)
-      .toString()
-      .padStart(4, '0');
-    return `AI-${stamp}-${random}`;
+    const seed = (now.getUTCMilliseconds() * 1000 + Math.floor(Math.random() * 1000)) % 1_000_000;
+    return `AI-${seed.toString().padStart(6, '0')}`;
+  }
+
+  private async deriveAssistantOrderDefaults(
+    services:
+      | Array<{
+          serviceId: string;
+          selectedTeeth: number[];
+        }>
+      | undefined,
+    tenantId: string,
+  ): Promise<{ restoration: OrderRestoration; units: number; amount: number }> {
+    const normalizedServices = services ?? [];
+    const allTeeth = Array.from(
+      new Set(normalizedServices.flatMap((service) => service.selectedTeeth)),
+    );
+    const units = Math.max(allTeeth.length, 1);
+
+    if (normalizedServices.length === 0) {
+      return { restoration: 'Crown', units, amount: 0 };
+    }
+
+    const [firstService] = normalizedServices;
+    const catalog = await this.dependencies.catalogRepository.listServices(tenantId);
+    const priceById = new Map(catalog.map((service) => [service.serviceId, service.basePrice]));
+    const amount = normalizedServices.reduce(
+      (sum, service) => sum + (priceById.get(service.serviceId) ?? 0),
+      0,
+    );
+
+    return {
+      restoration: this.mapServiceIdToRestoration(firstService?.serviceId),
+      units,
+      amount,
+    };
+  }
+
+  private async withDerivedUpdateOrderDefaults(
+    payload: OrderUpdatePayload,
+    context: AssistantExecutionContext,
+  ): Promise<OrderUpdatePayload> {
+    const services = payload.creationData?.services;
+    if (!services || services.length === 0) {
+      return payload;
+    }
+
+    const defaults = await this.deriveAssistantOrderDefaults(
+      services.map((service) => ({
+        serviceId: service.serviceId,
+        selectedTeeth: service.selectedTeeth,
+      })),
+      context.tenantId,
+    );
+    const allTeeth = Array.from(new Set(services.flatMap((service) => service.selectedTeeth)));
+
+    return {
+      ...payload,
+      restoration: payload.restoration ?? defaults.restoration,
+      units: payload.units ?? defaults.units,
+      amount: payload.amount ?? defaults.amount,
+      arch: payload.arch ?? this.deriveArchFromSelectedTeeth(allTeeth),
+    };
+  }
+
+  private async createAssistantSubOrdersIfNeeded(
+    orderId: string,
+    orderPayload: OrderWritePayload,
+    context: AssistantExecutionContext,
+  ): Promise<void> {
+    const serviceRows = orderPayload.creationData?.services ?? [];
+    if (serviceRows.length === 0) {
+      return;
+    }
+
+    const subOrders = await this.buildAssistantSubOrderPayloads(
+      serviceRows,
+      context.tenantId,
+      orderPayload.priority,
+      orderPayload.dueDate,
+      orderPayload.notes,
+    );
+
+    await this.dependencies.ordersService.createSubOrders(orderId, subOrders, context.scope);
+  }
+
+  private async replaceAssistantSubOrdersIfNeeded(
+    orderId: string,
+    payload: ReturnType<AssistantActionExecutor['parseUpdateOrderPayload']>,
+    updatedOrder: {
+      priority: 'Low' | 'Normal' | 'High' | 'Urgent';
+      dueDate: string;
+      notes: string;
+    },
+    context: AssistantExecutionContext,
+  ): Promise<void> {
+    const serviceRows = payload.creationData?.services;
+    if (serviceRows === undefined) {
+      return;
+    }
+
+    const dueDate =
+      payload.dueDate instanceof Date ? payload.dueDate : new Date(updatedOrder.dueDate);
+    const priority = payload.priority ?? updatedOrder.priority;
+    const notes = payload.notes ?? updatedOrder.notes;
+    const subOrders = await this.buildAssistantSubOrderPayloads(
+      serviceRows,
+      context.tenantId,
+      priority,
+      dueDate,
+      notes,
+    );
+    await this.dependencies.ordersService.replaceSubOrders(orderId, subOrders, context.scope);
+  }
+
+  private async buildAssistantSubOrderPayloads(
+    serviceRows: Array<{
+      serviceId: string;
+      serviceDetails: Record<string, string>;
+      serviceForm: Record<string, string>;
+      selectedTeeth: number[];
+      scanRequirements: string[];
+      fileReferences: string[];
+    }>,
+    tenantId: string,
+    priority: 'Low' | 'Normal' | 'High' | 'Urgent',
+    dueDate: Date,
+    notes: string,
+  ): Promise<SubOrderWritePayload[]> {
+    const catalog = await this.dependencies.catalogRepository.listServices(tenantId);
+    const catalogById = new Map(catalog.map((service) => [service.serviceId, service]));
+
+    return serviceRows.map((service) => {
+      const catalogService = catalogById.get(service.serviceId);
+      const scanRequirements =
+        service.scanRequirements.length > 0
+          ? [...service.scanRequirements]
+          : [...(catalogService?.scanRequirements ?? [])];
+      const selectedTeeth = Array.from(new Set(service.selectedTeeth));
+
+      return {
+        service: catalogService?.name ?? service.serviceId,
+        icon: '',
+        status: 'pending',
+        formsComplete: 0,
+        formsTotal: 0,
+        scansComplete: 0,
+        scansTotal: scanRequirements.length,
+        teeth: selectedTeeth,
+        priority,
+        dueDate,
+        notes,
+        creationData: {
+          ...service,
+          scanRequirements,
+          selectedTeeth,
+        },
+      };
+    });
+  }
+
+  private mapServiceIdToRestoration(serviceId: string | undefined): OrderRestoration {
+    if (serviceId === 'surgical-guide') return 'Implant Crown';
+    if (serviceId === 'final-restoration' || serviceId === 'fmb') return 'Bridge';
+    if (serviceId === 'gfmr' || serviceId === 'full-guide') return 'Full Arch';
+    if (serviceId === 'temp-restoration') return 'Crown';
+    return 'Crown';
+  }
+
+  private deriveArchFromSelectedTeeth(teeth: readonly number[]): OrderArch {
+    const hasUpper = teeth.some((tooth) => tooth >= 11 && tooth <= 28);
+    const hasLower = teeth.some((tooth) => tooth >= 31 && tooth <= 48);
+    if (hasUpper && hasLower) return 'Both';
+    if (hasUpper) return 'Maxilla';
+    if (hasLower) return 'Mandible';
+    return 'Both';
   }
 
   private async resolvePatientId(
@@ -935,7 +1116,7 @@ export class AssistantActionExecutor {
         sortDirection: 'desc',
         statuses: [],
       },
-      { page: 1, pageSize: 20 },
+      { page: 1, pageSize: 100 },
     );
     const exact = result.items.filter(
       (item) => item.name.trim().toLowerCase() === patientName.trim().toLowerCase(),
@@ -979,7 +1160,7 @@ export class AssistantActionExecutor {
           sortDirection: 'desc',
           statuses: [],
         },
-        { page: 1, pageSize: 20 },
+        { page: 1, pageSize: 100 },
       );
       const exact = result.items.filter(
         (item) => item.name.trim().toLowerCase() === doctorName.trim().toLowerCase(),
@@ -1038,7 +1219,7 @@ export class AssistantActionExecutor {
           sortDirection: 'desc',
           statuses: [],
         },
-        { page: 1, pageSize: 20 },
+        { page: 1, pageSize: 100 },
       );
       const exact = result.items.filter(
         (item) => item.name.trim().toLowerCase() === clinicName.trim().toLowerCase(),
@@ -1116,6 +1297,29 @@ export class AssistantActionExecutor {
         isLocked: z.boolean().optional(),
         hasNotes: z.boolean().optional(),
         notes: z.string().optional(),
+        creationData: z
+          .object({
+            services: z.array(
+              z.object({
+                serviceId: z.string().trim().min(1),
+                serviceDetails: z.record(z.string(), z.string()).default({}),
+                serviceForm: z.record(z.string(), z.string()).default({}),
+                selectedTeeth: z.array(z.coerce.number().int().min(1).max(99)).default([]),
+                scanRequirements: z.array(z.string()).default([]),
+                fileReferences: z.array(z.string()).default([]),
+              }),
+            ),
+            communication: z
+              .object({
+                internalCaseNote: z.string().default(''),
+                internalCaseFiles: z.array(z.string()).default([]),
+                sendMailTo: z.array(z.string()).default([]),
+                sendIhTaskTo: z.string().optional(),
+                rushTask: z.boolean().default(false),
+              })
+              .optional(),
+          })
+          .optional(),
         archiveDate: z.coerce.date().nullable().optional(),
         receivedAt: z.coerce.date().optional(),
         sentAt: z.coerce.date().optional(),
@@ -1181,13 +1385,24 @@ export class AssistantActionExecutor {
         sortDirection: 'asc',
         statuses: [],
       },
-      { page: 1, pageSize: 20 },
+      { page: 1, pageSize: 100 },
     );
-    const exact = clinics.items.find(
+    const exactMatches = clinics.items.filter(
       (clinic) => clinic.name.toLowerCase() === payload.clinicName?.toLowerCase(),
     );
-    if (exact) {
-      return { clinicId: exact.id };
+    if (exactMatches.length === 1) {
+      const [exact] = exactMatches;
+      if (exact) {
+        return { clinicId: exact.id };
+      }
+    }
+    if (exactMatches.length > 1) {
+      throw new ApplicationError({
+        message: `Multiple clinics match '${payload.clinicName}'. Please provide clinicId.`,
+        statusCode: 400,
+        code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+        expose: true,
+      });
     }
 
     throw new ApplicationError({
@@ -1228,13 +1443,24 @@ export class AssistantActionExecutor {
         sortDirection: 'asc',
         statuses: [],
       },
-      { page: 1, pageSize: 20 },
+      { page: 1, pageSize: 100 },
     );
-    const exact = doctors.items.find(
+    const exactMatches = doctors.items.filter(
       (doctor) => doctor.name.toLowerCase() === payload.doctorName?.toLowerCase(),
     );
-    if (exact) {
-      return { doctorId: exact.id };
+    if (exactMatches.length === 1) {
+      const [exact] = exactMatches;
+      if (exact) {
+        return { doctorId: exact.id };
+      }
+    }
+    if (exactMatches.length > 1) {
+      throw new ApplicationError({
+        message: `Multiple doctors match '${payload.doctorName}'. Please provide doctorId.`,
+        statusCode: 400,
+        code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+        expose: true,
+      });
     }
 
     throw new ApplicationError({
@@ -1273,6 +1499,16 @@ export class AssistantActionExecutor {
         pageSize: pagination.pageSize,
       },
     };
+  }
+
+  private async normalizeUpdateOrderArgs(
+    payload: Record<string, unknown>,
+    context: AssistantExecutionContext,
+  ): Promise<{ orderId: string; payload: ReturnType<AssistantActionExecutor['parseUpdateOrderPayload']> }> {
+    const args = this.parseStrictToolArgs(updateOrderArgsSchema, payload, 'update_order');
+    const resolvedOrderId = await this.resolveOrderIdForDetails(args.orderId, context);
+    const parsedPayload = this.parseUpdateOrderPayload(args.payload);
+    return { orderId: resolvedOrderId, payload: parsedPayload };
   }
 }
 

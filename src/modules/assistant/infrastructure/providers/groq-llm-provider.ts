@@ -305,10 +305,14 @@ function buildGroqError(params: {
   upstreamBody: string;
   retriedWithoutHistory: boolean;
 }): ApplicationError {
+  const isRateLimited = params.status === 429;
   return new ApplicationError({
-    message: params.message,
-    statusCode: 502,
+    message: isRateLimited
+      ? 'Assistant model rate limit reached. Please try again shortly.'
+      : params.message,
+    statusCode: isRateLimited ? 429 : 502,
     code: APPLICATION_ERROR_CODES.INTERNAL_ERROR,
+    expose: isRateLimited,
     details: {
       status: params.status,
       statusText: params.statusText,

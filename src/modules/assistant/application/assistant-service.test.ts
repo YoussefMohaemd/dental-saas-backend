@@ -1,5 +1,5 @@
 import { Types } from 'mongoose';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   APPLICATION_ERROR_CODES,
@@ -152,6 +152,53 @@ describe('AssistantService', () => {
       throw new Error('Expected confirmation result');
     }
     expect(response.result.pendingActions).toHaveLength(1);
+  });
+
+  it('normalizes create-order pending payload when clinicId is stale', async () => {
+    const service = AssistantService.createForTests({
+      providerReply: {
+        reply: 'Preparing draft',
+        actions: [
+          {
+            id: 'a1',
+            tool: 'create_order',
+            arguments: {
+              payload: {
+                patientId: '96889346eeb97e3c70caa914',
+                doctorId: '66f100000000000000000222',
+                clinicId: 'f5d9afd005f77d5531ffefe5',
+                creationData: {
+                  services: [{ serviceId: 'treatment-plan', selectedTeeth: [12, 34] }],
+                },
+              },
+            },
+            dependsOn: [],
+          },
+        ],
+      },
+    });
+
+    const conversation = await service.createConversation({
+      tenantId: '66f100000000000000000001',
+      userId: '66f1000000000000000000aa',
+      roles: ['staff'],
+    });
+
+    const response = await service.postMessage(principal(['staff']), {
+      conversationId: conversation.id,
+      content: 'Create order for patient',
+    });
+
+    expect(response.result.type).toBe('confirmation');
+    if (response.result.type !== 'confirmation') {
+      throw new Error('Expected confirmation result');
+    }
+
+    const pending = response.result.pendingActions[0];
+    expect(pending).toBeDefined();
+    expect((pending?.payload as { payload?: { clinicId?: string } }).payload?.clinicId).toBe(
+      '66f100000000000000000333',
+    );
   });
 
   it('accepts create-order when model leaks dependsOn inside arguments', async () => {
@@ -614,6 +661,134 @@ describe('AssistantService', () => {
     ).rejects.toThrow('Assistant model request timed out');
   });
 
+  it('retries planning without history when provider fails with upstream bad gateway', async () => {
+    const provider = {
+      name: 'vllm' as const,
+      completePlan: vi
+        .fn()
+        .mockImplementationOnce(async () => {
+          throw new ApplicationError({
+            message: 'vLLM completion request failed',
+            statusCode: 502,
+            code: APPLICATION_ERROR_CODES.INTERNAL_ERROR,
+          });
+        })
+        .mockImplementationOnce(async (request: { history?: unknown[] }) => ({
+          reply: request.history?.length === 0 ? 'Recovered without history.' : 'Unexpected',
+          actions: [],
+        })),
+    };
+
+    const service = AssistantService.create({
+      provider,
+      conversationRepository: {
+        create: async () => ({
+          conversationId: 'conv-3',
+          tenantId: '66f100000000000000000001',
+          userId: '66f1000000000000000000aa',
+          title: 'New conversation',
+          status: 'active',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          messages: [
+            {
+              id: 'm-prev-user',
+              role: 'user',
+              text: 'previous question',
+              resultType: 'text',
+              createdAt: new Date(),
+            },
+            {
+              id: 'm-prev-assistant',
+              role: 'assistant',
+              text: 'previous answer',
+              resultType: 'text',
+              createdAt: new Date(),
+            },
+          ],
+        }),
+        findOwnedConversation: async () => ({
+          conversationId: 'conv-3',
+          tenantId: '66f100000000000000000001',
+          userId: '66f1000000000000000000aa',
+          title: 'New conversation',
+          status: 'active',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          messages: [
+            {
+              id: 'm-prev-user',
+              role: 'user',
+              text: 'previous question',
+              resultType: 'text',
+              createdAt: new Date(),
+            },
+            {
+              id: 'm-prev-assistant',
+              role: 'assistant',
+              text: 'previous answer',
+              resultType: 'text',
+              createdAt: new Date(),
+            },
+          ],
+        }),
+        appendMessage: async () => undefined,
+        listOwnedConversations: async () => [],
+        updateStatus: async () => undefined,
+      },
+      pendingActionRepository: {
+        create: async () => {
+          throw new Error('not used in this test');
+        },
+        findOwnedPendingAction: async () => null,
+        markConfirmed: async () => true,
+      },
+      auditRepository: {
+        create: async () => undefined,
+      },
+      ordersService: {
+        listOrders: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        getOrderById: async () => ({}),
+      } as never,
+      patientService: {
+        listPatients: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        getPatientById: async () => ({}),
+      } as never,
+      doctorService: {
+        listDoctors: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+      } as never,
+      clinicService: {
+        listClinics: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+      } as never,
+      catalogRepository: {
+        listServices: async () => [],
+        getCompanyProfile: async () => null,
+      },
+      options: {
+        maxActionsPerMessage: 8,
+        maxPlanningRounds: 4,
+        maxInputChars: 4000,
+        confirmationTtlSeconds: 900,
+      },
+    });
+
+    const conversation = await service.createConversation({
+      tenantId: '66f100000000000000000001',
+      userId: '66f1000000000000000000aa',
+      roles: ['staff'],
+    });
+
+    const response = await service.postMessage(principal(['staff']), {
+      conversationId: conversation.id,
+      content: 'show service prices',
+    });
+
+    expect(response.result.type).toBe('text');
+    expect(provider.completePlan).toHaveBeenCalledTimes(2);
+    const secondCallArgs = provider.completePlan.mock.calls[1]?.[0] as { history?: unknown[] } | undefined;
+    expect(secondCallArgs?.history).toEqual([]);
+  });
+
   it('falls back to get_company_info when model returns no actions for company profile request', async () => {
     const service = AssistantService.createForTests({
       providerReply: {
@@ -639,6 +814,115 @@ describe('AssistantService', () => {
     }
     expect(response.result.executions).toHaveLength(1);
     expect(response.result.executions[0]?.tool).toBe('get_company_info');
+  });
+
+  it('falls back to catalog actions when model is rate-limited for pricing requests', async () => {
+    const provider = {
+      name: 'groq' as const,
+      completePlan: vi.fn().mockRejectedValue(
+        new ApplicationError({
+          message: 'Groq completion request failed',
+          statusCode: 502,
+          code: APPLICATION_ERROR_CODES.INTERNAL_ERROR,
+          details: {
+            status: 429,
+            statusText: 'Too Many Requests',
+          },
+        }),
+      ),
+    };
+
+    const service = AssistantService.create({
+      provider,
+      conversationRepository: {
+        create: async () => ({
+          conversationId: 'conv-rate-limit',
+          tenantId: '66f100000000000000000001',
+          userId: '66f1000000000000000000aa',
+          title: 'New conversation',
+          status: 'active',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          messages: [],
+        }),
+        findOwnedConversation: async () => ({
+          conversationId: 'conv-rate-limit',
+          tenantId: '66f100000000000000000001',
+          userId: '66f1000000000000000000aa',
+          title: 'New conversation',
+          status: 'active',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          messages: [],
+        }),
+        appendMessage: async () => undefined,
+        listOwnedConversations: async () => [],
+        updateStatus: async () => undefined,
+      },
+      pendingActionRepository: {
+        create: async () => {
+          throw new Error('not used in this test');
+        },
+        findOwnedPendingAction: async () => null,
+        markConfirmed: async () => true,
+      },
+      auditRepository: {
+        create: async () => undefined,
+      },
+      ordersService: {
+        listOrders: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        getOrderById: async () => ({}),
+      } as never,
+      patientService: {
+        listPatients: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        getPatientById: async () => ({}),
+      } as never,
+      doctorService: {
+        listDoctors: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+      } as never,
+      clinicService: {
+        listClinics: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+      } as never,
+      catalogRepository: {
+        listServices: async () => [
+          {
+            serviceId: 'svc-treatment-plan',
+            name: 'Treatment Plan',
+            description: 'Comprehensive treatment planning',
+            basePrice: 250,
+            turnaroundDays: 5,
+            scanRequirements: ['Full arch STL'],
+          },
+        ],
+        getCompanyProfile: async () => null,
+      },
+      options: {
+        maxActionsPerMessage: 8,
+        maxPlanningRounds: 4,
+        maxInputChars: 4000,
+        confirmationTtlSeconds: 900,
+      },
+    });
+
+    const conversation = await service.createConversation({
+      tenantId: '66f100000000000000000001',
+      userId: '66f1000000000000000000aa',
+      roles: ['staff'],
+    });
+
+    const response = await service.postMessage(principal(['staff']), {
+      conversationId: conversation.id,
+      content: 'Show the price of every service.',
+    });
+
+    expect(response.result.type).toBe('text');
+    if (response.result.type !== 'text') {
+      throw new Error('Expected text result');
+    }
+    expect(response.result.executions.length).toBeGreaterThan(0);
+    expect(response.result.executions.map((execution) => execution.tool)).toContain(
+      'list_service_prices',
+    );
   });
 
   it('does not force overdue search when model returns no actions', async () => {

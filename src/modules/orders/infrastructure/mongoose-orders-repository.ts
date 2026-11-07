@@ -217,7 +217,7 @@ export class MongooseOrdersRepository implements OrderRepository {
     if (scope.doctorId) {
       patientFilter.doctorId = scope.doctorId;
     }
-    if (scope.clinicId) {
+    if (!scope.isAdmin && scope.clinicId) {
       patientFilter.clinicId = scope.clinicId;
     }
 
@@ -253,7 +253,7 @@ export class MongooseOrdersRepository implements OrderRepository {
       .findOne({
         _id: doctorId,
         tenantId: scope.tenantId,
-        ...(scope.clinicId ? { clinicId: scope.clinicId } : {}),
+        ...(!scope.isAdmin && scope.clinicId ? { clinicId: scope.clinicId } : {}),
       })
       .select('_id name clinicId')
       .lean<DoctorReferenceRecord | null>()
@@ -270,7 +270,7 @@ export class MongooseOrdersRepository implements OrderRepository {
   }
 
   public async clinicExists(clinicId: string, scope: DataVisibilityScope): Promise<boolean> {
-    if (scope.clinicId && scope.clinicId.toString() !== clinicId) {
+    if (!scope.isAdmin && scope.clinicId && scope.clinicId.toString() !== clinicId) {
       return false;
     }
 
