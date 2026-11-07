@@ -23,6 +23,7 @@ export function createAssistantService(): AssistantService {
     vllmApiKey: env.AI_ASSISTANT_VLLM_API_KEY,
     groqApiKey: env.AI_ASSISTANT_GROQ_API_KEY,
     groqBaseUrl: env.AI_ASSISTANT_GROQ_BASE_URL,
+    groqMaxCompletionTokens: env.AI_ASSISTANT_GROQ_MAX_COMPLETION_TOKENS,
     plannerPromptVersion: env.AI_ASSISTANT_PLANNER_PROMPT_VERSION,
   });
 

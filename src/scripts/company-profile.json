@@ -1,0 +1,13 @@
+{
+  "name": "Dental Digital Lab",
+  "about": "Dental Digital Lab is a full-service dental laboratory delivering digital planning, guided surgery workflows, restorative design, and production support for clinics and doctors.",
+  "email": "support@dentaldigitallab.com",
+  "phone": "+20-100-000-0000",
+  "address": "Cairo, Egypt",
+  "workingHours": "Sun-Thu 09:00-17:00",
+  "submissionStandards": [
+    "Provide clear upper/lower STL scans with bite registration.",
+    "Attach CBCT/CT data for surgical-guide and full-guide cases.",
+    "Include shade reference and clinical notes for restorative cases."
+  ]
+}

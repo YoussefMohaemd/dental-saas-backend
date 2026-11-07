@@ -8,15 +8,16 @@ import {
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 import { type ClinicService } from '../../clinics/application/clinic-service';
 import { type DoctorService } from '../../doctors/application/doctor-service';
-import { createClinicBodySchema } from '../../clinics/presentation/clinics.schemas';
-import { createDoctorBodySchema } from '../../doctors/presentation/doctors.schemas';
-import { createPatientBodySchema } from '../../patients/presentation/patients.schemas';
+import { createClinicBodySchema, updateClinicBodySchema } from '../../clinics/presentation/clinics.schemas';
+import { createDoctorBodySchema, updateDoctorBodySchema } from '../../doctors/presentation/doctors.schemas';
+import { createPatientBodySchema, updatePatientBodySchema } from '../../patients/presentation/patients.schemas';
 import { type OrdersService } from '../../orders/application/orders-service';
 import { type PatientService } from '../../patients/application/patient-service';
 import {
   ORDER_DURATION_VALUES,
   ORDER_LIST_SORT_FIELDS,
   ORDER_STATUS_VALUES,
+  type OrderWritePayload,
 } from '../../orders/domain/order';
 import { type AssistantCatalogRepository } from './assistant-catalog';
 import { type AssistantPlanAction, type AssistantToolDefinition } from '../domain/assistant.types';
@@ -126,6 +127,27 @@ const updateOrderArgsSchema = z
     payload: z.record(z.string(), z.unknown()),
   })
   .strict();
+
+const updatePatientArgsSchema = z
+  .object({
+    patientId: z.string().trim().min(1),
+    payload: z.record(z.string(), z.unknown()),
+  })
+  .strict();
+
+const updateDoctorArgsSchema = z
+  .object({
+    doctorId: z.string().trim().min(1),
+    payload: z.record(z.string(), z.unknown()),
+  })
+  .strict();
+
+const updateClinicArgsSchema = z
+  .object({
+    clinicId: z.string().trim().min(1),
+    payload: z.record(z.string(), z.unknown()),
+  })
+  .strict();
 const objectIdRegex = /^[a-f0-9]{24}$/i;
 const createPatientAssistantPayloadSchema = z
   .object({
@@ -154,6 +176,135 @@ const createPatientAssistantPayloadSchema = z
 
 export class AssistantActionExecutor {
   public constructor(private readonly dependencies: AssistantActionExecutorDependencies) {}
+
+  public async validateWriteActionDraft(input: {
+    toolName: string;
+    payload: Record<string, unknown>;
+    context: AssistantExecutionContext;
+  }): Promise<void> {
+    if (containsDeleteOperation(input.toolName)) {
+      throw new ApplicationError({
+        message: 'Delete operations are blocked',
+        statusCode: 403,
+        code: APPLICATION_ERROR_CODES.FORBIDDEN,
+        expose: true,
+        details: { tool: input.toolName },
+      });
+    }
+
+    if (input.toolName === 'create_order') {
+      const args = this.parseStrictToolArgs(createOrderArgsSchema, input.payload, input.toolName);
+      await this.parseCreateOrderPayload(args.payload, input.context);
+      return;
+    }
+
+    if (input.toolName === 'update_order') {
+      const args = this.parseStrictToolArgs(updateOrderArgsSchema, input.payload, input.toolName);
+      const payload = this.parseUpdateOrderPayload(args.payload);
+      if (Object.keys(payload).length === 0) {
+        throw new ApplicationError({
+          message: 'Update order payload must contain at least one field',
+          statusCode: 400,
+          code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+          expose: true,
+        });
+      }
+      return;
+    }
+
+    if (input.toolName === 'create_patient') {
+      const args = this.parseStrictToolArgs(createEntityArgsSchema, input.payload, input.toolName);
+      const payload = this.parseStrictToolArgs(
+        createPatientAssistantPayloadSchema,
+        args.payload,
+        'create_patient.payload',
+      );
+      const { clinicId } = await this.resolveClinicForPatientPayload(payload, input.context.scope);
+      const { doctorId } = await this.resolveDoctorForPatientPayload(
+        payload,
+        clinicId,
+        input.context.scope,
+      );
+      this.parseStrictToolArgs(
+        createPatientBodySchema,
+        {
+          name: payload.name,
+          dob: payload.dob,
+          gender: payload.gender,
+          phone: payload.phone,
+          email: payload.email,
+          clinicId,
+          doctorId,
+          status: payload.status,
+          lastVisit: payload.lastVisit ?? new Date(),
+        },
+        'create_patient.payload',
+      );
+      return;
+    }
+
+    if (input.toolName === 'create_doctor') {
+      const args = this.parseStrictToolArgs(createEntityArgsSchema, input.payload, input.toolName);
+      this.parseStrictToolArgs(createDoctorBodySchema, args.payload, 'create_doctor.payload');
+      return;
+    }
+
+    if (input.toolName === 'create_clinic') {
+      const args = this.parseStrictToolArgs(createEntityArgsSchema, input.payload, input.toolName);
+      this.parseStrictToolArgs(createClinicBodySchema, args.payload, 'create_clinic.payload');
+      return;
+    }
+
+    if (input.toolName === 'update_patient') {
+      const args = this.parseStrictToolArgs(updatePatientArgsSchema, input.payload, input.toolName);
+      const payload = this.parseStrictToolArgs(updatePatientBodySchema, args.payload, 'update_patient.payload');
+      if (Object.keys(payload).length === 0) {
+        throw new ApplicationError({
+          message: 'Update patient payload must contain at least one field',
+          statusCode: 400,
+          code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+          expose: true,
+        });
+      }
+      return;
+    }
+
+    if (input.toolName === 'update_doctor') {
+      const args = this.parseStrictToolArgs(updateDoctorArgsSchema, input.payload, input.toolName);
+      const payload = this.parseStrictToolArgs(updateDoctorBodySchema, args.payload, 'update_doctor.payload');
+      if (Object.keys(payload).length === 0) {
+        throw new ApplicationError({
+          message: 'Update doctor payload must contain at least one field',
+          statusCode: 400,
+          code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+          expose: true,
+        });
+      }
+      return;
+    }
+
+    if (input.toolName === 'update_clinic') {
+      const args = this.parseStrictToolArgs(updateClinicArgsSchema, input.payload, input.toolName);
+      const payload = this.parseStrictToolArgs(updateClinicBodySchema, args.payload, 'update_clinic.payload');
+      if (Object.keys(payload).length === 0) {
+        throw new ApplicationError({
+          message: 'Update clinic payload must contain at least one field',
+          statusCode: 400,
+          code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+          expose: true,
+        });
+      }
+      return;
+    }
+
+    throw new ApplicationError({
+      message: 'Write action is not supported by assistant executor',
+      statusCode: 400,
+      code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+      expose: true,
+      details: { tool: input.toolName },
+    });
+  }
 
   public executeReadActions(
     actions: AssistantPlanAction[],
@@ -216,6 +367,14 @@ export class AssistantActionExecutor {
       return this.executeCreateEntity(input);
     }
 
+    if (
+      input.toolName === 'update_patient' ||
+      input.toolName === 'update_doctor' ||
+      input.toolName === 'update_clinic'
+    ) {
+      return this.executeUpdateEntity(input);
+    }
+
     throw new ApplicationError({
       message: 'Write action is not supported by assistant executor',
       statusCode: 400,
@@ -272,6 +431,7 @@ export class AssistantActionExecutor {
                 ...result.meta,
                 totalItems: items.length,
                 totalPages: Math.max(1, Math.ceil(items.length / Math.max(1, result.meta.pageSize))),
+                overdueOnThisPage: items.length,
                 overdueTotalItems: items.length,
               }
             : result.meta,
@@ -347,10 +507,27 @@ export class AssistantActionExecutor {
       return { actionId: action.id, tool: action.tool, status: 'executed', result: { services } };
     }
 
+    if (action.tool === 'list_service_prices') {
+      this.parseStrictToolArgs(emptyArgsSchema, action.arguments, action.tool);
+      const services = await this.dependencies.catalogRepository.listServices(context.tenantId);
+      return { actionId: action.id, tool: action.tool, status: 'executed', result: { services } };
+    }
+
     if (action.tool === 'get_company_info') {
       this.parseStrictToolArgs(emptyArgsSchema, action.arguments, action.tool);
       const profile = await this.dependencies.catalogRepository.getCompanyProfile(context.tenantId);
       return { actionId: action.id, tool: action.tool, status: 'executed', result: { profile } };
+    }
+
+    if (action.tool === 'get_submission_standards') {
+      this.parseStrictToolArgs(emptyArgsSchema, action.arguments, action.tool);
+      const profile = await this.dependencies.catalogRepository.getCompanyProfile(context.tenantId);
+      return {
+        actionId: action.id,
+        tool: action.tool,
+        status: 'executed',
+        result: { standards: profile?.submissionStandards ?? [] },
+      };
     }
 
     if (action.tool === 'search_clinics') {
@@ -462,7 +639,7 @@ export class AssistantActionExecutor {
     context: AssistantExecutionContext;
   }): Promise<AssistantActionExecutionSummary> {
     const args = this.parseStrictToolArgs(createOrderArgsSchema, input.payload, input.toolName);
-    const payload = this.parseCreateOrderPayload(args.payload);
+    const payload = await this.parseCreateOrderPayload(args.payload, input.context);
     const result = await this.dependencies.ordersService.createOrder(payload, input.context.scope);
     return {
       actionId: input.actionId,
@@ -500,6 +677,58 @@ export class AssistantActionExecutor {
       status: 'executed',
       result,
     };
+  }
+
+  private async executeUpdateEntity(input: {
+    actionId: string;
+    toolName: string;
+    payload: Record<string, unknown>;
+    context: AssistantExecutionContext;
+  }): Promise<AssistantActionExecutionSummary> {
+    const { scope } = input.context;
+
+    if (input.toolName === 'update_patient') {
+      const args = this.parseStrictToolArgs(updatePatientArgsSchema, input.payload, input.toolName);
+      const payload = this.parseStrictToolArgs(updatePatientBodySchema, args.payload, 'update_patient.payload');
+      if (Object.keys(payload).length === 0) {
+        throw new ApplicationError({
+          message: 'Update patient payload must contain at least one field',
+          statusCode: 400,
+          code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+          expose: true,
+        });
+      }
+      const result = await this.dependencies.patientService.updatePatient(args.patientId, payload, scope);
+      return { actionId: input.actionId, tool: input.toolName, status: 'executed', result };
+    }
+
+    if (input.toolName === 'update_doctor') {
+      const args = this.parseStrictToolArgs(updateDoctorArgsSchema, input.payload, input.toolName);
+      const payload = this.parseStrictToolArgs(updateDoctorBodySchema, args.payload, 'update_doctor.payload');
+      if (Object.keys(payload).length === 0) {
+        throw new ApplicationError({
+          message: 'Update doctor payload must contain at least one field',
+          statusCode: 400,
+          code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+          expose: true,
+        });
+      }
+      const result = await this.dependencies.doctorService.updateDoctor(args.doctorId, payload, scope);
+      return { actionId: input.actionId, tool: input.toolName, status: 'executed', result };
+    }
+
+    const args = this.parseStrictToolArgs(updateClinicArgsSchema, input.payload, input.toolName);
+    const payload = this.parseStrictToolArgs(updateClinicBodySchema, args.payload, 'update_clinic.payload');
+    if (Object.keys(payload).length === 0) {
+      throw new ApplicationError({
+        message: 'Update clinic payload must contain at least one field',
+        statusCode: 400,
+        code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+        expose: true,
+      });
+    }
+    const result = await this.dependencies.clinicService.updateClinic(args.clinicId, payload, scope);
+    return { actionId: input.actionId, tool: input.toolName, status: 'executed', result };
   }
 
   private resolvePagination(args: {
@@ -547,45 +776,57 @@ export class AssistantActionExecutor {
     });
   }
 
-  private parseCreateOrderPayload(payload: Record<string, unknown>) {
+  private async parseCreateOrderPayload(
+    payload: Record<string, unknown>,
+    context: AssistantExecutionContext,
+  ): Promise<OrderWritePayload> {
+    const now = new Date();
+    const defaultDueDate = new Date(now);
+    defaultDueDate.setDate(defaultDueDate.getDate() + 7);
+
     const schema = z
       .object({
-        orderNumber: z.string().trim().min(1),
-        patientId: z.string().trim().min(1),
-        doctorId: z.string().trim().min(1),
-        clinicId: z.string().trim().min(1),
+        orderNumber: z.string().trim().min(1).optional(),
+        patientId: z.string().trim().min(1).optional(),
+        patientName: z.string().trim().min(1).optional(),
+        doctorId: z.string().trim().min(1).optional(),
+        doctorName: z.string().trim().min(1).optional(),
+        clinicId: z.string().trim().min(1).optional(),
+        clinicName: z.string().trim().min(1).optional(),
         scanCenterId: z.string().trim().min(1).optional(),
-        status: z.enum(ORDER_STATUS_VALUES),
-        priority: z.enum(['Low', 'Normal', 'High', 'Urgent']),
-        restoration: z.enum([
-          'Crown',
-          'Bridge',
-          'Veneer',
-          'Implant Crown',
-          'Full Arch',
-          'Night Guard',
-          'Inlay',
-          'Onlay',
-          'Partial Denture',
-          'Complete Denture',
-        ]),
-        arch: z.enum(['Maxilla', 'Mandible', 'Both']),
-        format: z.string().trim().min(1),
-        shade: z.string().trim().min(1),
-        units: z.coerce.number().int().min(1),
-        amount: z.coerce.number().min(0),
-        billed: z.boolean(),
+        status: z.enum(ORDER_STATUS_VALUES).default('New'),
+        priority: z.enum(['Low', 'Normal', 'High', 'Urgent']).default('Normal'),
+        restoration: z
+          .enum([
+            'Crown',
+            'Bridge',
+            'Veneer',
+            'Implant Crown',
+            'Full Arch',
+            'Night Guard',
+            'Inlay',
+            'Onlay',
+            'Partial Denture',
+            'Complete Denture',
+          ])
+          .default('Crown'),
+        arch: z.enum(['Maxilla', 'Mandible', 'Both']).default('Both'),
+        format: z.string().trim().min(1).default('STL'),
+        shade: z.string().trim().min(1).default('A2'),
+        units: z.coerce.number().int().min(1).default(1),
+        amount: z.coerce.number().min(0).default(0),
+        billed: z.boolean().default(false),
         billedAmount: z.coerce.number().min(0).optional(),
-        billTo: z.string().trim().min(1),
-        vouchers: z.coerce.number().int().min(0),
-        isLocked: z.boolean(),
-        hasNotes: z.boolean(),
-        notes: z.string(),
+        billTo: z.string().trim().min(1).default('doctor'),
+        vouchers: z.coerce.number().int().min(0).default(0),
+        isLocked: z.boolean().default(false),
+        hasNotes: z.boolean().optional(),
+        notes: z.string().default(''),
         archiveDate: z.coerce.date().optional(),
-        receivedAt: z.coerce.date(),
+        receivedAt: z.coerce.date().optional(),
         sentAt: z.coerce.date().optional(),
         chargedAt: z.coerce.date().optional(),
-        dueDate: z.coerce.date(),
+        dueDate: z.coerce.date().optional(),
         changeRequestId: z.string().trim().min(1).optional(),
         csTask: z.string().trim().min(1).optional(),
         technicianId: z.string().trim().min(1).optional(),
@@ -594,29 +835,249 @@ export class AssistantActionExecutor {
             services: z.array(
               z.object({
                 serviceId: z.string().trim().min(1),
-                serviceDetails: z.record(z.string(), z.string()),
-                serviceForm: z.record(z.string(), z.string()),
-                selectedTeeth: z.array(z.number().int().min(1).max(99)),
-                scanRequirements: z.array(z.string()),
-                fileReferences: z.array(z.string()),
+                serviceDetails: z.record(z.string(), z.string()).default({}),
+                serviceForm: z.record(z.string(), z.string()).default({}),
+                selectedTeeth: z.array(z.coerce.number().int().min(1).max(99)).default([]),
+                scanRequirements: z.array(z.string()).default([]),
+                fileReferences: z.array(z.string()).default([]),
               }),
             ),
             communication: z
               .object({
-                internalCaseNote: z.string(),
-                internalCaseFiles: z.array(z.string()),
-                sendMailTo: z.array(z.string()),
+                internalCaseNote: z.string().default(''),
+                internalCaseFiles: z.array(z.string()).default([]),
+                sendMailTo: z.array(z.string()).default([]),
                 sendIhTaskTo: z.string().optional(),
-                rushTask: z.boolean(),
+                rushTask: z.boolean().default(false),
               })
               .optional(),
           })
+          .transform((value) => ({
+            ...value,
+            services: value.services ?? [],
+          }))
           .optional(),
       })
       .strict();
 
     const parsed = this.parseStrictToolArgs(schema, payload, 'create_order.payload');
-    return stripUndefined(parsed);
+    const patientId = await this.resolvePatientId(
+      parsed.patientId,
+      parsed.patientName,
+      context.scope,
+    );
+    const patient = await this.dependencies.patientService.getPatientById(patientId, context.scope);
+    const patientDoctorId =
+      typeof patient.doctorId === 'string' ? patient.doctorId.trim() : '';
+    const patientClinicId =
+      typeof patient.clinicId === 'string' ? patient.clinicId.trim() : '';
+    const doctorId = await this.resolveDoctorId(
+      patientDoctorId || parsed.doctorId,
+      patientDoctorId ? undefined : parsed.doctorName,
+      context.scope,
+    );
+    const doctor = await this.dependencies.doctorService.getDoctorById(doctorId, context.scope);
+    const doctorClinicId =
+      typeof (doctor as { clinicId?: unknown }).clinicId === 'string'
+        ? (doctor as { clinicId: string }).clinicId.trim()
+        : '';
+    const clinicId = await this.resolveClinicId(
+      doctorClinicId || patientClinicId || parsed.clinicId,
+      doctorClinicId || patientClinicId ? undefined : parsed.clinicName,
+      context.scope,
+    );
+    await this.dependencies.clinicService.getClinicById(clinicId, context.scope);
+
+    return stripUndefined({
+      ...parsed,
+      patientId,
+      doctorId,
+      clinicId,
+      orderNumber: parsed.orderNumber ?? this.buildAssistantOrderNumber(now),
+      hasNotes: parsed.hasNotes ?? parsed.notes.trim().length > 0,
+      receivedAt: parsed.receivedAt ?? now,
+      dueDate: parsed.dueDate ?? defaultDueDate,
+    }) as OrderWritePayload;
+  }
+
+  private buildAssistantOrderNumber(now: Date): string {
+    const stamp = now.toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
+    const random = Math.floor(Math.random() * 10_000)
+      .toString()
+      .padStart(4, '0');
+    return `AI-${stamp}-${random}`;
+  }
+
+  private async resolvePatientId(
+    patientId: string | undefined,
+    patientName: string | undefined,
+    scope: DataVisibilityScope,
+  ): Promise<string> {
+    if (patientId && objectIdRegex.test(patientId)) {
+      return patientId;
+    }
+    if (!patientName) {
+      throw new ApplicationError({
+        message: patientId
+          ? 'create_order requires valid patientId or patientName'
+          : 'create_order requires patientId or patientName',
+        statusCode: 400,
+        code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+        expose: true,
+      });
+    }
+
+    const result = await this.dependencies.patientService.listPatients(
+      {
+        scope,
+        search: patientName,
+        sortBy: 'createdAt',
+        sortDirection: 'desc',
+        statuses: [],
+      },
+      { page: 1, pageSize: 20 },
+    );
+    const exact = result.items.filter(
+      (item) => item.name.trim().toLowerCase() === patientName.trim().toLowerCase(),
+    );
+    if (exact.length === 1) {
+      const [match] = exact;
+      if (match) {
+        return match.id;
+      }
+    }
+    if (exact.length > 1) {
+      throw new ApplicationError({
+        message: `Multiple patients match '${patientName}'. Please provide patientId.`,
+        statusCode: 400,
+        code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+        expose: true,
+      });
+    }
+    throw new ApplicationError({
+      message: `Patient '${patientName}' was not found`,
+      statusCode: 404,
+      code: APPLICATION_ERROR_CODES.NOT_FOUND,
+      expose: true,
+    });
+  }
+
+  private async resolveDoctorId(
+    doctorId: string | undefined,
+    doctorName: string | undefined,
+    scope: DataVisibilityScope,
+  ): Promise<string> {
+    if (doctorId && objectIdRegex.test(doctorId)) {
+      return doctorId;
+    }
+    if (doctorName) {
+      const result = await this.dependencies.doctorService.listDoctors(
+        {
+          scope,
+          search: doctorName,
+          sortBy: 'createdAt',
+          sortDirection: 'desc',
+          statuses: [],
+        },
+        { page: 1, pageSize: 20 },
+      );
+      const exact = result.items.filter(
+        (item) => item.name.trim().toLowerCase() === doctorName.trim().toLowerCase(),
+      );
+      if (exact.length === 1) {
+        const [match] = exact;
+        if (match) {
+          return match.id;
+        }
+      }
+      if (exact.length > 1) {
+        throw new ApplicationError({
+          message: `Multiple doctors match '${doctorName}'. Please provide doctorId.`,
+          statusCode: 400,
+          code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+          expose: true,
+        });
+      }
+      throw new ApplicationError({
+        message: `Doctor '${doctorName}' was not found`,
+        statusCode: 404,
+        code: APPLICATION_ERROR_CODES.NOT_FOUND,
+        expose: true,
+      });
+    }
+    if (doctorId) {
+      throw new ApplicationError({
+        message: 'create_order requires valid doctorId or doctorName',
+        statusCode: 400,
+        code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+        expose: true,
+      });
+    }
+    throw new ApplicationError({
+      message: 'create_order requires doctorId or doctorName',
+      statusCode: 400,
+      code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+      expose: true,
+    });
+  }
+
+  private async resolveClinicId(
+    clinicId: string | undefined,
+    clinicName: string | undefined,
+    scope: DataVisibilityScope,
+  ): Promise<string> {
+    if (clinicId && objectIdRegex.test(clinicId)) {
+      return clinicId;
+    }
+    if (clinicName) {
+      const result = await this.dependencies.clinicService.listClinics(
+        {
+          scope,
+          search: clinicName,
+          sortBy: 'createdAt',
+          sortDirection: 'desc',
+          statuses: [],
+        },
+        { page: 1, pageSize: 20 },
+      );
+      const exact = result.items.filter(
+        (item) => item.name.trim().toLowerCase() === clinicName.trim().toLowerCase(),
+      );
+      if (exact.length === 1) {
+        const [match] = exact;
+        if (match) {
+          return match.id;
+        }
+      }
+      if (exact.length > 1) {
+        throw new ApplicationError({
+          message: `Multiple clinics match '${clinicName}'. Please provide clinicId.`,
+          statusCode: 400,
+          code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+          expose: true,
+        });
+      }
+      throw new ApplicationError({
+        message: `Clinic '${clinicName}' was not found`,
+        statusCode: 404,
+        code: APPLICATION_ERROR_CODES.NOT_FOUND,
+        expose: true,
+      });
+    }
+    if (clinicId) {
+      throw new ApplicationError({
+        message: 'create_order requires valid clinicId or clinicName',
+        statusCode: 400,
+        code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+        expose: true,
+      });
+    }
+    throw new ApplicationError({
+      message: 'create_order requires clinicId or clinicName',
+      statusCode: 400,
+      code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+      expose: true,
+    });
   }
 
   private parseUpdateOrderPayload(payload: Record<string, unknown>) {

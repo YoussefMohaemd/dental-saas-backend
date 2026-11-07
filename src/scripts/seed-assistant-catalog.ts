@@ -16,8 +16,9 @@ import { UserModel } from '../shared/infrastructure/persistence/mongoose/models/
  *
  *   npm run seed:assistant-catalog
  *
- * Company profile: copy scripts/company-profile.example.json to
- * scripts/company-profile.json, fill in the real values and re-run.
+ * Company profile: copy src/scripts/company-profile.example.json to
+ * src/scripts/company-profile.json (or scripts/company-profile.json at project
+ * root), fill in the real values and re-run.
  */
 const SERVICES = [
   {
@@ -136,8 +137,13 @@ const run = async (): Promise<void> => {
     }
   }
 
-  const profilePath = resolve(__dirname, 'company-profile.json');
-  if (existsSync(profilePath)) {
+  const profilePathCandidates = [
+    resolve(process.cwd(), 'scripts', 'company-profile.json'),
+    resolve(__dirname, 'company-profile.json'),
+  ];
+  const profilePath = profilePathCandidates.find((path) => existsSync(path));
+
+  if (profilePath) {
     const profile = JSON.parse(readFileSync(profilePath, 'utf8')) as Record<string, unknown>;
     for (const tenantId of tenantIds) {
       await AssistantCompanyProfileModel.updateOne(
@@ -147,7 +153,10 @@ const run = async (): Promise<void> => {
       );
     }
   } else {
-    logger.warn('scripts/company-profile.json not found; company profile not seeded');
+    logger.warn(
+      { lookedIn: profilePathCandidates },
+      'company-profile.json not found; company profile not seeded',
+    );
   }
 
   logger.info({ tenants: tenantIds.length, services: SERVICES.length }, 'Assistant catalog seeded');

@@ -137,8 +137,8 @@ export class AssistantService {
       auditRepository,
       ordersService: new NoopOrdersServiceForTests() as unknown as OrdersService,
       patientService: new NoopPatientsServiceForTests() as unknown as PatientService,
-      doctorService: {} as unknown as DoctorService,
-      clinicService: {} as unknown as ClinicService,
+      doctorService: new NoopDoctorsServiceForTests() as unknown as DoctorService,
+      clinicService: new NoopClinicsServiceForTests() as unknown as ClinicService,
       options: {
         maxActionsPerMessage: 8,
         maxPlanningRounds: 4,
@@ -320,17 +320,24 @@ export class AssistantService {
     });
 
     const effectiveCapabilities = new Set(resolveRoleCapabilities(principal.roles));
-    const llmCompletion = await this.completePlanWithFallback(content, history);
+    const llmCompletion = await this.completePlan(content, history);
 
-    const plannedActions = applyCatalogFallbackActions(content, llmCompletion.actions);
+    const plannedActions =
+      llmCompletion.actions.length > 0
+        ? llmCompletion.actions
+        : buildCatalogFallbackActions(content);
     const actions = this.dependencies.actionPlanner.validatePlan({
       intent: plannedActions.length > 1 ? 'multiple_actions' : 'single_action',
       actions: plannedActions,
     }).actions;
+    const normalizedActions = actions.map((action) => ({
+      ...action,
+      arguments: normalizeModelToolArguments(action.arguments),
+    }));
 
     const pendingActions = [];
     const toolByActionId = new Map<string, ReturnType<AssistantToolRegistry['get']>>();
-    for (const action of actions) {
+    for (const action of normalizedActions) {
       const tool = this.dependencies.toolRegistry.get(action.tool);
       toolByActionId.set(action.id, tool);
       this.dependencies.permissionGuard.assertCapabilities(
@@ -340,6 +347,15 @@ export class AssistantService {
       );
 
       if (tool.requiresConfirmation) {
+        await this.dependencies.actionExecutor.validateWriteActionDraft({
+          toolName: tool.name,
+          payload: action.arguments,
+          context: {
+            scope: principal.scope,
+            tenantId: principal.tenantId,
+          },
+        });
+
         const pendingAction = await this.dependencies.confirmationService.createPendingAction({
           conversationId: input.conversationId,
           tenantId: principal.tenantId,
@@ -363,7 +379,7 @@ export class AssistantService {
 
     }
 
-    const executions = await this.dependencies.actionExecutor.executeReadActions(actions, toolByActionId, {
+    const executions = await this.dependencies.actionExecutor.executeReadActions(normalizedActions, toolByActionId, {
       scope: principal.scope,
       tenantId: principal.tenantId,
     });
@@ -378,8 +394,8 @@ export class AssistantService {
           }
         : {
             type: 'text',
-            text: composeReadReply(llmCompletion.reply, executions, actions),
-            plannedActions: actions.length,
+            text: composeReadReply(llmCompletion.reply, executions, normalizedActions),
+            plannedActions: normalizedActions.length,
             executions,
           };
 
@@ -425,33 +441,17 @@ export class AssistantService {
     };
   }
 
-  private async completePlanWithFallback(
+  private async completePlan(
     content: string,
     history: AssistantLlmCompletionRequest['history'],
   ): Promise<AssistantLlmCompletionResult> {
-    try {
-      return await this.dependencies.provider.completePlan({
-        userMessage: content,
-        history,
-        systemPrompt: buildSystemPrompt(new Date()),
-        tools: this.dependencies.toolRegistry.list(),
-        languageHint: detectLanguageHint(content),
-      });
-    } catch (error) {
-      if (!isAssistantTimeoutError(error)) {
-        throw error;
-      }
-
-      const fallbackActions = buildTimeoutFallbackActions(content);
-      if (fallbackActions.length === 0) {
-        throw error;
-      }
-
-      return {
-        reply: 'Model timed out, so I used direct data tools.',
-        actions: fallbackActions,
-      };
-    }
+    return this.dependencies.provider.completePlan({
+      userMessage: content,
+      history,
+      systemPrompt: buildSystemPrompt(new Date()),
+      tools: this.dependencies.toolRegistry.list(),
+      languageHint: detectLanguageHint(content),
+    });
   }
 
   public async confirmAction(
@@ -583,16 +583,79 @@ class NoopOrdersServiceForTests {
 }
 
 class NoopPatientsServiceForTests {
+  private readonly patient = {
+    id: '96889346eeb97e3c70caa914',
+    name: 'Adam Wael',
+    doctorId: '66f100000000000000000222',
+    clinicId: '66f100000000000000000333',
+  };
+
   public listPatients(): Promise<{ items: unknown[]; meta: unknown }> {
     return Promise.resolve({
-      items: [],
+      items: [this.patient],
       meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
     });
   }
 
-  public getPatientById(): Promise<Record<string, never>> {
+  public getPatientById(patientId: string): Promise<unknown> {
+    if (patientId === this.patient.id) {
+      return Promise.resolve(this.patient);
+    }
     return Promise.resolve({});
   }
+}
+
+class NoopDoctorsServiceForTests {
+  private readonly doctor = {
+    id: '66f100000000000000000222',
+    name: 'Mostafa Samir',
+    clinicId: '66f100000000000000000333',
+  };
+
+  public listDoctors(): Promise<{ items: unknown[]; meta: unknown }> {
+    return Promise.resolve({
+      items: [this.doctor],
+      meta: { totalItems: 1, page: 1, pageSize: 20, totalPages: 1 },
+    });
+  }
+
+  public getDoctorById(doctorId: string): Promise<unknown> {
+    if (doctorId === this.doctor.id) {
+      return Promise.resolve(this.doctor);
+    }
+    return Promise.resolve({});
+  }
+}
+
+class NoopClinicsServiceForTests {
+  private readonly clinic = {
+    id: '66f100000000000000000333',
+    name: 'Dental Care Clinic 10',
+  };
+
+  public listClinics(): Promise<{ items: unknown[]; meta: unknown }> {
+    return Promise.resolve({
+      items: [this.clinic],
+      meta: { totalItems: 1, page: 1, pageSize: 20, totalPages: 1 },
+    });
+  }
+
+  public getClinicById(clinicId: string): Promise<unknown> {
+    if (clinicId === this.clinic.id) {
+      return Promise.resolve(this.clinic);
+    }
+    return Promise.resolve({});
+  }
+}
+
+function normalizeModelToolArguments(value: Record<string, unknown>): Record<string, unknown> {
+  if (!('dependsOn' in value)) {
+    return value;
+  }
+
+  const normalized = { ...value };
+  delete normalized.dependsOn;
+  return normalized;
 }
 
 function composeReadReply(
@@ -615,6 +678,60 @@ function buildReadOnlyFallbackText(actions: AssistantPlanAction[]): string {
   }
 
   return `Planned ${actions.length} action(s): ${actions.map((action) => action.tool).join(', ')}.`;
+}
+
+function buildCatalogFallbackActions(content: string): AssistantPlanAction[] {
+  const normalized = content.toLowerCase();
+  const asksServicePricing =
+    /(pricing|prices?|price list|cost|fees?|الاسعار|الأسعار|السعر)/u.test(
+      normalized,
+    );
+  const asksServiceCatalog =
+    /(services?|service catalog|catalog|offerings|الخدمات|الخدمه|الخدمة)/u.test(normalized);
+  const asksCompanyProfile =
+    /(about|company|profile|contact|working hours|address|phone|email|who are you|about us|من نحن|الشركة|الملف|العنوان|التواصل|ساعات العمل)/u.test(
+      normalized,
+    );
+  const asksSubmissionStandards =
+    /(submission standard|submission standards|requirements|المتطلبات|معايير|ستاندرد|standard)/u.test(
+      normalized,
+    );
+
+  const actions: AssistantPlanAction[] = [];
+  if (asksCompanyProfile) {
+    actions.push({
+      id: 'fallback-company-info',
+      tool: 'get_company_info',
+      arguments: {},
+      dependsOn: [],
+    });
+  }
+  if (asksServiceCatalog) {
+    actions.push({
+      id: 'fallback-list-services',
+      tool: 'list_services',
+      arguments: {},
+      dependsOn: [],
+    });
+  }
+  if (asksServicePricing) {
+    actions.push({
+      id: 'fallback-list-service-prices',
+      tool: 'list_service_prices',
+      arguments: {},
+      dependsOn: [],
+    });
+  }
+  if (asksSubmissionStandards) {
+    actions.push({
+      id: 'fallback-submission-standards',
+      tool: 'get_submission_standards',
+      arguments: {},
+      dependsOn: [],
+    });
+  }
+
+  return actions;
 }
 
 function detectLanguageHint(content: string): 'ar' | 'en' | 'mixed' {
@@ -644,14 +761,17 @@ function buildSystemPrompt(now: Date): string {
     `Current date/time (UTC): ${now.toISOString()}. Resolve relative dates such as "today", "tomorrow" or "next week" from it.`,
     'You can see the previous messages of this conversation. Use them to complete a request across several turns.',
     'NEVER guess ids, order numbers or required fields. If a required field is missing, ask the user for it in "reply" and return an empty actions array.',
-    'To turn a name into an id, call the matching search tool first; the user will see the ids and you can use them on the next turn.',
+    'To turn a name into an id, you may call search tools, or pass patientName/doctorName/clinicName in create_order and let backend resolve them.',
     'You are the Dental SaaS assistant for a dental laboratory platform.',
     'Reply in the same language the user writes in (Arabic, English or mixed).',
     'Never execute delete operations.',
     'Respect authenticated user capabilities and tenant scope.',
     'NEVER invent company facts, services, prices, orders, patients, doctors or clinics. All of them come from tools.',
-    'For questions about the company, call get_company_info. For services or prices, call list_services.',
-    'All authenticated users can call list_services and get_company_info.',
+    'For questions about the company, call get_company_info.',
+    'For service catalog details, call list_services.',
+    'For service pricing only, call list_service_prices.',
+    'For submission standards only, call get_submission_standards.',
+    'All authenticated users can call list_services, list_service_prices, get_submission_standards and get_company_info.',
     'For orders, patients, doctors or clinics, call the matching search/details tool.',
     'When creating a patient, you may pass clinicName/doctorName if ids are unavailable; the system can auto-resolve or create missing clinic/doctor with safe defaults.',
     'The system appends the tool results to your reply automatically, so keep "reply" to one short sentence and do not repeat or retype the data.',
@@ -659,181 +779,6 @@ function buildSystemPrompt(now: Date): string {
     'Return strict JSON object: {"reply":string,"actions":[{"id":string,"tool":string,"arguments":object,"dependsOn":string[]}]}',
     'Do not include chain of thought.',
   ].join('\n');
-}
-
-function applyCatalogFallbackActions(
-  content: string,
-  actions: AssistantPlanAction[],
-): AssistantPlanAction[] {
-  if (actions.length > 0) {
-    return actions;
-  }
-
-  if (isServiceCatalogQuery(content)) {
-    return [
-      ...actions,
-      {
-        id: 'auto-list-services',
-        tool: 'list_services',
-        arguments: {},
-        dependsOn: [],
-      },
-    ];
-  }
-
-  if (isCompanyProfileQuery(content)) {
-    return [
-      ...actions,
-      {
-        id: 'fallback-company-info',
-        tool: 'get_company_info',
-        arguments: {},
-        dependsOn: [],
-      },
-    ];
-  }
-
-  if (isOverdueOrdersQuery(content)) {
-    return [
-      ...actions,
-      {
-        id: 'fallback-overdue-orders',
-        tool: 'search_orders',
-        arguments: { overdue: true },
-        dependsOn: [],
-      },
-    ];
-  }
-
-  return actions;
-}
-
-function isCompanyProfileQuery(content: string): boolean {
-  const normalized = content.toLowerCase();
-  return (
-    normalized.includes('about the company') ||
-    normalized.includes('about company') ||
-    normalized.includes('about us') ||
-    normalized.includes('company info') ||
-    normalized.includes('company information') ||
-    normalized.includes('tell me about the company') ||
-    normalized.includes('who are you') ||
-    (content.includes('الشركة') &&
-      (content.includes('عن') || content.includes('معلومات') || content.includes('نبذة')))
-  );
-}
-
-function isOverdueOrdersQuery(content: string): boolean {
-  const normalized = content.toLowerCase();
-  const referencesOrders =
-    normalized.includes('order') ||
-    normalized.includes('orders') ||
-    content.includes('اوردر') ||
-    content.includes('أوردر') ||
-    content.includes('طلب') ||
-    content.includes('طلبات');
-  const referencesDelay =
-    normalized.includes('overdue') ||
-    normalized.includes('delayed') ||
-    normalized.includes('past due') ||
-    normalized.includes('late') ||
-    content.includes('متأخر') ||
-    content.includes('متاخر') ||
-    content.includes('متأخرة') ||
-    content.includes('متاخرة') ||
-    content.includes('تأخير');
-
-  return referencesOrders && referencesDelay;
-}
-
-function isServiceCatalogQuery(content: string): boolean {
-  const normalized = content.toLowerCase();
-  return (
-    normalized.includes('service') ||
-    normalized.includes('services') ||
-    normalized.includes('price') ||
-    normalized.includes('pricing') ||
-    /[\u0600-\u06FF]/u.test(content) &&
-      (content.includes('خدم') || content.includes('سعر'))
-  );
-}
-
-function isAssistantTimeoutError(error: unknown): boolean {
-  return (
-    error instanceof ApplicationError &&
-    error.statusCode === 504 &&
-    error.message.toLowerCase().includes('timed out')
-  );
-}
-
-function buildTimeoutFallbackActions(content: string): AssistantPlanAction[] {
-  const orderCode = content.match(/[A-Z]{2,}-\d{3,}/i)?.[0];
-  if (orderCode && isOrderDetailsQuery(content)) {
-    return [
-      {
-        id: 'fallback-order-details',
-        tool: 'get_order_details',
-        arguments: { orderId: orderCode },
-        dependsOn: [],
-      },
-    ];
-  }
-
-  const doctorName = extractDoctorName(content);
-  if (doctorName) {
-    return [
-      {
-        id: 'fallback-search-orders-doctor',
-        tool: 'search_orders',
-        arguments: { search: doctorName },
-        dependsOn: [],
-      },
-    ];
-  }
-
-  if (orderCode) {
-    return [
-      {
-        id: 'fallback-search-orders-code',
-        tool: 'search_orders',
-        arguments: { search: orderCode },
-        dependsOn: [],
-      },
-    ];
-  }
-
-  if (isServiceCatalogQuery(content)) {
-    return [
-      {
-        id: 'fallback-list-services',
-        tool: 'list_services',
-        arguments: {},
-        dependsOn: [],
-      },
-    ];
-  }
-
-  return [];
-}
-
-function isOrderDetailsQuery(content: string): boolean {
-  const normalized = content.toLowerCase();
-  return (
-    normalized.includes('show data') ||
-    normalized.includes('order details') ||
-    normalized.includes('details for order') ||
-    content.includes('بيانات') ||
-    content.includes('تفاصيل')
-  );
-}
-
-function extractDoctorName(content: string): string | null {
-  const latinDoctor = content.match(/(?:doctor|dr\.?|دكتور)\s+([A-Za-z][A-Za-z\s'-]{1,80})/i)?.[1];
-  if (latinDoctor) {
-    return latinDoctor.trim();
-  }
-
-  return null;
 }
 
 function buildWriteConfirmationText(

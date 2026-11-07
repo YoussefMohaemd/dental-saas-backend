@@ -120,6 +120,260 @@ describe('AssistantActionExecutor', () => {
     expect(createPatient).not.toHaveBeenCalled();
   });
 
+  it('uses patient-linked clinicId when create_order receives stale clinicId', async () => {
+    const createOrder = vi.fn().mockResolvedValue({ id: 'order-1' });
+    const patientId = '66f100000000000000000111';
+    const patientClinicId = '66f100000000000000000333';
+    const staleClinicId = 'f5d9afd005f77d5531ffefe5';
+    const patientDoctorId = '66f100000000000000000222';
+
+    const executor = new AssistantActionExecutor({
+      ordersService: { createOrder } as never,
+      patientService: {
+        getPatientById: vi.fn().mockResolvedValue({
+          id: patientId,
+          doctorId: patientDoctorId,
+          clinicId: patientClinicId,
+        }),
+      } as never,
+      doctorService: {
+        getDoctorById: vi.fn().mockResolvedValue({ id: patientDoctorId, clinicId: patientClinicId }),
+      } as never,
+      clinicService: {
+        getClinicById: vi.fn().mockResolvedValue({ id: patientClinicId }),
+      } as never,
+      catalogRepository: {} as never,
+    });
+
+    await executor.executeConfirmedWriteAction({
+      actionId: 'a-create-order',
+      toolName: 'create_order',
+      payload: {
+        payload: {
+          patientId,
+          clinicId: staleClinicId,
+          creationData: {
+            services: [
+              {
+                serviceId: 'treatment-plan',
+                selectedTeeth: [13, 33],
+              },
+            ],
+          },
+        },
+      },
+      context,
+    });
+
+    expect(createOrder).toHaveBeenCalledTimes(1);
+    expect(createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        patientId,
+        doctorId: patientDoctorId,
+        clinicId: patientClinicId,
+      }),
+      context.scope,
+    );
+  });
+
+  it('accepts selectedTeeth values provided as numeric strings', async () => {
+    const createOrder = vi.fn().mockResolvedValue({ id: 'order-2' });
+    const patientId = '66f100000000000000000111';
+    const clinicId = '66f100000000000000000333';
+    const doctorId = '66f100000000000000000222';
+
+    const executor = new AssistantActionExecutor({
+      ordersService: { createOrder } as never,
+      patientService: {
+        getPatientById: vi.fn().mockResolvedValue({
+          id: patientId,
+          doctorId,
+          clinicId,
+        }),
+      } as never,
+      doctorService: {
+        getDoctorById: vi.fn().mockResolvedValue({ id: doctorId, clinicId }),
+      } as never,
+      clinicService: {
+        getClinicById: vi.fn().mockResolvedValue({ id: clinicId }),
+      } as never,
+      catalogRepository: {} as never,
+    });
+
+    await executor.executeConfirmedWriteAction({
+      actionId: 'a-create-order-strings',
+      toolName: 'create_order',
+      payload: {
+        payload: {
+          patientId,
+          creationData: {
+            services: [
+              {
+                serviceId: 'treatment-plan',
+                selectedTeeth: ['14', '33', '24'],
+              },
+            ],
+          },
+        },
+      },
+      context,
+    });
+
+    expect(createOrder).toHaveBeenCalledTimes(1);
+    expect(createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        creationData: {
+          services: [
+            expect.objectContaining({
+              serviceId: 'treatment-plan',
+              selectedTeeth: [14, 33, 24],
+            }),
+          ],
+        },
+      }),
+      context.scope,
+    );
+  });
+
+  it('rejects unresolved patientId placeholders before querying patient repository', async () => {
+    const createOrder = vi.fn().mockResolvedValue({ id: 'order-4' });
+    const getPatientById = vi.fn();
+
+    const executor = new AssistantActionExecutor({
+      ordersService: { createOrder } as never,
+      patientService: {
+        getPatientById,
+      } as never,
+      doctorService: {} as never,
+      clinicService: {} as never,
+      catalogRepository: {} as never,
+    });
+
+    await expect(
+      executor.executeConfirmedWriteAction({
+        actionId: 'a-create-order-invalid-patient-id',
+        toolName: 'create_order',
+        payload: {
+          payload: {
+            patientId: '__RESOLVED_PATIENT_ID__',
+            creationData: {
+              services: [
+                {
+                  serviceId: 'treatment-plan',
+                  selectedTeeth: [12, 32],
+                },
+              ],
+            },
+          },
+        },
+        context,
+      }),
+    ).rejects.toThrow('create_order requires valid patientId or patientName');
+
+    expect(getPatientById).not.toHaveBeenCalled();
+    expect(createOrder).not.toHaveBeenCalled();
+  });
+
+  it('uses doctor-linked clinicId when patient clinicId is stale', async () => {
+    const createOrder = vi.fn().mockResolvedValue({ id: 'order-3' });
+    const patientId = '66f100000000000000000111';
+    const staleClinicId = 'f5d9afd005f77d5531ffefe5';
+    const doctorId = '66f100000000000000000222';
+    const doctorClinicId = '66f100000000000000000333';
+
+    const executor = new AssistantActionExecutor({
+      ordersService: { createOrder } as never,
+      patientService: {
+        getPatientById: vi.fn().mockResolvedValue({
+          id: patientId,
+          doctorId,
+          clinicId: staleClinicId,
+        }),
+      } as never,
+      doctorService: {
+        getDoctorById: vi.fn().mockResolvedValue({ id: doctorId, clinicId: doctorClinicId }),
+      } as never,
+      clinicService: {
+        getClinicById: vi.fn().mockResolvedValue({ id: doctorClinicId }),
+      } as never,
+      catalogRepository: {} as never,
+    });
+
+    await executor.executeConfirmedWriteAction({
+      actionId: 'a-create-order-stale-patient-clinic',
+      toolName: 'create_order',
+      payload: {
+        payload: {
+          patientId,
+          doctorId,
+          clinicId: staleClinicId,
+          creationData: {
+            services: [
+              {
+                serviceId: 'surgical-guide',
+                selectedTeeth: [12, 34],
+              },
+            ],
+          },
+        },
+      },
+      context,
+    });
+
+    expect(createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        patientId,
+        doctorId,
+        clinicId: doctorClinicId,
+      }),
+      context.scope,
+    );
+  });
+
+  it('rejects create_order draft when resolved clinic does not exist', async () => {
+    const patientId = '66f100000000000000000111';
+    const doctorId = '66f100000000000000000222';
+    const missingClinicId = 'f5d9afd005f77d5531ffefe5';
+
+    const executor = new AssistantActionExecutor({
+      ordersService: {} as never,
+      patientService: {
+        getPatientById: vi.fn().mockResolvedValue({
+          id: patientId,
+          doctorId,
+          clinicId: missingClinicId,
+        }),
+      } as never,
+      doctorService: {
+        getDoctorById: vi.fn().mockResolvedValue({ id: doctorId, clinicId: missingClinicId }),
+      } as never,
+      clinicService: {
+        getClinicById: vi.fn().mockRejectedValue(new Error(`Clinic ${missingClinicId} was not found`)),
+      } as never,
+      catalogRepository: {} as never,
+    });
+
+    await expect(
+      executor.validateWriteActionDraft({
+        toolName: 'create_order',
+        payload: {
+          payload: {
+            patientId,
+            creationData: {
+              services: [
+                {
+                  serviceId: 'treatment-plan',
+                  selectedTeeth: [14, 33],
+                },
+              ],
+            },
+          },
+        },
+        context,
+      }),
+    ).rejects.toThrow(`Clinic ${missingClinicId} was not found`);
+  });
+
   it('collects overdue orders from all pages before returning search_orders results', async () => {
     const listOrders = vi
       .fn()

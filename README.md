@@ -36,7 +36,8 @@ Copy `.env.example` to `.env` and adjust values as needed.
 - `AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_ACCOUNT` maximum login attempts allowed per tenant/email account key in each window (default falls back to `AUTH_RATE_LIMIT_MAX_ATTEMPTS`, then `20`)
 - `AUTH_RATE_LIMIT_MAX_ATTEMPTS` backward-compatible fallback for per-account attempts when `AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_ACCOUNT` is not set
 - `MONGODB_URI` MongoDB connection URI used by app startup and seed script
-- `AI_ASSISTANT_PROVIDER` (`mock` | `vllm` | `groq`, default `mock`; `mock` is non-production only and is rejected when `NODE_ENV=production`)
+- `AI_ASSISTANT_PROVIDER` (`mock` | `vllm` | `groq`, default `vllm`)
+- `AI_ASSISTANT_ALLOW_MOCK` (`true` | `false`, default `false`; required as `true` to run `mock` outside `NODE_ENV=test`)
 - `AI_ASSISTANT_MODEL` (default `qwen/qwen3.8-27b`)
 - `AI_ASSISTANT_VLLM_BASE_URL` internal OpenAI-compatible vLLM endpoint (default `http://127.0.0.1:8000/v1`)
 - `AI_ASSISTANT_VLLM_API_KEY` optional internal service token for vLLM gateway

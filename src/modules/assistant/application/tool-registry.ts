@@ -63,12 +63,28 @@ const ASSISTANT_TOOLS: AssistantToolDefinition[] = [
     { domain: 'catalog', action: 'list_services' },
   ),
   createTool(
+    'list_service_prices',
+    'List every company service with its price only',
+    '{}',
+    'read',
+    [],
+    { domain: 'catalog', action: 'list_service_prices' },
+  ),
+  createTool(
     'get_company_info',
     'Get the company profile: who we are, contact details, working hours and submission standards',
     '{}',
     'read',
     [],
     { domain: 'catalog', action: 'company_info' },
+  ),
+  createTool(
+    'get_submission_standards',
+    'Get only the submission standards from company profile',
+    '{}',
+    'read',
+    [],
+    { domain: 'catalog', action: 'submission_standards' },
   ),
   createTool(
     'search_clinics',
@@ -95,6 +111,14 @@ const ASSISTANT_TOOLS: AssistantToolDefinition[] = [
     { domain: 'patients', action: 'create' },
   ),
   createTool(
+    'update_patient',
+    'Update an existing patient',
+    '{"patientId": string, "payload": object containing only patient fields to change}',
+    'write',
+    ['patients.update'],
+    { domain: 'patients', action: 'update' },
+  ),
+  createTool(
     'create_doctor',
     'Create a new doctor',
     '{"payload": {"name": string, "gender"?: "M"|"F", "specialty": string, "clinicId": string, "email": string, "phone": string, "joinedDate": "YYYY-MM-DD"}}',
@@ -103,12 +127,28 @@ const ASSISTANT_TOOLS: AssistantToolDefinition[] = [
     { domain: 'doctors', action: 'create' },
   ),
   createTool(
+    'update_doctor',
+    'Update an existing doctor',
+    '{"doctorId": string, "payload": object containing only doctor fields to change}',
+    'write',
+    ['doctors.manage'],
+    { domain: 'doctors', action: 'update' },
+  ),
+  createTool(
     'create_clinic',
     'Create a new clinic',
     '{"payload": {"name": string, "address": string, "city": string, "phone": string, "email": string, "accountManager": string}}',
     'write',
     ['clinics.manage'],
     { domain: 'clinics', action: 'create' },
+  ),
+  createTool(
+    'update_clinic',
+    'Update an existing clinic',
+    '{"clinicId": string, "payload": object containing only clinic fields to change}',
+    'write',
+    ['clinics.manage'],
+    { domain: 'clinics', action: 'update' },
   ),
 ];
 

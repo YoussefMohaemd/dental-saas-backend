@@ -30,8 +30,12 @@ function formatExecution(execution: AssistantActionExecutionSummary): string {
   switch (execution.tool) {
     case 'list_services':
       return formatServices((result as { services: AssistantServiceRecord[] }).services);
+    case 'list_service_prices':
+      return formatServicePrices((result as { services: AssistantServiceRecord[] }).services);
     case 'get_company_info':
       return formatCompany((result as { profile: AssistantCompanyProfileRecord | null }).profile);
+    case 'get_submission_standards':
+      return formatSubmissionStandards((result as { standards: string[] }).standards);
     case 'search_orders':
       return formatList('Orders', result, (row) => {
         const due = shortDate(row.dueDate);
@@ -104,7 +108,7 @@ function formatServices(services: readonly AssistantServiceRecord[]): string {
 
   return services
     .map((service) => {
-      const header = `### ${service.name} — ${money(service.basePrice)}`;
+      const header = `### ${service.name} — ${formatServicePrice(service.basePrice)}`;
       const meta = `${service.description}${
         service.turnaroundDays > 0 ? ` _(turnaround: ${service.turnaroundDays} days)_` : ''
       }`;
@@ -117,12 +121,21 @@ function formatServices(services: readonly AssistantServiceRecord[]): string {
     .join('\n\n');
 }
 
+function formatServicePrices(services: readonly AssistantServiceRecord[]): string {
+  if (services.length === 0) {
+    return '_No services are configured for your company yet._';
+  }
+
+  return ['### Service pricing', ...services.map((service) => `- ${service.name}: ${formatServicePrice(service.basePrice)}`)].join('\n');
+}
+
 function formatCompany(profile: AssistantCompanyProfileRecord | null): string {
   if (!profile) {
     return '_Company information has not been configured yet._';
   }
 
-  const lines = [`### ${profile.name}`, profile.about];
+  const about = profile.about.trim() ? profile.about : '_No company description configured yet._';
+  const lines = [`### ${profile.name}`, about];
   if (profile.address) lines.push(`- **Address:** ${profile.address}`);
   if (profile.phone) lines.push(`- **Phone:** ${profile.phone}`);
   if (profile.email) lines.push(`- **Email:** ${profile.email}`);
@@ -131,6 +144,14 @@ function formatCompany(profile: AssistantCompanyProfileRecord | null): string {
     lines.push('', '**Submission standards**', ...profile.submissionStandards.map((s) => `- ${s}`));
   }
   return lines.filter((line) => line !== undefined).join('\n');
+}
+
+function formatSubmissionStandards(standards: readonly string[]): string {
+  if (standards.length === 0) {
+    return '_No submission standards are configured yet._';
+  }
+
+  return ['### Submission standards', ...standards.map((item) => `- ${item}`)].join('\n');
 }
 
 function formatList(title: string, result: unknown, line: (row: Row) => string): string {
@@ -167,4 +188,9 @@ function shortDate(value: unknown): string {
 function money(value: unknown): string {
   const amount = Number(value);
   return Number.isFinite(amount) ? `$${amount.toLocaleString('en-US')}` : '';
+}
+
+function formatServicePrice(value: unknown): string {
+  const formatted = money(value);
+  return formatted || 'Price unavailable';
 }

@@ -82,12 +82,14 @@ const envSchema = z.object({
   AUTH_RATE_LIMIT_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10_000).default(20),
   AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_IP: z.coerce.number().int().min(1).max(100_000).default(100),
   AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_ACCOUNT: z.coerce.number().int().min(1).max(10_000).optional(),
-  AI_ASSISTANT_PROVIDER: z.enum(['mock', 'vllm', 'groq']).default('mock'),
+  AI_ASSISTANT_PROVIDER: z.enum(['mock', 'vllm', 'groq']).default('vllm'),
+  AI_ASSISTANT_ALLOW_MOCK: parseBoolean.default(false),
   AI_ASSISTANT_MODEL: z.string().min(1).default('qwen/qwen3.8-27b'),
   AI_ASSISTANT_VLLM_BASE_URL: z.string().url().default('http://127.0.0.1:8000/v1'),
   AI_ASSISTANT_VLLM_API_KEY: optionalString,
   AI_ASSISTANT_GROQ_API_KEY: optionalString,
   AI_ASSISTANT_GROQ_BASE_URL: optionalString,
+  AI_ASSISTANT_GROQ_MAX_COMPLETION_TOKENS: z.coerce.number().int().min(64).max(2000).default(900),
   AI_ASSISTANT_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(15_000),
   AI_ASSISTANT_MAX_ACTIONS_PER_MESSAGE: z.coerce.number().int().min(1).max(20).default(8),
   AI_ASSISTANT_MAX_PLANNING_ROUNDS: z.coerce.number().int().min(1).max(12).default(4),
@@ -143,11 +145,15 @@ const refinedEnvSchema = envSchema.superRefine((value, context) => {
     });
   }
 
-  if (value.NODE_ENV === 'production' && value.AI_ASSISTANT_PROVIDER === 'mock') {
+  if (
+    value.AI_ASSISTANT_PROVIDER === 'mock' &&
+    value.NODE_ENV !== 'test' &&
+    value.AI_ASSISTANT_ALLOW_MOCK !== true
+  ) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['AI_ASSISTANT_PROVIDER'],
-      message: 'AI_ASSISTANT_PROVIDER=mock is not allowed in production',
+      message: 'AI_ASSISTANT_PROVIDER=mock requires AI_ASSISTANT_ALLOW_MOCK=true outside test',
     });
   }
 });

@@ -28,6 +28,71 @@ describe('formatExecutionsAsMarkdown', () => {
     expect(text).not.toContain('Wax-up');
   });
 
+  it('renders service prices as price-only list', () => {
+    const text = formatExecutionsAsMarkdown([
+      {
+        actionId: 'a1',
+        tool: 'list_service_prices',
+        status: 'executed',
+        result: {
+          services: [
+            {
+              serviceId: 'sg',
+              name: 'Surgical Guide',
+              description: 'Desc',
+              basePrice: 420,
+              turnaroundDays: 8,
+              scanRequirements: ['CT'],
+            },
+          ],
+        },
+      },
+    ]);
+
+    expect(text).toContain('Service pricing');
+    expect(text).toContain('Surgical Guide: $420');
+    expect(text).not.toContain('Scan requirements');
+  });
+
+  it('renders submission standards only', () => {
+    const text = formatExecutionsAsMarkdown([
+      {
+        actionId: 'a1',
+        tool: 'get_submission_standards',
+        status: 'executed',
+        result: { standards: ['Rule 1', 'Rule 2'] },
+      },
+    ]);
+
+    expect(text).toContain('Submission standards');
+    expect(text).toContain('Rule 1');
+    expect(text).not.toContain('Address:');
+  });
+
+  it('renders explicit price fallback when catalog data is malformed', () => {
+    const text = formatExecutionsAsMarkdown([
+      {
+        actionId: 'a1',
+        tool: 'list_services',
+        status: 'executed',
+        result: {
+          services: [
+            {
+              serviceId: 'svc',
+              name: 'Custom Case',
+              description: 'Needs manual quote',
+              basePrice: Number.NaN,
+              turnaroundDays: 0,
+              scanRequirements: [],
+            },
+          ],
+        },
+      },
+    ]);
+
+    expect(text).toContain('Custom Case — Price unavailable');
+  });
+
   it('says so when the catalog or company profile is empty instead of inventing data', () => {
     const text = formatExecutionsAsMarkdown([
       { actionId: 'a1', tool: 'list_services', status: 'executed', result: { services: [] } },

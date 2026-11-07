@@ -11,6 +11,7 @@ export interface AssistantLlmProviderConfig {
   vllmApiKey: string | undefined;
   groqApiKey: string | undefined;
   groqBaseUrl: string | undefined;
+  groqMaxCompletionTokens?: number;
   plannerPromptVersion: string;
 }
 
@@ -40,6 +41,9 @@ export function createAssistantLlmProvider(
       model: config.model,
       timeoutMs: config.timeoutMs,
       apiKey: config.groqApiKey,
+      ...(config.groqMaxCompletionTokens !== undefined
+        ? { maxCompletionTokens: config.groqMaxCompletionTokens }
+        : {}),
       ...(config.groqBaseUrl ? { baseUrl: config.groqBaseUrl } : {}),
     });
   }

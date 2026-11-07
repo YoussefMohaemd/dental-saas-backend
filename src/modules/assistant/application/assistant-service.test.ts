@@ -47,10 +47,48 @@ describe('AssistantService', () => {
         actions: [
           {
             id: 'a1',
+            tool: 'update_order',
+            arguments: {
+              orderId: 'ord-1',
+              payload: { status: 'Review' },
+            },
+            dependsOn: [],
+          },
+        ],
+      },
+    });
+
+    const conversation = await service.createConversation({
+      tenantId: '66f100000000000000000001',
+      userId: '66f1000000000000000000aa',
+      roles: ['staff'],
+    });
+
+    const response = await service.postMessage(principal(['staff']), {
+      conversationId: conversation.id,
+      content: 'Create a new order for patient X',
+    });
+
+    expect(response.result.type).toBe('confirmation');
+    if (response.result.type !== 'confirmation') {
+      throw new Error('Expected confirmation result');
+    }
+    expect(response.result.pendingActions).toHaveLength(1);
+  });
+
+  it('accepts minimal create-order draft with ids and defaults remaining fields', async () => {
+    const service = AssistantService.createForTests({
+      providerReply: {
+        reply: 'Preparing draft',
+        actions: [
+          {
+            id: 'a1',
             tool: 'create_order',
             arguments: {
               payload: {
-                orderNumber: 'ORD-1',
+                patientId: '66f100000000000000000111',
+                doctorId: '66f100000000000000000222',
+                clinicId: '66f100000000000000000333',
               },
             },
             dependsOn: [],
@@ -75,6 +113,118 @@ describe('AssistantService', () => {
       throw new Error('Expected confirmation result');
     }
     expect(response.result.pendingActions).toHaveLength(1);
+  });
+
+  it('accepts create-order draft with names and resolves them in backend', async () => {
+    const service = AssistantService.createForTests({
+      providerReply: {
+        reply: 'Preparing draft',
+        actions: [
+          {
+            id: 'a1',
+            tool: 'create_order',
+            arguments: {
+              payload: {
+                patientName: 'Adam Wael',
+                doctorName: 'Mostafa Samir',
+                clinicName: 'Dental Care Clinic 10',
+              },
+            },
+            dependsOn: [],
+          },
+        ],
+      },
+    });
+
+    const conversation = await service.createConversation({
+      tenantId: '66f100000000000000000001',
+      userId: '66f1000000000000000000aa',
+      roles: ['staff'],
+    });
+
+    const response = await service.postMessage(principal(['staff']), {
+      conversationId: conversation.id,
+      content: 'Create a new order for patient X',
+    });
+
+    expect(response.result.type).toBe('confirmation');
+    if (response.result.type !== 'confirmation') {
+      throw new Error('Expected confirmation result');
+    }
+    expect(response.result.pendingActions).toHaveLength(1);
+  });
+
+  it('accepts create-order when model leaks dependsOn inside arguments', async () => {
+    const service = AssistantService.createForTests({
+      providerReply: {
+        reply: 'Preparing draft',
+        actions: [
+          {
+            id: 'a1',
+            tool: 'create_order',
+            arguments: {
+              payload: {
+                patientId: '66f100000000000000000111',
+                doctorId: '66f100000000000000000222',
+                clinicId: '66f100000000000000000333',
+              },
+              dependsOn: [],
+            },
+            dependsOn: [],
+          },
+        ],
+      },
+    });
+
+    const conversation = await service.createConversation({
+      tenantId: '66f100000000000000000001',
+      userId: '66f1000000000000000000aa',
+      roles: ['staff'],
+    });
+
+    const response = await service.postMessage(principal(['staff']), {
+      conversationId: conversation.id,
+      content: 'Create a new order for patient X',
+    });
+
+    expect(response.result.type).toBe('confirmation');
+    if (response.result.type !== 'confirmation') {
+      throw new Error('Expected confirmation result');
+    }
+    expect(response.result.pendingActions).toHaveLength(1);
+  });
+
+  it('rejects invalid write drafts before creating pending confirmation', async () => {
+    const service = AssistantService.createForTests({
+      providerReply: {
+        reply: 'Preparing draft',
+        actions: [
+          {
+            id: 'a1',
+            tool: 'create_order',
+            arguments: {
+              payload: {
+                orderNumber: 'ORD-1',
+              },
+            },
+            dependsOn: [],
+          },
+        ],
+      },
+    });
+
+    const conversation = await service.createConversation({
+      tenantId: '66f100000000000000000001',
+      userId: '66f1000000000000000000aa',
+      roles: ['staff'],
+    });
+
+    await expect(
+      service.postMessage(principal(['staff']), {
+        conversationId: conversation.id,
+        content: 'Create a new order for patient X',
+      }),
+    ).rejects.toThrow('create_order requires patientId or patientName');
   });
 
   it('blocks delete operations even when the model proposes them', async () => {
@@ -243,7 +393,7 @@ describe('AssistantService', () => {
     ).rejects.toThrow('Assistant tool permission denied');
   });
 
-  it('forces list_services execution when user asks for services/prices and model returns no actions', async () => {
+  it('falls back to list_services when model returns no actions for services/pricing request', async () => {
     const service = AssistantService.create({
       provider: {
         name: 'mock',
@@ -345,12 +495,15 @@ describe('AssistantService', () => {
     if (response.result.type !== 'text') {
       throw new Error('Expected text response');
     }
-    expect(response.result.plannedActions).toBe(1);
-    expect(response.result.executions[0]?.tool).toBe('list_services');
+    expect(response.result.plannedActions).toBeGreaterThanOrEqual(1);
+    expect(response.result.executions.length).toBeGreaterThanOrEqual(1);
+    const executedTools = response.result.executions.map((execution) => execution.tool);
+    expect(executedTools).toContain('list_services');
+    expect(response.result.executions.every((execution) => execution.status === 'executed')).toBe(true);
     expect(response.result.text).toContain('Implant Planning');
   });
 
-  it('falls back to deterministic order search when model times out', async () => {
+  it('propagates timeout when model times out instead of deterministic fallback', async () => {
     const service = AssistantService.create({
       provider: {
         name: 'groq',
@@ -453,21 +606,15 @@ describe('AssistantService', () => {
       roles: ['admin'],
     });
 
-    const response = await service.postMessage(principal(['admin']), {
-      conversationId: conversation.id,
-      content: 'هاتلي الاوردرات الي عند دكتور Omar Khalil',
-    });
-
-    expect(response.result.type).toBe('text');
-    if (response.result.type !== 'text') {
-      throw new Error('Expected text response');
-    }
-    expect(response.result.plannedActions).toBe(1);
-    expect(response.result.executions[0]?.tool).toBe('search_orders');
-    expect(response.result.text).toContain('DL-026015');
+    await expect(
+      service.postMessage(principal(['admin']), {
+        conversationId: conversation.id,
+        content: 'هاتلي الاوردرات الي عند دكتور Omar Khalil',
+      }),
+    ).rejects.toThrow('Assistant model request timed out');
   });
 
-  it('falls back to get_company_info for company/about prompts when no actions are planned', async () => {
+  it('falls back to get_company_info when model returns no actions for company profile request', async () => {
     const service = AssistantService.createForTests({
       providerReply: {
         reply: 'Sure, let me share more about us.',
@@ -490,12 +637,11 @@ describe('AssistantService', () => {
     if (response.result.type !== 'text') {
       throw new Error('Expected text result');
     }
-    expect(
-      response.result.executions.some((execution) => execution.tool === 'get_company_info'),
-    ).toBe(true);
+    expect(response.result.executions).toHaveLength(1);
+    expect(response.result.executions[0]?.tool).toBe('get_company_info');
   });
 
-  it('falls back to overdue search for delayed orders prompts when model returns no actions', async () => {
+  it('does not force overdue search when model returns no actions', async () => {
     const service = AssistantService.createForTests({
       providerReply: {
         reply: 'Here is what is overdue.',
@@ -518,16 +664,6 @@ describe('AssistantService', () => {
     if (response.result.type !== 'text') {
       throw new Error('Expected text result');
     }
-    const execution = response.result.executions.find(
-      (candidate) => candidate.tool === 'search_orders',
-    );
-    expect(execution).toBeDefined();
-    // `overdueOnThisPage` is only populated by the executor when the planned
-    // `search_orders` action carries `overdue: true`, so its presence proves
-    // the fallback planned an overdue-specific search rather than a generic one.
-    const resultMeta = (
-      execution?.result as { meta?: { overdueOnThisPage?: number } } | undefined
-    )?.meta;
-    expect(resultMeta?.overdueOnThisPage).toBeTypeOf('number');
+    expect(response.result.executions).toHaveLength(0);
   });
 });
