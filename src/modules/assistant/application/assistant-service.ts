@@ -669,19 +669,81 @@ function applyCatalogFallbackActions(
     return actions;
   }
 
-  if (!isServiceCatalogQuery(content)) {
-    return actions;
+  if (isServiceCatalogQuery(content)) {
+    return [
+      ...actions,
+      {
+        id: 'auto-list-services',
+        tool: 'list_services',
+        arguments: {},
+        dependsOn: [],
+      },
+    ];
   }
 
-  return [
-    ...actions,
-    {
-      id: 'auto-list-services',
-      tool: 'list_services',
-      arguments: {},
-      dependsOn: [],
-    },
-  ];
+  if (isCompanyProfileQuery(content)) {
+    return [
+      ...actions,
+      {
+        id: 'fallback-company-info',
+        tool: 'get_company_info',
+        arguments: {},
+        dependsOn: [],
+      },
+    ];
+  }
+
+  if (isOverdueOrdersQuery(content)) {
+    return [
+      ...actions,
+      {
+        id: 'fallback-overdue-orders',
+        tool: 'search_orders',
+        arguments: { overdue: true },
+        dependsOn: [],
+      },
+    ];
+  }
+
+  return actions;
+}
+
+function isCompanyProfileQuery(content: string): boolean {
+  const normalized = content.toLowerCase();
+  return (
+    normalized.includes('about the company') ||
+    normalized.includes('about company') ||
+    normalized.includes('about us') ||
+    normalized.includes('company info') ||
+    normalized.includes('company information') ||
+    normalized.includes('tell me about the company') ||
+    normalized.includes('who are you') ||
+    (content.includes('الشركة') &&
+      (content.includes('عن') || content.includes('معلومات') || content.includes('نبذة')))
+  );
+}
+
+function isOverdueOrdersQuery(content: string): boolean {
+  const normalized = content.toLowerCase();
+  const referencesOrders =
+    normalized.includes('order') ||
+    normalized.includes('orders') ||
+    content.includes('اوردر') ||
+    content.includes('أوردر') ||
+    content.includes('طلب') ||
+    content.includes('طلبات');
+  const referencesDelay =
+    normalized.includes('overdue') ||
+    normalized.includes('delayed') ||
+    normalized.includes('past due') ||
+    normalized.includes('late') ||
+    content.includes('متأخر') ||
+    content.includes('متاخر') ||
+    content.includes('متأخرة') ||
+    content.includes('متاخرة') ||
+    content.includes('تأخير');
+
+  return referencesOrders && referencesDelay;
 }
 
 function isServiceCatalogQuery(content: string): boolean {

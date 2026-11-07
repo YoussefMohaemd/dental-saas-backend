@@ -142,6 +142,14 @@ const refinedEnvSchema = envSchema.superRefine((value, context) => {
       message: 'Required when AI_ASSISTANT_PROVIDER=groq',
     });
   }
+
+  if (value.NODE_ENV === 'production' && value.AI_ASSISTANT_PROVIDER === 'mock') {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['AI_ASSISTANT_PROVIDER'],
+      message: 'AI_ASSISTANT_PROVIDER=mock is not allowed in production',
+    });
+  }
 });
 
 const parsedEnv = refinedEnvSchema.safeParse(process.env);
