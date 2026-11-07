@@ -518,8 +518,16 @@ describe('AssistantService', () => {
     if (response.result.type !== 'text') {
       throw new Error('Expected text result');
     }
-    expect(
-      response.result.executions.some((execution) => execution.tool === 'search_orders'),
-    ).toBe(true);
+    const execution = response.result.executions.find(
+      (candidate) => candidate.tool === 'search_orders',
+    );
+    expect(execution).toBeDefined();
+    // `overdueOnThisPage` is only populated by the executor when the planned
+    // `search_orders` action carries `overdue: true`, so its presence proves
+    // the fallback planned an overdue-specific search rather than a generic one.
+    const resultMeta = (
+      execution?.result as { meta?: { overdueOnThisPage?: number } } | undefined
+    )?.meta;
+    expect(resultMeta?.overdueOnThisPage).toBeTypeOf('number');
   });
 });
