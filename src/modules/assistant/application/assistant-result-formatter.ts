@@ -22,6 +22,10 @@ export function formatExecutionsAsMarkdown(
 }
 
 function formatExecution(execution: AssistantActionExecutionSummary): string {
+  if (execution.status === 'failed') {
+    return `⚠️ \`${execution.tool}\` failed: ${execution.error ?? 'unknown error'}`;
+  }
+
   const result = execution.result;
   switch (execution.tool) {
     case 'list_services':

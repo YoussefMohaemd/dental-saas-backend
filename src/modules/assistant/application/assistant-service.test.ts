@@ -290,7 +290,7 @@ describe('AssistantService', () => {
           throw new Error('not used in this test');
         },
         findOwnedPendingAction: async () => null,
-        markConfirmed: async () => undefined,
+        markConfirmed: async () => true,
       },
       auditRepository: {
         create: async () => undefined,
@@ -401,7 +401,7 @@ describe('AssistantService', () => {
           throw new Error('not used in this test');
         },
         findOwnedPendingAction: async () => null,
-        markConfirmed: async () => undefined,
+        markConfirmed: async () => true,
       },
       auditRepository: {
         create: async () => undefined,

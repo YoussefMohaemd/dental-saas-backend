@@ -9,7 +9,7 @@ const ASSISTANT_TOOLS: AssistantToolDefinition[] = [
   createTool(
     'search_orders',
     'Search orders by filters and keywords',
-    '{"search"?: string, "status"?: string[] using "New"|"Review"|"Design"|"Production"|"Quality Check"|"Ready"|"Completed"|"Cancelled", "duration"?: "today"|"week"|"month"|"2-months"|"3-months"|"6-months", "service"?: string[], "sortBy"?: "orderNumber"|"status"|"priority"|"restoration"|"receivedAt"|"dueDate"|"amount"|"createdAt"|"updatedAt", "sortDirection"?: "asc"|"desc", "page"?: integer, "pageSize"?: integer}',
+    '{"search"?: string, "status"?: string[] using "New"|"Review"|"Design"|"Production"|"Quality Check"|"Ready"|"Completed"|"Cancelled", "duration"?: "today"|"week"|"month"|"2-months"|"3-months"|"6-months", "service"?: string[], "overdue"?: boolean (true = open orders past their due date, for late-order reports), "sortBy"?: "orderNumber"|"status"|"priority"|"restoration"|"receivedAt"|"dueDate"|"amount"|"createdAt"|"updatedAt", "sortDirection"?: "asc"|"desc", "page"?: integer, "pageSize"?: integer}',
     'read',
     ['orders.read'],
     { domain: 'orders', action: 'search' },

@@ -24,8 +24,9 @@ import { type AssistantPlanAction, type AssistantToolDefinition } from '../domai
 export interface AssistantActionExecutionSummary {
   actionId: string;
   tool: string;
-  status: 'executed';
+  status: 'executed' | 'failed';
   result?: unknown;
+  error?: string;
 }
 
 interface AssistantActionExecutorDependencies {
@@ -81,8 +82,12 @@ const searchOrdersArgsSchema = z
     status: z.array(z.enum(ORDER_STATUS_VALUES)).default([]),
     duration: z.enum(ORDER_DURATION_VALUES).optional(),
     service: z.array(z.string().trim().min(1)).default([]),
+    overdue: z.boolean().optional(),
   })
   .strict();
+
+const OPEN_ORDER_STATUSES: Array<(typeof ORDER_STATUS_VALUES)[number]> =
+  ORDER_STATUS_VALUES.filter((status) => status !== 'Completed' && status !== 'Cancelled');
 
 const getOrderDetailsArgsSchema = z
   .object({
@@ -155,13 +160,27 @@ export class AssistantActionExecutor {
     toolByActionId: Map<string, AssistantToolDefinition>,
     context: AssistantExecutionContext,
   ): Promise<AssistantActionExecutionSummary[]> {
+    const readActions = actions.filter((action) => {
+      const tool = toolByActionId.get(action.id);
+      return tool?.operationType === 'read';
+    });
+
     return Promise.all(
-      actions
-        .filter((action) => {
-          const tool = toolByActionId.get(action.id);
-          return tool?.operationType === 'read';
-        })
-        .map((action) => this.executeReadAction(action, context)),
+      readActions.map(async (action): Promise<AssistantActionExecutionSummary> => {
+        try {
+          return await this.executeReadAction(action, context);
+        } catch (error) {
+          return {
+            actionId: action.id,
+            tool: action.tool,
+            status: 'failed',
+            error:
+              error instanceof ApplicationError && error.expose
+                ? error.message
+                : 'The data could not be loaded.',
+          };
+        }
+      }),
     );
   }
 
@@ -212,27 +231,39 @@ export class AssistantActionExecutor {
   ): Promise<AssistantActionExecutionSummary> {
     if (action.tool === 'search_orders') {
       const args = this.parseStrictToolArgs(searchOrdersArgsSchema, action.arguments, action.tool);
-      const pagination = this.resolvePagination({ page: args.page, pageSize: args.pageSize });
+      const pagination = this.resolvePagination({
+        page: args.page,
+        pageSize: args.overdue ? (args.pageSize ?? 100) : args.pageSize,
+      });
       const result = await this.dependencies.ordersService.listOrders(
         {
           scope: context.scope,
           ...(args.search ? { search: args.search } : {}),
-          sortBy: args.sortBy,
-          sortDirection: args.sortDirection,
-          statuses: args.status,
+          sortBy: args.overdue ? 'dueDate' : args.sortBy,
+          sortDirection: args.overdue ? 'asc' : args.sortDirection,
+          statuses: args.overdue
+            ? args.status.length > 0
+              ? args.status.filter((status) => OPEN_ORDER_STATUSES.includes(status))
+              : [...OPEN_ORDER_STATUSES]
+            : args.status,
           ...(args.duration ? { duration: args.duration } : {}),
           serviceIds: args.service,
         },
         pagination,
       );
 
+      const now = Date.now();
+      const items = args.overdue
+        ? result.items.filter((item) => new Date(item.dueDate).getTime() < now)
+        : result.items;
+
       return {
         actionId: action.id,
         tool: action.tool,
         status: 'executed',
         result: {
-          items: result.items,
-          meta: result.meta,
+          items,
+          meta: args.overdue ? { ...result.meta, overdueOnThisPage: items.length } : result.meta,
         },
       };
     }

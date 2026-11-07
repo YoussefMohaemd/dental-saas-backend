@@ -133,20 +133,24 @@ export class InMemoryAssistantPendingActionRepository implements AssistantPendin
     tenantId: string;
     userId: string;
     consumedAt: Date;
-  }): Promise<void> {
+  }): Promise<boolean> {
     const current = this.actions.get(params.actionId);
     if (!current) {
-      return Promise.resolve();
+      return Promise.resolve(false);
     }
 
     if (current.tenantId !== params.tenantId || current.userId !== params.userId) {
-      return Promise.resolve();
+      return Promise.resolve(false);
+    }
+
+    if (current.status !== 'pending') {
+      return Promise.resolve(false);
     }
 
     current.status = 'confirmed';
     current.consumedAt = params.consumedAt;
     current.updatedAt = params.consumedAt;
-    return Promise.resolve();
+    return Promise.resolve(true);
   }
 }
 

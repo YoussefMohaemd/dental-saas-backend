@@ -7,7 +7,7 @@ const context = {
   scope: {
     tenantId: new Types.ObjectId('66f100000000000000000001'),
     userId: new Types.ObjectId('66f1000000000000000000aa'),
-    roles: ['staff'],
+    roles: ['staff'] as string[],
     isAdmin: false,
     isDoctor: false,
     isTechnician: false,

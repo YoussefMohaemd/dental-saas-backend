@@ -79,7 +79,7 @@ export interface AssistantPendingActionRepository {
     tenantId: string;
     userId: string;
     consumedAt: Date;
-  }): Promise<void>;
+  }): Promise<boolean>;
 }
 
 export interface AssistantAuditEventRecord {

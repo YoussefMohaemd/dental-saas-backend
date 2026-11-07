@@ -65,8 +65,8 @@ export class MongooseAssistantPendingActionRepository implements AssistantPendin
     tenantId: string;
     userId: string;
     consumedAt: Date;
-  }): Promise<void> {
-    await AssistantPendingActionModel.updateOne(
+  }): Promise<boolean> {
+    const result = await AssistantPendingActionModel.updateOne(
       {
         actionId: params.actionId,
         tenantId: new Types.ObjectId(params.tenantId),
@@ -80,6 +80,8 @@ export class MongooseAssistantPendingActionRepository implements AssistantPendin
         },
       },
     ).exec();
+
+    return result.modifiedCount === 1;
   }
 }
 

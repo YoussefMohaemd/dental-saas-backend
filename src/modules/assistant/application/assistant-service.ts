@@ -23,7 +23,11 @@ import {
 import { AssistantAuditService } from './assistant-audit-service';
 import { ConfirmationService } from './confirmation-service';
 import { ConversationService } from './conversation-service';
-import { type AssistantLlmCompletionResult, type AssistantLlmProvider } from './llm-provider';
+import {
+  type AssistantLlmCompletionRequest,
+  type AssistantLlmCompletionResult,
+  type AssistantLlmProvider,
+} from './llm-provider';
 import { PermissionGuard } from './permission-guard';
 import { PromptCatalogService, type AssistantPromptSuggestion } from './prompt-catalog-service';
 import { buildAssistantToolRegistry, type AssistantToolRegistry } from './tool-registry';
@@ -107,6 +111,7 @@ export interface AssistantMessageResultConfirmation {
     tool: string;
     expiresAt: string;
     confirmationToken: string;
+    payload: Record<string, unknown>;
   }>;
 }
 
@@ -290,11 +295,12 @@ export class AssistantService {
       });
     }
 
-    await this.dependencies.conversationService.getOwnedConversation({
+    const existingConversation = await this.dependencies.conversationService.getOwnedConversation({
       conversationId: input.conversationId,
       tenantId: principal.tenantId,
       userId: principal.userId,
     });
+    const history = buildHistory(existingConversation.messages);
 
     const userMessage = await this.dependencies.conversationService.appendMessage({
       conversationId: input.conversationId,
@@ -314,7 +320,7 @@ export class AssistantService {
     });
 
     const effectiveCapabilities = new Set(resolveRoleCapabilities(principal.roles));
-    const llmCompletion = await this.completePlanWithFallback(content);
+    const llmCompletion = await this.completePlanWithFallback(content, history);
 
     const plannedActions = applyCatalogFallbackActions(content, llmCompletion.actions);
     const actions = this.dependencies.actionPlanner.validatePlan({
@@ -421,11 +427,13 @@ export class AssistantService {
 
   private async completePlanWithFallback(
     content: string,
+    history: AssistantLlmCompletionRequest['history'],
   ): Promise<AssistantLlmCompletionResult> {
     try {
       return await this.dependencies.provider.completePlan({
         userMessage: content,
-        systemPrompt: buildSystemPrompt(),
+        history,
+        systemPrompt: buildSystemPrompt(new Date()),
         tools: this.dependencies.toolRegistry.list(),
         languageHint: detectLanguageHint(content),
       });
@@ -619,8 +627,24 @@ function detectLanguageHint(content: string): 'ar' | 'en' | 'mixed' {
   return hasArabic ? 'ar' : 'en';
 }
 
-function buildSystemPrompt(): string {
+const HISTORY_MAX_MESSAGES = 10;
+const HISTORY_MAX_CHARS = 1_200;
+
+function buildHistory(
+  messages: ReadonlyArray<{ role: 'user' | 'assistant'; text: string }>,
+): NonNullable<AssistantLlmCompletionRequest['history']> {
+  return messages.slice(-HISTORY_MAX_MESSAGES).map((message) => ({
+    role: message.role,
+    content: message.text.slice(0, HISTORY_MAX_CHARS),
+  }));
+}
+
+function buildSystemPrompt(now: Date): string {
   return [
+    `Current date/time (UTC): ${now.toISOString()}. Resolve relative dates such as "today", "tomorrow" or "next week" from it.`,
+    'You can see the previous messages of this conversation. Use them to complete a request across several turns.',
+    'NEVER guess ids, order numbers or required fields. If a required field is missing, ask the user for it in "reply" and return an empty actions array.',
+    'To turn a name into an id, call the matching search tool first; the user will see the ids and you can use them on the next turn.',
     'You are the Dental SaaS assistant for a dental laboratory platform.',
     'Reply in the same language the user writes in (Arabic, English or mixed).',
     'Never execute delete operations.',
@@ -641,7 +665,7 @@ function applyCatalogFallbackActions(
   content: string,
   actions: AssistantPlanAction[],
 ): AssistantPlanAction[] {
-  if (actions.some((action) => action.tool === 'list_services')) {
+  if (actions.length > 0) {
     return actions;
   }
 

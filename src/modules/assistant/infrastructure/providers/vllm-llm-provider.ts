@@ -10,6 +10,7 @@ import {
   type AssistantLlmProvider,
 } from '../../application/llm-provider';
 import { type AssistantPlanAction } from '../../domain/assistant.types';
+import { buildSystemPromptWithTools } from './groq-llm-provider';
 
 const vllmResponseSchema = z.object({
   choices: z
@@ -74,7 +75,11 @@ export class VllmAssistantLlmProvider implements AssistantLlmProvider {
         body: JSON.stringify({
           model: this.options.model,
           messages: [
-            { role: 'system', content: request.systemPrompt },
+            {
+              role: 'system',
+              content: buildSystemPromptWithTools(request.systemPrompt, request.tools),
+            },
+            ...(request.history ?? []),
             { role: 'user', content: request.userMessage },
           ],
           temperature: 0,

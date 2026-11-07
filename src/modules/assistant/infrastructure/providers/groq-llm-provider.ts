@@ -87,6 +87,7 @@ export class GroqAssistantLlmProvider implements AssistantLlmProvider {
               role: 'system',
               content: buildSystemPromptWithTools(request.systemPrompt, request.tools),
             },
+            ...(request.history ?? []),
             { role: 'user', content: request.userMessage },
           ],
           temperature: 0,
@@ -198,7 +199,7 @@ function stripTrailingSlash(value: string): string {
   return value.endsWith('/') ? value.slice(0, -1) : value;
 }
 
-function buildSystemPromptWithTools(
+export function buildSystemPromptWithTools(
   systemPrompt: string,
   tools: AssistantLlmCompletionRequest['tools'],
 ): string {

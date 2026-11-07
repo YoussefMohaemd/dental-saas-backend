@@ -11,6 +11,7 @@ export interface AssistantConfirmationSummary {
   tool: string;
   expiresAt: string;
   confirmationToken: string;
+  payload: Record<string, unknown>;
 }
 
 export class ConfirmationService {
@@ -49,6 +50,7 @@ export class ConfirmationService {
       tool: params.toolName,
       expiresAt: expiresAt.toISOString(),
       confirmationToken,
+      payload: params.payload,
     };
   }
 
@@ -106,12 +108,20 @@ export class ConfirmationService {
       });
     }
 
-    await this.pendingActionRepository.markConfirmed({
+    const claimed = await this.pendingActionRepository.markConfirmed({
       actionId: pendingAction.actionId,
       tenantId: pendingAction.tenantId,
       userId: pendingAction.userId,
       consumedAt: new Date(),
     });
+    if (!claimed) {
+      throw new ApplicationError({
+        message: 'Pending action was already confirmed',
+        statusCode: 409,
+        code: APPLICATION_ERROR_CODES.CONFLICT,
+        expose: true,
+      });
+    }
 
     return {
       actionId: pendingAction.actionId,

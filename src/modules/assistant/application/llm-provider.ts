@@ -2,6 +2,7 @@ import { type AssistantPlanAction, type AssistantToolDefinition } from '../domai
 
 export interface AssistantLlmCompletionRequest {
   userMessage: string;
+  history?: Array<{ role: 'user' | 'assistant'; content: string }> | undefined;
   systemPrompt: string;
   tools: AssistantToolDefinition[];
   languageHint: 'ar' | 'en' | 'mixed';
