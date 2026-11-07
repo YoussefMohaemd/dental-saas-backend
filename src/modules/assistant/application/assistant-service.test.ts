@@ -466,4 +466,60 @@ describe('AssistantService', () => {
     expect(response.result.executions[0]?.tool).toBe('search_orders');
     expect(response.result.text).toContain('DL-026015');
   });
+
+  it('falls back to get_company_info for company/about prompts when no actions are planned', async () => {
+    const service = AssistantService.createForTests({
+      providerReply: {
+        reply: 'Sure, let me share more about us.',
+        actions: [],
+      },
+    });
+
+    const conversation = await service.createConversation({
+      tenantId: '66f100000000000000000001',
+      userId: '66f1000000000000000000aa',
+      roles: ['staff'],
+    });
+
+    const response = await service.postMessage(principal(['staff']), {
+      conversationId: conversation.id,
+      content: 'Tell me about the company',
+    });
+
+    expect(response.result.type).toBe('text');
+    if (response.result.type !== 'text') {
+      throw new Error('Expected text result');
+    }
+    expect(
+      response.result.executions.some((execution) => execution.tool === 'get_company_info'),
+    ).toBe(true);
+  });
+
+  it('falls back to overdue search for delayed orders prompts when model returns no actions', async () => {
+    const service = AssistantService.createForTests({
+      providerReply: {
+        reply: 'Here is what is overdue.',
+        actions: [],
+      },
+    });
+
+    const conversation = await service.createConversation({
+      tenantId: '66f100000000000000000001',
+      userId: '66f1000000000000000000aa',
+      roles: ['staff'],
+    });
+
+    const response = await service.postMessage(principal(['staff']), {
+      conversationId: conversation.id,
+      content: 'Show delayed orders',
+    });
+
+    expect(response.result.type).toBe('text');
+    if (response.result.type !== 'text') {
+      throw new Error('Expected text result');
+    }
+    expect(
+      response.result.executions.some((execution) => execution.tool === 'search_orders'),
+    ).toBe(true);
+  });
 });
