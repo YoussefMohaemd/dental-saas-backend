@@ -235,27 +235,31 @@ export class AssistantActionExecutor {
         page: args.page,
         pageSize: args.overdue ? (args.pageSize ?? 100) : args.pageSize,
       });
-      const result = await this.dependencies.ordersService.listOrders(
-        {
-          scope: context.scope,
-          ...(args.search ? { search: args.search } : {}),
-          sortBy: args.overdue ? 'dueDate' : args.sortBy,
-          sortDirection: args.overdue ? 'asc' : args.sortDirection,
-          statuses: args.overdue
-            ? args.status.length > 0
-              ? args.status.filter((status) => OPEN_ORDER_STATUSES.includes(status))
-              : [...OPEN_ORDER_STATUSES]
-            : args.status,
-          ...(args.duration ? { duration: args.duration } : {}),
-          serviceIds: args.service,
-        },
-        pagination,
-      );
+      const query = {
+        scope: context.scope,
+        ...(args.search ? { search: args.search } : {}),
+        sortBy: args.overdue ? ('dueDate' as const) : args.sortBy,
+        sortDirection: args.overdue ? ('asc' as const) : args.sortDirection,
+        statuses: args.overdue
+          ? args.status.length > 0
+            ? args.status.filter((status) => OPEN_ORDER_STATUSES.includes(status))
+            : [...OPEN_ORDER_STATUSES]
+          : args.status,
+        ...(args.duration ? { duration: args.duration } : {}),
+        serviceIds: args.service,
+      };
+
+      const result = args.overdue
+        ? await this.listOrdersAcrossAllPages(query, pagination)
+        : await this.dependencies.ordersService.listOrders(query, pagination);
 
       const now = Date.now();
-      const items = args.overdue
-        ? result.items.filter((item) => new Date(item.dueDate).getTime() < now)
-        : result.items;
+      const items = result.items.filter((item) => {
+        if (!args.overdue) {
+          return true;
+        }
+        return new Date(item.dueDate).getTime() < now;
+      });
 
       return {
         actionId: action.id,
@@ -263,7 +267,14 @@ export class AssistantActionExecutor {
         status: 'executed',
         result: {
           items,
-          meta: args.overdue ? { ...result.meta, overdueOnThisPage: items.length } : result.meta,
+          meta: args.overdue
+            ? {
+                ...result.meta,
+                totalItems: items.length,
+                totalPages: Math.max(1, Math.ceil(items.length / Math.max(1, result.meta.pageSize))),
+                overdueTotalItems: items.length,
+              }
+            : result.meta,
         },
       };
     }
@@ -407,12 +418,8 @@ export class AssistantActionExecutor {
         args.payload,
         'create_patient.payload',
       );
-      const { clinicId, createdClinic } = await this.resolveClinicForPatientPayload(payload, scope);
-      const { doctorId, createdDoctor } = await this.resolveDoctorForPatientPayload(
-        payload,
-        clinicId,
-        scope,
-      );
+      const { clinicId } = await this.resolveClinicForPatientPayload(payload, scope);
+      const { doctorId } = await this.resolveDoctorForPatientPayload(payload, clinicId, scope);
       const body = this.parseStrictToolArgs(
         createPatientBodySchema,
         {
@@ -433,13 +440,7 @@ export class AssistantActionExecutor {
         actionId: input.actionId,
         tool: input.toolName,
         status: 'executed',
-        result: {
-          patient: result,
-          provisioning: {
-            ...(createdClinic ? { createdClinic } : {}),
-            ...(createdDoctor ? { createdDoctor } : {}),
-          },
-        },
+        result: { patient: result },
       };
     }
 
@@ -697,7 +698,7 @@ export class AssistantActionExecutor {
   private async resolveClinicForPatientPayload(
     payload: z.infer<typeof createPatientAssistantPayloadSchema>,
     scope: DataVisibilityScope,
-  ): Promise<{ clinicId: string; createdClinic?: { id: string; name: string } }> {
+  ): Promise<{ clinicId: string }> {
     if (payload.clinicId) {
       return { clinicId: payload.clinicId };
     }
@@ -728,31 +729,22 @@ export class AssistantActionExecutor {
       return { clinicId: exact.id };
     }
 
-    const created = await this.dependencies.clinicService.createClinic(
-      {
-        name: payload.clinicName,
-        address: payload.clinicAddress ?? `Address pending for ${payload.clinicName}`,
-        city: payload.clinicCity ?? 'Unknown',
-        phone: payload.clinicPhone ?? '+200000000000',
-        email:
-          payload.clinicEmail ??
-          buildPlaceholderEmail(payload.clinicName, 'clinic'),
-        status: 'Active',
-        accountManager: payload.accountManager ?? 'AI Assistant',
+    throw new ApplicationError({
+      message: `Clinic name "${payload.clinicName}" was not found. Create the clinic first or provide a valid clinicId.`,
+      statusCode: 400,
+      code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+      expose: true,
+      details: {
+        clinicName: payload.clinicName,
       },
-      scope,
-    );
-    return {
-      clinicId: created.id,
-      createdClinic: { id: created.id, name: created.name },
-    };
+    });
   }
 
   private async resolveDoctorForPatientPayload(
     payload: z.infer<typeof createPatientAssistantPayloadSchema>,
     clinicId: string,
     scope: DataVisibilityScope,
-  ): Promise<{ doctorId: string; createdDoctor?: { id: string; name: string } }> {
+  ): Promise<{ doctorId: string }> {
     if (payload.doctorId) {
       return { doctorId: payload.doctorId };
     }
@@ -784,25 +776,41 @@ export class AssistantActionExecutor {
       return { doctorId: exact.id };
     }
 
-    const created = await this.dependencies.doctorService.createDoctor(
-      {
-        name: payload.doctorName,
+    throw new ApplicationError({
+      message: `Doctor name "${payload.doctorName}" was not found in the selected clinic. Create the doctor first or provide a valid doctorId.`,
+      statusCode: 400,
+      code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+      expose: true,
+      details: {
+        doctorName: payload.doctorName,
         clinicId,
-        specialty: payload.doctorSpecialty ?? 'General Dentistry',
-        email:
-          payload.doctorEmail ??
-          buildPlaceholderEmail(payload.doctorName, 'doctor'),
-        phone: payload.doctorPhone ?? '+200000000000',
-        gender: payload.doctorGender ?? 'M',
-        status: 'Active',
-        joinedDate: new Date(),
-        avatar: '',
       },
-      scope,
-    );
+    });
+  }
+
+  private async listOrdersAcrossAllPages(
+    query: Parameters<OrdersService['listOrders']>[0],
+    pagination: PaginationQuery,
+  ): Promise<Awaited<ReturnType<OrdersService['listOrders']>>> {
+    const firstPage = await this.dependencies.ordersService.listOrders(query, pagination);
+    const items = [...firstPage.items];
+    const totalPages = Math.max(firstPage.meta.totalPages, 1);
+
+    for (let page = pagination.page + 1; page <= totalPages; page += 1) {
+      const pageResult = await this.dependencies.ordersService.listOrders(query, {
+        page,
+        pageSize: pagination.pageSize,
+      });
+      items.push(...pageResult.items);
+    }
+
     return {
-      doctorId: created.id,
-      createdDoctor: { id: created.id, name: created.name },
+      items,
+      meta: {
+        ...firstPage.meta,
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+      },
     };
   }
 }
@@ -815,13 +823,4 @@ function stripUndefined<T extends Record<string, unknown>>(value: T): T {
   return Object.fromEntries(
     Object.entries(value).filter(([, propertyValue]) => propertyValue !== undefined),
   ) as T;
-}
-
-function buildPlaceholderEmail(name: string, kind: 'clinic' | 'doctor'): string {
-  const normalized = name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  const suffix = Date.now().toString().slice(-6);
-  return `${kind}-${normalized || 'entity'}-${suffix}@autogen.example.com`;
 }

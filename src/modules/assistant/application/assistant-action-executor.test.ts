@@ -80,60 +80,110 @@ describe('AssistantActionExecutor', () => {
       items: [],
       meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
     });
-    const createClinic = vi.fn().mockResolvedValue({
-      id: 'clinic-new-1',
-      name: 'Dental Care Clinic 2',
-    });
     const listDoctors = vi.fn().mockResolvedValue({
       items: [],
       meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
     });
-    const createDoctor = vi.fn().mockResolvedValue({
-      id: 'doctor-new-1',
-      name: 'Omar Khalil',
-      clinicId: 'clinic-new-1',
-    });
     const createPatient = vi.fn().mockResolvedValue({
       id: 'patient-1',
       name: 'yousseff',
-      clinicId: 'clinic-new-1',
-      doctorId: 'doctor-new-1',
+      clinicId: 'clinic-1',
+      doctorId: 'doctor-1',
     });
 
     const executor = new AssistantActionExecutor({
       ordersService: {} as never,
       patientService: { createPatient } as never,
-      doctorService: { listDoctors, createDoctor } as never,
-      clinicService: { listClinics, createClinic } as never,
+      doctorService: { listDoctors } as never,
+      clinicService: { listClinics } as never,
       catalogRepository: {} as never,
     });
 
-    const execution = await executor.executeConfirmedWriteAction({
-      actionId: 'a-create-patient',
-      toolName: 'create_patient',
-      payload: {
+    await expect(
+      executor.executeConfirmedWriteAction({
+        actionId: 'a-create-patient',
+        toolName: 'create_patient',
         payload: {
-          name: 'yousseff',
-          dob: '2005-08-15',
-          gender: 'M',
-          phone: '01151711722',
-          email: 'ym0998682@gmail.com',
-          clinicName: 'Dental Care Clinic 2',
-          doctorName: 'Omar Khalil',
+          payload: {
+            name: 'yousseff',
+            dob: '2005-08-15',
+            gender: 'M',
+            phone: '01151711722',
+            email: 'ym0998682@gmail.com',
+            clinicName: 'Dental Care Clinic 2',
+            doctorName: 'Omar Khalil',
+          },
         },
-      },
-      context,
+        context,
+      }),
+    ).rejects.toThrow(/clinic name.*not found/i);
+    expect(createPatient).not.toHaveBeenCalled();
+  });
+
+  it('collects overdue orders from all pages before returning search_orders results', async () => {
+    const listOrders = vi
+      .fn()
+      .mockResolvedValueOnce({
+        items: [
+          {
+            id: 'order-1',
+            orderNumber: 'DL-001',
+            dueDate: '2024-01-01',
+            status: 'New',
+          },
+        ],
+        meta: { totalItems: 2, page: 1, pageSize: 1, totalPages: 2 },
+      })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            id: 'order-2',
+            orderNumber: 'DL-002',
+            dueDate: '2024-01-02',
+            status: 'Review',
+          },
+        ],
+        meta: { totalItems: 2, page: 2, pageSize: 1, totalPages: 2 },
+      });
+
+    const executor = new AssistantActionExecutor({
+      ordersService: { listOrders } as never,
+      patientService: {} as never,
+      doctorService: {} as never,
+      clinicService: {} as never,
+      catalogRepository: {} as never,
     });
 
-    expect(createClinic).toHaveBeenCalledTimes(1);
-    expect(createDoctor).toHaveBeenCalledTimes(1);
-    expect(createPatient).toHaveBeenCalledWith(
-      expect.objectContaining({
-        clinicId: 'clinic-new-1',
-        doctorId: 'doctor-new-1',
-      }),
-      context.scope,
+    const actions = await executor.executeReadActions(
+      [
+        {
+          id: 'a1',
+          tool: 'search_orders',
+          arguments: { overdue: true, page: 1, pageSize: 1, status: [] },
+          dependsOn: [],
+        },
+      ],
+      new Map([
+        [
+          'a1',
+          {
+            name: 'search_orders',
+            description: 'Search orders',
+            argumentsHint: '{}',
+            operationType: 'read',
+            requiredCapabilities: [],
+            capabilityMatchMode: 'all',
+            requiresConfirmation: false,
+            timeoutMs: 20000,
+            auditMetadata: { domain: 'orders', action: 'search' },
+          },
+        ],
+      ]),
+      context,
     );
-    expect(execution.tool).toBe('create_patient');
+
+    expect(listOrders).toHaveBeenCalledTimes(2);
+    expect(actions[0]?.tool).toBe('search_orders');
+    expect((actions[0]?.result as { items: Array<{ id: string }> }).items).toHaveLength(2);
   });
 });
