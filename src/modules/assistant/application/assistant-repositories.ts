@@ -62,7 +62,7 @@ export interface AssistantPendingActionRecord {
   confirmationTokenHash: string;
   expiresAt: Date;
   consumedAt?: Date;
-  status: 'pending' | 'confirmed' | 'expired';
+  status: 'pending' | 'processing' | 'confirmed' | 'expired' | 'failed';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -79,6 +79,18 @@ export interface AssistantPendingActionRepository {
     tenantId: string;
     userId: string;
     consumedAt: Date;
+  }): Promise<boolean>;
+  markProcessing(params: {
+    actionId: string;
+    tenantId: string;
+    userId: string;
+    updatedAt: Date;
+  }): Promise<boolean>;
+  markPending(params: {
+    actionId: string;
+    tenantId: string;
+    userId: string;
+    updatedAt: Date;
   }): Promise<boolean>;
 }
 

@@ -63,7 +63,7 @@ const PROMPT_SUGGESTIONS: AssistantPromptSuggestion[] = [
     template: 'Generate a report for order {{orderNumber}} including related sub-orders.',
     requiredCapabilities: ['reports.read'],
     resultType: 'order-report',
-    enabled: true,
+    enabled: false,
   },
   {
     id: 'assistant-sub-orders-performance',
@@ -73,7 +73,7 @@ const PROMPT_SUGGESTIONS: AssistantPromptSuggestion[] = [
     template: 'Show sub-order performance for this month.',
     requiredCapabilities: ['reports.read'],
     resultType: 'table',
-    enabled: true,
+    enabled: false,
   },
   {
     id: 'assistant-dashboard-summary',
@@ -83,7 +83,7 @@ const PROMPT_SUGGESTIONS: AssistantPromptSuggestion[] = [
     template: 'Summarize dashboard KPIs for this week.',
     requiredCapabilities: ['dashboard.read'],
     resultType: 'chart',
-    enabled: true,
+    enabled: false,
   },
   {
     id: 'assistant-search-patients',
@@ -103,7 +103,7 @@ const PROMPT_SUGGESTIONS: AssistantPromptSuggestion[] = [
     template: 'Show recently updated cases and their current status.',
     requiredCapabilities: ['cases.read'],
     resultType: 'table',
-    enabled: true,
+    enabled: false,
   },
   {
     id: 'assistant-create-order',

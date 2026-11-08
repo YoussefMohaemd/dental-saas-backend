@@ -120,7 +120,7 @@ describe('AssistantActionExecutor', () => {
     expect(createPatient).not.toHaveBeenCalled();
   });
 
-  it('uses patient-linked clinicId when create_order receives stale clinicId', async () => {
+  it('keeps explicit clinicId when create_order receives stale clinicId', async () => {
     const createOrder = vi.fn().mockResolvedValue({ id: 'order-1' });
     const createSubOrders = vi.fn().mockResolvedValue([]);
     const patientId = '66f100000000000000000111';
@@ -153,6 +153,9 @@ describe('AssistantActionExecutor', () => {
         payload: {
           patientId,
           clinicId: staleClinicId,
+          format: 'STL',
+          shade: 'A2',
+          dueDate: '2026-11-20T00:00:00.000Z',
           creationData: {
             services: [
               {
@@ -171,7 +174,7 @@ describe('AssistantActionExecutor', () => {
       expect.objectContaining({
         patientId,
         doctorId: patientDoctorId,
-        clinicId: patientClinicId,
+        clinicId: staleClinicId,
       }),
       context.scope,
     );
@@ -208,6 +211,9 @@ describe('AssistantActionExecutor', () => {
       payload: {
         payload: {
           patientId,
+          format: 'STL',
+          shade: 'A2',
+          dueDate: '2026-11-20T00:00:00.000Z',
           creationData: {
             services: [
               {
@@ -237,7 +243,7 @@ describe('AssistantActionExecutor', () => {
     );
   });
 
-  it('builds concise AI order numbers and derives units/amount from selected services', async () => {
+  it('builds collision-resistant AI order numbers and derives units/amount from selected services', async () => {
     const createOrder = vi.fn().mockResolvedValue({ id: 'order-5' });
     const createSubOrders = vi.fn().mockResolvedValue([]);
     const patientId = '66f100000000000000000111';
@@ -279,6 +285,9 @@ describe('AssistantActionExecutor', () => {
       payload: {
         payload: {
           patientId,
+          format: 'STL',
+          shade: 'A2',
+          dueDate: '2026-11-20T00:00:00.000Z',
           creationData: {
             services: [
               {
@@ -294,7 +303,7 @@ describe('AssistantActionExecutor', () => {
 
     expect(createOrder).toHaveBeenCalledWith(
       expect.objectContaining({
-        orderNumber: expect.stringMatching(/^AI-\d{6}$/),
+        orderNumber: expect.stringMatching(/^AI-\d{10}-\d{6}$/),
         units: 3,
         amount: 250,
       }),
@@ -346,6 +355,9 @@ describe('AssistantActionExecutor', () => {
       payload: {
         payload: {
           patientId,
+          format: 'STL',
+          shade: 'A2',
+          dueDate: '2026-11-20T00:00:00.000Z',
           creationData: {
             services: [
               {
@@ -400,6 +412,9 @@ describe('AssistantActionExecutor', () => {
         payload: {
           payload: {
             patientId: '__RESOLVED_PATIENT_ID__',
+            format: 'STL',
+            shade: 'A2',
+            dueDate: '2026-11-20T00:00:00.000Z',
             creationData: {
               services: [
                 {
@@ -418,7 +433,7 @@ describe('AssistantActionExecutor', () => {
     expect(createOrder).not.toHaveBeenCalled();
   });
 
-  it('uses doctor-linked clinicId when patient clinicId is stale', async () => {
+  it('keeps explicit clinicId even when patient clinicId is stale', async () => {
     const createOrder = vi.fn().mockResolvedValue({ id: 'order-3' });
     const createSubOrders = vi.fn().mockResolvedValue([]);
     const patientId = '66f100000000000000000111';
@@ -452,6 +467,9 @@ describe('AssistantActionExecutor', () => {
           patientId,
           doctorId,
           clinicId: staleClinicId,
+          format: 'STL',
+          shade: 'A2',
+          dueDate: '2026-11-20T00:00:00.000Z',
           creationData: {
             services: [
               {
@@ -469,7 +487,7 @@ describe('AssistantActionExecutor', () => {
       expect.objectContaining({
         patientId,
         doctorId,
-        clinicId: doctorClinicId,
+        clinicId: staleClinicId,
       }),
       context.scope,
     );
@@ -504,6 +522,9 @@ describe('AssistantActionExecutor', () => {
         payload: {
           payload: {
             patientId,
+            format: 'STL',
+            shade: 'A2',
+            dueDate: '2026-11-20T00:00:00.000Z',
             creationData: {
               services: [
                 {
@@ -622,6 +643,9 @@ describe('AssistantActionExecutor', () => {
           patientId,
           doctorId: explicitDoctorId,
           clinicId: explicitClinicId,
+          format: 'STL',
+          shade: 'A2',
+          dueDate: '2026-11-20T00:00:00.000Z',
           creationData: {
             services: [{ serviceId: 'treatment-plan', selectedTeeth: [11] }],
           },
@@ -638,6 +662,60 @@ describe('AssistantActionExecutor', () => {
       }),
       context.scope,
     );
+  });
+
+  it('does not silently fallback to patient-linked doctor when doctorName is explicitly provided', async () => {
+    const createOrder = vi.fn().mockResolvedValue({ id: 'order-doctor-name' });
+    const createSubOrders = vi.fn().mockResolvedValue([]);
+    const patientId = '66f100000000000000000111';
+    const patientDoctorId = '66f100000000000000000222';
+    const clinicId = '66f100000000000000000333';
+
+    const executor = new AssistantActionExecutor({
+      ordersService: { createOrder, createSubOrders } as never,
+      patientService: {
+        getPatientById: vi.fn().mockResolvedValue({
+          id: patientId,
+          doctorId: patientDoctorId,
+          clinicId,
+        }),
+      } as never,
+      doctorService: {
+        listDoctors: vi.fn().mockResolvedValue({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+        }),
+        getDoctorById: vi.fn().mockResolvedValue({ id: patientDoctorId, clinicId }),
+      } as never,
+      clinicService: {
+        getClinicById: vi.fn().mockResolvedValue({ id: clinicId }),
+      } as never,
+      catalogRepository: { listServices: vi.fn().mockResolvedValue([]) } as never,
+    });
+
+    await expect(
+      executor.executeConfirmedWriteAction({
+        actionId: 'a-create-order-doctor-name',
+        toolName: 'create_order',
+        payload: {
+          payload: {
+            patientId,
+            doctorName: 'Unknown Doctor',
+            clinicId,
+            restoration: 'Crown',
+            arch: 'Maxilla',
+            format: 'STL',
+            shade: 'A2',
+            units: 1,
+            amount: 100,
+            dueDate: new Date().toISOString(),
+          },
+        },
+        context,
+      }),
+    ).rejects.toThrow(/doctor .*not found/i);
+
+    expect(createOrder).not.toHaveBeenCalled();
   });
 
   it('accepts update_order creationData.services payload', async () => {

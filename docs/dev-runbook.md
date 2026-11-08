@@ -84,6 +84,12 @@ For assistant and AI alias endpoints, create a conversation first, then set
 `conversationId` and (when required) `actionId` from responses before running
 message/confirmation requests.
 
+Assistant write-safety behavior in current implementation:
+
+- A single assistant message can produce **at most one write action** (create/update) for confirmation.
+- Write actions always require confirmation tokens before execution.
+- Read actions can still run in the same message response.
+
 ## 5) Quality and build checks
 
 Run from the backend project root:

@@ -59,6 +59,16 @@ export class MongooseAssistantConversationRepository implements AssistantConvers
       tenantId: new Types.ObjectId(params.tenantId),
       userId: new Types.ObjectId(params.userId),
     })
+      .select({
+        conversationId: 1,
+        tenantId: 1,
+        userId: 1,
+        title: 1,
+        status: 1,
+        messages: { $slice: -1 },
+        createdAt: 1,
+        updatedAt: 1,
+      })
       .sort({ updatedAt: -1 })
       .limit(params.limit)
       .lean<AssistantConversationPersistence[]>()

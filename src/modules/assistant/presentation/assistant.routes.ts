@@ -1,5 +1,6 @@
 import { Router } from 'express';
 
+import { assistantRateLimit } from '../../../middleware/assistant-rate-limit';
 import { createAssistantService } from '../application/assistant-service-factory';
 import { AssistantController } from './assistant.controller';
 
@@ -7,6 +8,8 @@ const assistantRouter = Router();
 const assistantService = createAssistantService();
 const assistantController = new AssistantController(assistantService);
 
+assistantRouter.use('/assistant', assistantRateLimit);
+assistantRouter.use('/ai', assistantRateLimit);
 assistantRouter.get('/assistant/suggestions', assistantController.getSuggestions);
 assistantRouter.get('/assistant/conversations', assistantController.listConversations);
 assistantRouter.post('/assistant/conversations', assistantController.createConversation);

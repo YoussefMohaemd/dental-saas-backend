@@ -71,12 +71,60 @@ export class MongooseAssistantPendingActionRepository implements AssistantPendin
         actionId: params.actionId,
         tenantId: new Types.ObjectId(params.tenantId),
         userId: new Types.ObjectId(params.userId),
-        status: 'pending',
+        status: 'processing',
       },
       {
         $set: {
           status: 'confirmed',
           consumedAt: params.consumedAt,
+        },
+      },
+    ).exec();
+
+    return result.modifiedCount === 1;
+  }
+
+  public async markProcessing(params: {
+    actionId: string;
+    tenantId: string;
+    userId: string;
+    updatedAt: Date;
+  }): Promise<boolean> {
+    const result = await AssistantPendingActionModel.updateOne(
+      {
+        actionId: params.actionId,
+        tenantId: new Types.ObjectId(params.tenantId),
+        userId: new Types.ObjectId(params.userId),
+        status: { $in: ['pending', 'failed'] },
+      },
+      {
+        $set: {
+          status: 'processing',
+          updatedAt: params.updatedAt,
+        },
+      },
+    ).exec();
+
+    return result.modifiedCount === 1;
+  }
+
+  public async markPending(params: {
+    actionId: string;
+    tenantId: string;
+    userId: string;
+    updatedAt: Date;
+  }): Promise<boolean> {
+    const result = await AssistantPendingActionModel.updateOne(
+      {
+        actionId: params.actionId,
+        tenantId: new Types.ObjectId(params.tenantId),
+        userId: new Types.ObjectId(params.userId),
+        status: 'processing',
+      },
+      {
+        $set: {
+          status: 'pending',
+          updatedAt: params.updatedAt,
         },
       },
     ).exec();

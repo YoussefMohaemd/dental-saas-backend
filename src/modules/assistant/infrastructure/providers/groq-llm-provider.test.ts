@@ -8,7 +8,7 @@ describe('GroqAssistantLlmProvider', () => {
     vi.unstubAllGlobals();
   });
 
-  it('uses JSON mode without native tools and describes tools in the system prompt', async () => {
+  it('uses native tools without json response_format when tools are present', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -57,12 +57,59 @@ describe('GroqAssistantLlmProvider', () => {
       messages: Array<{ role: string; content: string }>;
     };
 
-    expect(body.response_format).toEqual({ type: 'json_object' });
     expect(body.max_completion_tokens).toBeLessThanOrEqual(1000);
-    expect(body).not.toHaveProperty('tools');
+    expect(Array.isArray(body.tools)).toBe(true);
+    expect((body.tools as Array<{ function?: { name?: string } }>).length).toBeGreaterThan(0);
+    expect((body.tools as Array<{ function?: { name?: string } }>)[0]?.function?.name).toBe(
+      'search_orders',
+    );
+    expect(body).not.toHaveProperty('response_format');
     expect(body.messages[0]?.content).toContain('search_orders');
     expect(body.messages[0]?.content).toContain('Search orders by filters and keywords');
     expect(body.messages[0]?.content).toContain('"status"?: string[]');
+  });
+
+  it('uses json response_format when no tools are provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({ reply: 'hello', actions: [] }),
+              },
+            },
+          ],
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const provider = new GroqAssistantLlmProvider({
+      model: 'test-model',
+      timeoutMs: 1_000,
+      apiKey: 'test-key',
+    });
+
+    await provider.completePlan({
+      userMessage: 'hello',
+      systemPrompt: 'You are assistant.',
+      tools: [],
+      languageHint: 'en',
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as {
+      response_format?: unknown;
+      tools?: unknown;
+    };
+
+    expect(body.response_format).toEqual({ type: 'json_object' });
+    expect(body).not.toHaveProperty('tools');
   });
 
   it('retries once without history when groq returns 400 and history is present', async () => {

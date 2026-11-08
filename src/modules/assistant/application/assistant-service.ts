@@ -322,10 +322,7 @@ export class AssistantService {
     const effectiveCapabilities = new Set(resolveRoleCapabilities(principal.roles));
     const llmCompletion = await this.completePlanWithFallback(content, history);
 
-    const plannedActions =
-      llmCompletion.actions.length > 0
-        ? llmCompletion.actions
-        : buildCatalogFallbackActions(content);
+    const plannedActions = llmCompletion.actions;
     const actions = this.dependencies.actionPlanner.validatePlan({
       intent: plannedActions.length > 1 ? 'multiple_actions' : 'single_action',
       actions: plannedActions,
@@ -335,7 +332,6 @@ export class AssistantService {
       arguments: normalizeModelToolArguments(action.arguments),
     }));
 
-    const pendingActions = [];
     const toolByActionId = new Map<string, ReturnType<AssistantToolRegistry['get']>>();
     for (const action of normalizedActions) {
       const tool = this.dependencies.toolRegistry.get(action.tool);
@@ -345,38 +341,55 @@ export class AssistantService {
         tool.requiredCapabilities,
         tool.capabilityMatchMode,
       );
+    }
+    const writeActionsCount = normalizedActions.reduce((count, action) => {
+      const tool = toolByActionId.get(action.id);
+      return count + (tool?.operationType === 'write' ? 1 : 0);
+    }, 0);
+    if (writeActionsCount > 1) {
+      throw new ApplicationError({
+        message: 'Only one write action is allowed per assistant message',
+        statusCode: 400,
+        code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+        expose: true,
+      });
+    }
 
-      if (tool.requiresConfirmation) {
-        const normalizedPayload = await this.dependencies.actionExecutor.validateWriteActionDraft({
-          toolName: tool.name,
-          payload: action.arguments,
-          context: {
-            scope: principal.scope,
-            tenantId: principal.tenantId,
-          },
-        });
-
-        const pendingAction = await this.dependencies.confirmationService.createPendingAction({
-          conversationId: input.conversationId,
-          tenantId: principal.tenantId,
-          userId: principal.userId,
-          toolName: tool.name,
-          payload: normalizedPayload,
-        });
-        pendingActions.push(pendingAction);
-        await this.dependencies.auditService.recordEvent({
-          tenantId: principal.tenantId,
-          userId: principal.userId,
-          conversationId: input.conversationId,
-          actionId: pendingAction.actionId,
-          eventType: 'assistant.confirmation.created',
-          status: 'success',
-          details: {
-            tool: tool.name,
-          },
-        });
+    const pendingActions = [];
+    for (const action of normalizedActions) {
+      const tool = toolByActionId.get(action.id);
+      if (!tool || !tool.requiresConfirmation) {
+        continue;
       }
 
+      const normalizedPayload = await this.dependencies.actionExecutor.validateWriteActionDraft({
+        toolName: tool.name,
+        payload: action.arguments,
+        context: {
+          scope: principal.scope,
+          tenantId: principal.tenantId,
+        },
+      });
+
+      const pendingAction = await this.dependencies.confirmationService.createPendingAction({
+        conversationId: input.conversationId,
+        tenantId: principal.tenantId,
+        userId: principal.userId,
+        toolName: tool.name,
+        payload: normalizedPayload,
+      });
+      pendingActions.push(pendingAction);
+      await this.dependencies.auditService.recordEvent({
+        tenantId: principal.tenantId,
+        userId: principal.userId,
+        conversationId: input.conversationId,
+        actionId: pendingAction.actionId,
+        eventType: 'assistant.confirmation.created',
+        status: 'success',
+        details: {
+          tool: tool.name,
+        },
+      });
     }
 
     const executions = await this.dependencies.actionExecutor.executeReadActions(normalizedActions, toolByActionId, {
@@ -544,18 +557,6 @@ export class AssistantService {
       confirmationToken: input.confirmationToken,
     });
 
-    await this.dependencies.auditService.recordEvent({
-      tenantId: principal.tenantId,
-      userId: principal.userId,
-      conversationId: confirmedAction.conversationId,
-      actionId: confirmedAction.actionId,
-      eventType: 'assistant.confirmation.accepted',
-      status: 'success',
-      details: {
-        tool: confirmedAction.toolName,
-      },
-    });
-
     const effectiveCapabilities = new Set(resolveRoleCapabilities(principal.roles));
     const tool = this.dependencies.toolRegistry.get(confirmedAction.toolName);
     try {
@@ -577,18 +578,62 @@ export class AssistantService {
           stage: 'confirm',
         },
       });
+      await this.dependencies.confirmationService.releasePendingAction({
+        actionId: confirmedAction.actionId,
+        tenantId: principal.tenantId,
+        userId: principal.userId,
+      });
       throw error;
     }
 
-    const execution = await this.dependencies.actionExecutor.executeConfirmedWriteAction({
-      actionId: confirmedAction.actionId,
-      toolName: confirmedAction.toolName,
-      payload: confirmedAction.payload,
-      context: {
-        scope: principal.scope,
+    let execution: Awaited<ReturnType<AssistantActionExecutor['executeConfirmedWriteAction']>>;
+    try {
+      execution = await this.dependencies.actionExecutor.executeConfirmedWriteAction({
+        actionId: confirmedAction.actionId,
+        toolName: confirmedAction.toolName,
+        payload: confirmedAction.payload,
+        context: {
+          scope: principal.scope,
+          tenantId: principal.tenantId,
+        },
+      });
+    } catch (error) {
+      await this.dependencies.confirmationService.releasePendingAction({
+        actionId: confirmedAction.actionId,
         tenantId: principal.tenantId,
+        userId: principal.userId,
+      });
+      await this.dependencies.auditService.recordEvent({
+        tenantId: principal.tenantId,
+        userId: principal.userId,
+        conversationId: confirmedAction.conversationId,
+        actionId: confirmedAction.actionId,
+        eventType: 'assistant.confirmation.accepted',
+        status: 'failed',
+        details: {
+          tool: confirmedAction.toolName,
+          stage: 'execution',
+        },
+      });
+      throw error;
+    }
+    await this.dependencies.confirmationService.completePendingAction({
+      actionId: confirmedAction.actionId,
+      tenantId: principal.tenantId,
+      userId: principal.userId,
+    });
+    await this.dependencies.auditService.recordEvent({
+      tenantId: principal.tenantId,
+      userId: principal.userId,
+      conversationId: confirmedAction.conversationId,
+      actionId: confirmedAction.actionId,
+      eventType: 'assistant.confirmation.accepted',
+      status: 'success',
+      details: {
+        tool: confirmedAction.toolName,
       },
     });
+
     const confirmationText = buildWriteConfirmationText(execution);
 
     await this.dependencies.conversationService.appendMessage({

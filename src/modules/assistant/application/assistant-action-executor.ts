@@ -14,12 +14,14 @@ import { createPatientBodySchema, updatePatientBodySchema } from '../../patients
 import { type OrdersService } from '../../orders/application/orders-service';
 import { type PatientService } from '../../patients/application/patient-service';
 import {
-  type OrderArch,
+  type ArchType,
   ORDER_DURATION_VALUES,
   ORDER_LIST_SORT_FIELDS,
   ORDER_STATUS_VALUES,
+  ORDER_ARCH_VALUES,
+  ORDER_RESTORATION_VALUES,
   type OrderUpdatePayload,
-  type OrderRestoration,
+  type RestorativeType,
   type OrderWritePayload,
 } from '../../orders/domain/order';
 import { type SubOrderWritePayload } from '../../orders/domain/sub-order';
@@ -787,8 +789,6 @@ export class AssistantActionExecutor {
     context: AssistantExecutionContext,
   ): Promise<OrderWritePayload> {
     const now = new Date();
-    const defaultDueDate = new Date(now);
-    defaultDueDate.setDate(defaultDueDate.getDate() + 7);
 
     const schema = z
       .object({
@@ -802,23 +802,10 @@ export class AssistantActionExecutor {
         scanCenterId: z.string().trim().min(1).optional(),
         status: z.enum(ORDER_STATUS_VALUES).default('New'),
         priority: z.enum(['Low', 'Normal', 'High', 'Urgent']).default('Normal'),
-        restoration: z
-          .enum([
-            'Crown',
-            'Bridge',
-            'Veneer',
-            'Implant Crown',
-            'Full Arch',
-            'Night Guard',
-            'Inlay',
-            'Onlay',
-            'Partial Denture',
-            'Complete Denture',
-          ])
-          .optional(),
-        arch: z.enum(['Maxilla', 'Mandible', 'Both']).default('Both'),
-        format: z.string().trim().min(1).default('STL'),
-        shade: z.string().trim().min(1).default('A2'),
+        restoration: z.enum(ORDER_RESTORATION_VALUES).optional(),
+        arch: z.enum(ORDER_ARCH_VALUES).optional(),
+        format: z.string().trim().min(1).optional(),
+        shade: z.string().trim().min(1).optional(),
         units: z.coerce.number().int().min(1).optional(),
         amount: z.coerce.number().min(0).optional(),
         billed: z.boolean().default(false),
@@ -878,8 +865,8 @@ export class AssistantActionExecutor {
     const patientClinicId =
       typeof patient.clinicId === 'string' ? patient.clinicId.trim() : '';
     const doctorId = await this.resolveDoctorId(
-      parsed.doctorId || patientDoctorId,
-      parsed.doctorId || patientDoctorId ? undefined : parsed.doctorName,
+      parsed.doctorId ?? (parsed.doctorName ? undefined : patientDoctorId),
+      parsed.doctorName,
       context.scope,
     );
     const doctor = await this.dependencies.doctorService.getDoctorById(doctorId, context.scope);
@@ -887,13 +874,35 @@ export class AssistantActionExecutor {
       typeof (doctor as { clinicId?: unknown }).clinicId === 'string'
         ? (doctor as { clinicId: string }).clinicId.trim()
         : '';
+    const requestedClinicId = parsed.clinicId?.trim();
+    const preferredClinicId =
+      requestedClinicId && requestedClinicId.length > 0
+        ? requestedClinicId
+        : doctorClinicId || patientClinicId;
     const clinicId = await this.resolveClinicId(
-      doctorClinicId || patientClinicId || parsed.clinicId,
-      doctorClinicId || patientClinicId ? undefined : parsed.clinicName,
+      preferredClinicId,
+      parsed.clinicName,
       context.scope,
     );
     await this.dependencies.clinicService.getClinicById(clinicId, context.scope);
     const defaults = await this.deriveAssistantOrderDefaults(parsed.creationData?.services, context.tenantId);
+    const missingFields: string[] = [];
+    if (!parsed.format) missingFields.push('format');
+    if (!parsed.shade) missingFields.push('shade');
+    if (!parsed.dueDate) missingFields.push('dueDate');
+    if (!parsed.restoration && !defaults.restoration) missingFields.push('restoration');
+    if (!parsed.arch && !defaults.arch) missingFields.push('arch');
+    if (parsed.units === undefined && defaults.units === undefined) missingFields.push('units');
+    if (parsed.amount === undefined && defaults.amount === undefined) missingFields.push('amount');
+
+    if (missingFields.length > 0) {
+      throw new ApplicationError({
+        message: `create_order is missing required field(s): ${missingFields.join(', ')}`,
+        statusCode: 400,
+        code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+        expose: true,
+      });
+    }
 
     return stripUndefined({
       ...parsed,
@@ -902,17 +911,22 @@ export class AssistantActionExecutor {
       clinicId,
       orderNumber: parsed.orderNumber ?? this.buildAssistantOrderNumber(now),
       restoration: parsed.restoration ?? defaults.restoration,
+      arch: parsed.arch ?? defaults.arch,
       units: parsed.units ?? defaults.units,
       amount: parsed.amount ?? defaults.amount,
       hasNotes: parsed.hasNotes ?? parsed.notes.trim().length > 0,
       receivedAt: parsed.receivedAt ?? now,
-      dueDate: parsed.dueDate ?? defaultDueDate,
     }) as OrderWritePayload;
   }
 
   private buildAssistantOrderNumber(now: Date): string {
-    const seed = (now.getUTCMilliseconds() * 1000 + Math.floor(Math.random() * 1000)) % 1_000_000;
-    return `AI-${seed.toString().padStart(6, '0')}`;
+    const date = now.toISOString().slice(2, 10).replace(/-/g, '');
+    const time = now.toISOString().slice(11, 16).replace(':', '');
+    const timestamp = `${date}${time}`;
+    const random = Math.floor(Math.random() * 1_000_000)
+      .toString()
+      .padStart(6, '0');
+    return `AI-${timestamp}-${random}`;
   }
 
   private async deriveAssistantOrderDefaults(
@@ -923,15 +937,24 @@ export class AssistantActionExecutor {
         }>
       | undefined,
     tenantId: string,
-  ): Promise<{ restoration: OrderRestoration; units: number; amount: number }> {
+  ): Promise<{
+    restoration?: RestorativeType;
+    arch?: ArchType;
+    units?: number;
+    amount?: number;
+  }> {
     const normalizedServices = services ?? [];
     const allTeeth = Array.from(
       new Set(normalizedServices.flatMap((service) => service.selectedTeeth)),
     );
-    const units = Math.max(allTeeth.length, 1);
+    const units = allTeeth.length > 0 ? allTeeth.length : undefined;
+    const arch = allTeeth.length > 0 ? this.deriveArchFromSelectedTeeth(allTeeth) : undefined;
 
     if (normalizedServices.length === 0) {
-      return { restoration: 'Crown', units, amount: 0 };
+      return {
+        ...(arch ? { arch } : {}),
+        ...(units !== undefined ? { units } : {}),
+      };
     }
 
     const [firstService] = normalizedServices;
@@ -943,8 +966,11 @@ export class AssistantActionExecutor {
     );
 
     return {
-      restoration: this.mapServiceIdToRestoration(firstService?.serviceId),
-      units,
+      ...(firstService?.serviceId
+        ? { restoration: this.mapServiceIdToRestoration(firstService.serviceId) }
+        : {}),
+      ...(arch ? { arch } : {}),
+      ...(units !== undefined ? { units } : {}),
       amount,
     };
   }
@@ -1072,7 +1098,7 @@ export class AssistantActionExecutor {
     });
   }
 
-  private mapServiceIdToRestoration(serviceId: string | undefined): OrderRestoration {
+  private mapServiceIdToRestoration(serviceId: string | undefined): RestorativeType {
     if (serviceId === 'surgical-guide') return 'Implant Crown';
     if (serviceId === 'final-restoration' || serviceId === 'fmb') return 'Bridge';
     if (serviceId === 'gfmr' || serviceId === 'full-guide') return 'Full Arch';
@@ -1080,7 +1106,7 @@ export class AssistantActionExecutor {
     return 'Crown';
   }
 
-  private deriveArchFromSelectedTeeth(teeth: readonly number[]): OrderArch {
+  private deriveArchFromSelectedTeeth(teeth: readonly number[]): ArchType {
     const hasUpper = teeth.some((tooth) => tooth >= 11 && tooth <= 28);
     const hasLower = teeth.some((tooth) => tooth >= 31 && tooth <= 48);
     if (hasUpper && hasLower) return 'Both';

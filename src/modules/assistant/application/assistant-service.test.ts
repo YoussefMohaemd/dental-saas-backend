@@ -5,6 +5,11 @@ import {
   APPLICATION_ERROR_CODES,
   ApplicationError,
 } from '../../../shared/application/errors/application-error';
+import {
+  InMemoryAssistantAuditRepository,
+  InMemoryAssistantConversationRepository,
+  InMemoryAssistantPendingActionRepository,
+} from '../infrastructure/persistence/in-memory-assistant-repositories';
 import { AssistantService } from './assistant-service';
 
 function principal(roles: string[]) {
@@ -76,7 +81,7 @@ describe('AssistantService', () => {
     expect(response.result.pendingActions).toHaveLength(1);
   });
 
-  it('accepts minimal create-order draft with ids and defaults remaining fields', async () => {
+  it('rejects plans that include more than one write action in a single message', async () => {
     const service = AssistantService.createForTests({
       providerReply: {
         reply: 'Preparing draft',
@@ -89,6 +94,66 @@ describe('AssistantService', () => {
                 patientId: '66f100000000000000000111',
                 doctorId: '66f100000000000000000222',
                 clinicId: '66f100000000000000000333',
+                format: 'STL',
+                shade: 'A2',
+                dueDate: '2026-11-20T00:00:00.000Z',
+                creationData: {
+                  services: [{ serviceId: 'treatment-plan', selectedTeeth: [11] }],
+                },
+              },
+            },
+            dependsOn: [],
+          },
+          {
+            id: 'a2',
+            tool: 'update_order',
+            arguments: {
+              orderId: 'ord-1',
+              payload: { status: 'Review' },
+            },
+            dependsOn: [],
+          },
+        ],
+      },
+    });
+
+    const conversation = await service.createConversation({
+      tenantId: '66f100000000000000000001',
+      userId: '66f1000000000000000000aa',
+      roles: ['staff'],
+    });
+
+    await expect(
+      service.postMessage(principal(['staff']), {
+        conversationId: conversation.id,
+        content: 'Create one order and update another order',
+      }),
+    ).rejects.toMatchObject({
+      message: 'Only one write action is allowed per assistant message',
+      statusCode: 400,
+      code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+    });
+  });
+
+  it('accepts minimal create-order draft with ids and required fields', async () => {
+    const service = AssistantService.createForTests({
+      providerReply: {
+        reply: 'Preparing draft',
+        actions: [
+          {
+            id: 'a1',
+            tool: 'create_order',
+            arguments: {
+              payload: {
+                patientId: '66f100000000000000000111',
+                doctorId: '66f100000000000000000222',
+                clinicId: '66f100000000000000000333',
+                format: 'STL',
+                shade: 'A2',
+                dueDate: '2026-11-20T00:00:00.000Z',
+                creationData: {
+                  services: [{ serviceId: 'treatment-plan', selectedTeeth: [12] }],
+                },
               },
             },
             dependsOn: [],
@@ -128,6 +193,12 @@ describe('AssistantService', () => {
                 patientName: 'Adam Wael',
                 doctorName: 'Mostafa Samir',
                 clinicName: 'Dental Care Clinic 10',
+                format: 'STL',
+                shade: 'A2',
+                dueDate: '2026-11-20T00:00:00.000Z',
+                creationData: {
+                  services: [{ serviceId: 'treatment-plan', selectedTeeth: [11] }],
+                },
               },
             },
             dependsOn: [],
@@ -154,7 +225,7 @@ describe('AssistantService', () => {
     expect(response.result.pendingActions).toHaveLength(1);
   });
 
-  it('normalizes create-order pending payload when clinicId is stale', async () => {
+  it('keeps explicit clinicId in create-order pending payload', async () => {
     const service = AssistantService.createForTests({
       providerReply: {
         reply: 'Preparing draft',
@@ -167,6 +238,9 @@ describe('AssistantService', () => {
                 patientId: '96889346eeb97e3c70caa914',
                 doctorId: '66f100000000000000000222',
                 clinicId: 'f5d9afd005f77d5531ffefe5',
+                format: 'STL',
+                shade: 'A2',
+                dueDate: '2026-11-20T00:00:00.000Z',
                 creationData: {
                   services: [{ serviceId: 'treatment-plan', selectedTeeth: [12, 34] }],
                 },
@@ -197,7 +271,7 @@ describe('AssistantService', () => {
     const pending = response.result.pendingActions[0];
     expect(pending).toBeDefined();
     expect((pending?.payload as { payload?: { clinicId?: string } }).payload?.clinicId).toBe(
-      '66f100000000000000000333',
+      'f5d9afd005f77d5531ffefe5',
     );
   });
 
@@ -214,6 +288,12 @@ describe('AssistantService', () => {
                 patientId: '66f100000000000000000111',
                 doctorId: '66f100000000000000000222',
                 clinicId: '66f100000000000000000333',
+                format: 'STL',
+                shade: 'A2',
+                dueDate: '2026-11-20T00:00:00.000Z',
+                creationData: {
+                  services: [{ serviceId: 'treatment-plan', selectedTeeth: [21] }],
+                },
               },
               dependsOn: [],
             },
@@ -440,7 +520,7 @@ describe('AssistantService', () => {
     ).rejects.toThrow('Assistant tool permission denied');
   });
 
-  it('falls back to list_services when model returns no actions for services/pricing request', async () => {
+  it('keeps service/pricing prompts action-free when model returns no actions', async () => {
     const service = AssistantService.create({
       provider: {
         name: 'mock',
@@ -488,6 +568,8 @@ describe('AssistantService', () => {
         },
         findOwnedPendingAction: async () => null,
         markConfirmed: async () => true,
+        markProcessing: async () => true,
+        markPending: async () => true,
       },
       auditRepository: {
         create: async () => undefined,
@@ -542,12 +624,9 @@ describe('AssistantService', () => {
     if (response.result.type !== 'text') {
       throw new Error('Expected text response');
     }
-    expect(response.result.plannedActions).toBeGreaterThanOrEqual(1);
-    expect(response.result.executions.length).toBeGreaterThanOrEqual(1);
-    const executedTools = response.result.executions.map((execution) => execution.tool);
-    expect(executedTools).toContain('list_services');
-    expect(response.result.executions.every((execution) => execution.status === 'executed')).toBe(true);
-    expect(response.result.text).toContain('Implant Planning');
+    expect(response.result.plannedActions).toBe(0);
+    expect(response.result.executions).toHaveLength(0);
+    expect(response.result.text).toContain('Here is what I can help with.');
   });
 
   it('propagates timeout when model times out instead of deterministic fallback', async () => {
@@ -602,6 +681,8 @@ describe('AssistantService', () => {
         },
         findOwnedPendingAction: async () => null,
         markConfirmed: async () => true,
+        markProcessing: async () => true,
+        markPending: async () => true,
       },
       auditRepository: {
         create: async () => undefined,
@@ -742,6 +823,8 @@ describe('AssistantService', () => {
         },
         findOwnedPendingAction: async () => null,
         markConfirmed: async () => true,
+        markProcessing: async () => true,
+        markPending: async () => true,
       },
       auditRepository: {
         create: async () => undefined,
@@ -789,7 +872,7 @@ describe('AssistantService', () => {
     expect(secondCallArgs?.history).toEqual([]);
   });
 
-  it('falls back to get_company_info when model returns no actions for company profile request', async () => {
+  it('does not inject fallback catalog actions when model intentionally returns no actions', async () => {
     const service = AssistantService.createForTests({
       providerReply: {
         reply: 'Sure, let me share more about us.',
@@ -812,8 +895,113 @@ describe('AssistantService', () => {
     if (response.result.type !== 'text') {
       throw new Error('Expected text result');
     }
-    expect(response.result.executions).toHaveLength(1);
-    expect(response.result.executions[0]?.tool).toBe('get_company_info');
+    expect(response.result.executions).toHaveLength(0);
+  });
+
+  it('keeps pending action confirmable after transient execution failure', async () => {
+    const updateOrder = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new ApplicationError({
+          message: 'Temporary upstream failure',
+          statusCode: 503,
+          code: APPLICATION_ERROR_CODES.INTERNAL_ERROR,
+          expose: true,
+        }),
+      )
+      .mockResolvedValueOnce({ id: 'ord-1', status: 'Review' });
+
+    const provider = {
+      name: 'mock' as const,
+      completePlan: vi.fn().mockResolvedValue({
+        reply: 'Preparing update',
+        actions: [
+          {
+            id: 'a1',
+            tool: 'update_order',
+            arguments: {
+              orderId: 'ord-1',
+              payload: { status: 'Review' },
+            },
+            dependsOn: [],
+          },
+        ],
+      }),
+    };
+
+    const service = AssistantService.create({
+      provider,
+      conversationRepository: new InMemoryAssistantConversationRepository(),
+      pendingActionRepository: new InMemoryAssistantPendingActionRepository(),
+      auditRepository: new InMemoryAssistantAuditRepository(),
+      ordersService: {
+        listOrders: async () => ({
+          items: [{ id: 'ord-1', orderNumber: 'ORD-1' }],
+          meta: { totalItems: 1, page: 1, pageSize: 20, totalPages: 1 },
+        }),
+        getOrderById: async () => ({
+          id: 'ord-1',
+          dueDate: new Date().toISOString(),
+          priority: 'Normal',
+          notes: '',
+        }),
+        updateOrder,
+      } as never,
+      patientService: {
+        listPatients: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        getPatientById: async () => ({}),
+      } as never,
+      doctorService: {
+        listDoctors: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+      } as never,
+      clinicService: {
+        listClinics: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+      } as never,
+      catalogRepository: {
+        listServices: async () => [],
+        getCompanyProfile: async () => null,
+      },
+      options: {
+        maxActionsPerMessage: 8,
+        maxPlanningRounds: 4,
+        maxInputChars: 4000,
+        confirmationTtlSeconds: 900,
+      },
+    });
+
+    const conversation = await service.createConversation({
+      tenantId: '66f100000000000000000001',
+      userId: '66f1000000000000000000aa',
+      roles: ['staff'],
+    });
+
+    const messageResponse = await service.postMessage(principal(['staff']), {
+      conversationId: conversation.id,
+      content: 'Update order status',
+    });
+    expect(messageResponse.result.type).toBe('confirmation');
+    if (messageResponse.result.type !== 'confirmation') {
+      throw new Error('Expected confirmation result');
+    }
+
+    const pending = messageResponse.result.pendingActions[0];
+    if (!pending) {
+      throw new Error('Expected pending action');
+    }
+
+    await expect(
+      service.confirmAction(principal(['staff']), {
+        actionId: pending.actionId,
+        confirmationToken: pending.confirmationToken,
+      }),
+    ).rejects.toThrow('Temporary upstream failure');
+
+    const secondAttempt = await service.confirmAction(principal(['staff']), {
+      actionId: pending.actionId,
+      confirmationToken: pending.confirmationToken,
+    });
+    expect(secondAttempt.status).toBe('confirmed');
+    expect(updateOrder).toHaveBeenCalledTimes(2);
   });
 
   it('falls back to catalog actions when model is rate-limited for pricing requests', async () => {
@@ -865,6 +1053,8 @@ describe('AssistantService', () => {
         },
         findOwnedPendingAction: async () => null,
         markConfirmed: async () => true,
+        markProcessing: async () => true,
+        markPending: async () => true,
       },
       auditRepository: {
         create: async () => undefined,

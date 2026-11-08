@@ -159,28 +159,48 @@ export class GroqAssistantLlmProvider implements AssistantLlmProvider {
         payload: string;
       }
   > {
+    const hasTools = params.request.tools.length > 0;
+    const requestBody: Record<string, unknown> = {
+      model: this.options.model,
+      messages: [
+        {
+          role: 'system',
+          content: buildSystemPromptWithTools(params.request.systemPrompt, params.request.tools),
+        },
+        ...(params.includeHistory ? (params.request.history ?? []) : []),
+        { role: 'user', content: params.request.userMessage },
+      ],
+      temperature: 0,
+      max_completion_tokens: this.options.maxCompletionTokens ?? 900,
+      ...(hasTools
+        ? {
+            tools: params.request.tools.map((tool) => ({
+              type: 'function',
+              function: {
+                name: tool.name,
+                description: tool.description,
+                parameters: {
+                  type: 'object',
+                  additionalProperties: true,
+                },
+              },
+            })),
+            tool_choice: 'auto',
+          }
+        : {
+            response_format: {
+              type: 'json_object',
+            },
+          }),
+    };
+
     const response = await fetch(`${stripTrailingSlash(params.baseUrl)}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${this.options.apiKey}`,
       },
-      body: JSON.stringify({
-        model: this.options.model,
-        messages: [
-          {
-            role: 'system',
-            content: buildSystemPromptWithTools(params.request.systemPrompt, params.request.tools),
-          },
-          ...(params.includeHistory ? (params.request.history ?? []) : []),
-          { role: 'user', content: params.request.userMessage },
-        ],
-        temperature: 0,
-        max_completion_tokens: this.options.maxCompletionTokens ?? 900,
-        response_format: {
-          type: 'json_object',
-        },
-      }),
+      body: JSON.stringify(requestBody),
       signal: params.signal,
     });
 

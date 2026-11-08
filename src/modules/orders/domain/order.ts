@@ -11,6 +11,8 @@ import {
 } from '../../../shared/domain/entities/dental-data-model';
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 
+export type { ArchType, OrderStatus, Priority, RestorativeType };
+
 export interface OrderCreationData {
   services: SubOrderCreationDataEntity[];
   communication?:

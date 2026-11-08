@@ -143,13 +143,61 @@ export class InMemoryAssistantPendingActionRepository implements AssistantPendin
       return Promise.resolve(false);
     }
 
-    if (current.status !== 'pending') {
+    if (current.status !== 'processing') {
       return Promise.resolve(false);
     }
 
     current.status = 'confirmed';
     current.consumedAt = params.consumedAt;
     current.updatedAt = params.consumedAt;
+    return Promise.resolve(true);
+  }
+
+  public markProcessing(params: {
+    actionId: string;
+    tenantId: string;
+    userId: string;
+    updatedAt: Date;
+  }): Promise<boolean> {
+    const current = this.actions.get(params.actionId);
+    if (!current) {
+      return Promise.resolve(false);
+    }
+
+    if (current.tenantId !== params.tenantId || current.userId !== params.userId) {
+      return Promise.resolve(false);
+    }
+
+    if (current.status !== 'pending' && current.status !== 'failed') {
+      return Promise.resolve(false);
+    }
+
+    current.status = 'processing';
+    current.updatedAt = params.updatedAt;
+    return Promise.resolve(true);
+  }
+
+  public markPending(params: {
+    actionId: string;
+    tenantId: string;
+    userId: string;
+    updatedAt: Date;
+  }): Promise<boolean> {
+    const current = this.actions.get(params.actionId);
+    if (!current) {
+      return Promise.resolve(false);
+    }
+
+    if (current.tenantId !== params.tenantId || current.userId !== params.userId) {
+      return Promise.resolve(false);
+    }
+
+    if (current.status !== 'processing') {
+      return Promise.resolve(false);
+    }
+
+    current.status = 'pending';
+    current.updatedAt = params.updatedAt;
     return Promise.resolve(true);
   }
 }

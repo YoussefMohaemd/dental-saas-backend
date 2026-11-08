@@ -15,7 +15,7 @@ const assistantPendingActionSchema = new Schema(
     consumedAt: { type: Date, default: undefined },
     status: {
       type: String,
-      enum: ['pending', 'confirmed', 'expired'],
+      enum: ['pending', 'processing', 'confirmed', 'expired', 'failed'],
       required: true,
       default: 'pending',
     },

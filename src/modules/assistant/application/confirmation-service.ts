@@ -80,9 +80,18 @@ export class ConfirmationService {
       });
     }
 
-    if (pendingAction.status !== 'pending' || pendingAction.consumedAt) {
+    if (pendingAction.status === 'confirmed' || pendingAction.consumedAt) {
       throw new ApplicationError({
         message: 'Pending action was already confirmed',
+        statusCode: 409,
+        code: APPLICATION_ERROR_CODES.CONFLICT,
+        expose: true,
+      });
+    }
+
+    if (pendingAction.status === 'processing') {
+      throw new ApplicationError({
+        message: 'Pending action is currently being confirmed',
         statusCode: 409,
         code: APPLICATION_ERROR_CODES.CONFLICT,
         expose: true,
@@ -108,15 +117,15 @@ export class ConfirmationService {
       });
     }
 
-    const claimed = await this.pendingActionRepository.markConfirmed({
+    const claimed = await this.pendingActionRepository.markProcessing({
       actionId: pendingAction.actionId,
       tenantId: pendingAction.tenantId,
       userId: pendingAction.userId,
-      consumedAt: new Date(),
+      updatedAt: new Date(),
     });
     if (!claimed) {
       throw new ApplicationError({
-        message: 'Pending action was already confirmed',
+        message: 'Pending action is currently being confirmed',
         statusCode: 409,
         code: APPLICATION_ERROR_CODES.CONFLICT,
         expose: true,
@@ -129,6 +138,40 @@ export class ConfirmationService {
       toolName: pendingAction.toolName,
       payload: pendingAction.payload,
     };
+  }
+
+  public async completePendingAction(params: {
+    actionId: string;
+    tenantId: string;
+    userId: string;
+  }): Promise<void> {
+    const marked = await this.pendingActionRepository.markConfirmed({
+      actionId: params.actionId,
+      tenantId: params.tenantId,
+      userId: params.userId,
+      consumedAt: new Date(),
+    });
+    if (!marked) {
+      throw new ApplicationError({
+        message: 'Pending action confirmation state is invalid',
+        statusCode: 409,
+        code: APPLICATION_ERROR_CODES.CONFLICT,
+        expose: true,
+      });
+    }
+  }
+
+  public async releasePendingAction(params: {
+    actionId: string;
+    tenantId: string;
+    userId: string;
+  }): Promise<void> {
+    await this.pendingActionRepository.markPending({
+      actionId: params.actionId,
+      tenantId: params.tenantId,
+      userId: params.userId,
+      updatedAt: new Date(),
+    });
   }
 }
 
