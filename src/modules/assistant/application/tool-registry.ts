@@ -166,14 +166,20 @@ export interface AssistantToolRegistry {
   get(name: string): AssistantToolDefinition;
 }
 
-export function buildAssistantToolRegistry(): AssistantToolRegistry {
+export function buildAssistantToolRegistry(options?: {
+  createToolsEnabled?: boolean;
+}): AssistantToolRegistry {
+  const createToolsEnabled = options?.createToolsEnabled ?? true;
   const toolsByName = new Map<string, AssistantToolDefinition>();
-  for (const tool of ASSISTANT_TOOLS) {
+  const tools = ASSISTANT_TOOLS.filter(
+    (tool) => createToolsEnabled || !tool.name.startsWith('create_'),
+  );
+  for (const tool of tools) {
     toolsByName.set(tool.name, tool);
   }
 
   return {
-    list: () => [...ASSISTANT_TOOLS],
+    list: () => [...tools],
     get: (name: string) => {
       const tool = toolsByName.get(name);
       if (tool) {

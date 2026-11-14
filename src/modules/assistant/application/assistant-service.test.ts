@@ -31,6 +31,37 @@ function principal(roles: string[]) {
 }
 
 describe('AssistantService', () => {
+  it('rejects create plans when create tools are disabled', async () => {
+    const service = AssistantService.createForTests({
+      createToolsEnabled: false,
+      providerReply: {
+        reply: 'Preparing draft',
+        actions: [
+          {
+            id: 'a1',
+            tool: 'create_order',
+            arguments: { payload: {} },
+            dependsOn: [],
+          },
+        ],
+      },
+    });
+    const conversation = await service.createConversation({
+      tenantId: '66f100000000000000000001',
+      userId: '66f1000000000000000000aa',
+      roles: ['staff'],
+    });
+
+    await expect(
+      service.postMessage(principal(['staff']), {
+        conversationId: conversation.id,
+        content: 'Create an order',
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+    });
+  });
+
   it('filters prompt suggestions by effective capabilities', async () => {
     const service = AssistantService.createForTests({
       providerReply: {

@@ -18,4 +18,12 @@ describe('buildAssistantToolRegistry', () => {
 
     expect(() => registry.get('delete_order')).toThrow('Unknown assistant tool');
   });
+
+  it('omits create tools when create tools are disabled', () => {
+    const registry = buildAssistantToolRegistry({ createToolsEnabled: false });
+
+    expect(registry.list().some((tool) => tool.name === 'create_order')).toBe(false);
+    expect(registry.list().some((tool) => tool.name === 'create_patient')).toBe(false);
+    expect(() => registry.get('create_order')).toThrow('Unknown assistant tool');
+  });
 });

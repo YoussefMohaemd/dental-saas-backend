@@ -46,6 +46,7 @@ export function createAssistantService(): AssistantService {
       maxPlanningRounds: env.AI_ASSISTANT_MAX_PLANNING_ROUNDS,
       maxInputChars: env.AI_ASSISTANT_MAX_INPUT_CHARS,
       confirmationTtlSeconds: env.AI_ASSISTANT_CONFIRMATION_TTL_SECONDS,
+      createToolsEnabled: env.AI_ASSISTANT_CREATE_TOOLS_ENABLED,
     },
   });
 }

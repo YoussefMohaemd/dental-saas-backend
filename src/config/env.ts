@@ -97,6 +97,7 @@ const envSchema = z.object({
   AI_ASSISTANT_MAX_PLANNING_ROUNDS: z.coerce.number().int().min(1).max(12).default(4),
   AI_ASSISTANT_MAX_INPUT_CHARS: z.coerce.number().int().min(256).max(32_000).default(4_000),
   AI_ASSISTANT_CONFIRMATION_TTL_SECONDS: z.coerce.number().int().min(60).max(86_400).default(900),
+  AI_ASSISTANT_CREATE_TOOLS_ENABLED: parseBoolean.default(false),
   AI_ASSISTANT_PLANNER_PROMPT_VERSION: z.string().min(1).default('v1'),
 });
 

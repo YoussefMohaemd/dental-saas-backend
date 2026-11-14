@@ -49,6 +49,7 @@ interface AssistantOptions {
   maxPlanningRounds: number;
   maxInputChars: number;
   confirmationTtlSeconds: number;
+  createToolsEnabled?: boolean;
 }
 
 export interface AssistantPrincipalContext {
@@ -69,6 +70,7 @@ interface AssistantServiceDependencies {
   confirmationService: ConfirmationService;
   auditService: AssistantAuditService;
   options: AssistantOptions;
+  createToolsEnabled: boolean;
 }
 
 export interface AssistantConversationView {
@@ -94,6 +96,10 @@ export interface AssistantConversationSummaryView {
   createdAt: string;
   updatedAt: string;
   preview: string;
+}
+
+export interface AssistantCapabilitiesView {
+  createEnabled: boolean;
 }
 
 export interface AssistantMessageResultText {
@@ -122,6 +128,7 @@ export class AssistantService {
 
   public static createForTests(params?: {
     providerReply?: AssistantLlmCompletionResult;
+    createToolsEnabled?: boolean;
   }): AssistantService {
     const provider = params?.providerReply
       ? new DeterministicTestProvider(params.providerReply)
@@ -144,6 +151,7 @@ export class AssistantService {
         maxPlanningRounds: 4,
         maxInputChars: 4_000,
         confirmationTtlSeconds: 900,
+        createToolsEnabled: params?.createToolsEnabled ?? true,
       },
     });
   }
@@ -159,7 +167,10 @@ export class AssistantService {
     clinicService: ClinicService;
     catalogRepository?: AssistantCatalogRepository;
     options: AssistantOptions;
+    createToolsEnabled?: boolean;
   }): AssistantService {
+    const createToolsEnabled =
+      params.createToolsEnabled ?? params.options.createToolsEnabled ?? true;
     const promptCatalogService = new PromptCatalogService();
     const permissionGuard = new PermissionGuard();
     const actionPlanner = new ActionPlanner({
@@ -182,7 +193,7 @@ export class AssistantService {
 
     return new AssistantService({
       provider: params.provider,
-      toolRegistry: buildAssistantToolRegistry(),
+      toolRegistry: buildAssistantToolRegistry({ createToolsEnabled }),
       promptCatalogService,
       permissionGuard,
       actionPlanner,
@@ -191,7 +202,12 @@ export class AssistantService {
       confirmationService,
       auditService,
       options: params.options,
+      createToolsEnabled,
     });
+  }
+
+  public getCapabilities(): AssistantCapabilitiesView {
+    return { createEnabled: this.dependencies.createToolsEnabled };
   }
 
   public getSuggestions(
@@ -556,6 +572,18 @@ export class AssistantService {
       userId: principal.userId,
       confirmationToken: input.confirmationToken,
     });
+
+    if (
+      !this.dependencies.createToolsEnabled &&
+      confirmedAction.toolName.startsWith('create_')
+    ) {
+      throw new ApplicationError({
+        message: 'Assistant create tools are disabled',
+        statusCode: 403,
+        code: APPLICATION_ERROR_CODES.FORBIDDEN,
+        expose: true,
+      });
+    }
 
     const effectiveCapabilities = new Set(resolveRoleCapabilities(principal.roles));
     const tool = this.dependencies.toolRegistry.get(confirmedAction.toolName);

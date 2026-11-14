@@ -24,7 +24,14 @@ export class AssistantController {
   public getSuggestions = async (req: Request, res: Response): Promise<void> => {
     const principal = await readPrincipal(req);
     const suggestions = await this.assistantService.getSuggestions(principal);
-    sendOk(res, suggestions, buildRequestMeta(req));
+    sendOk(
+      res,
+      {
+        suggestions,
+        capabilities: this.assistantService.getCapabilities(),
+      },
+      buildRequestMeta(req),
+    );
   };
 
   public listConversations = async (req: Request, res: Response): Promise<void> => {
