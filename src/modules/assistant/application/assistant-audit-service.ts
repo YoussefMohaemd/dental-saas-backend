@@ -16,7 +16,9 @@ export class AssistantAuditService {
       | 'assistant.message.responded'
       | 'assistant.confirmation.created'
       | 'assistant.confirmation.accepted'
-      | 'assistant.permission.denied';
+      | 'assistant.permission.denied'
+      | 'assistant.llm.called'
+      | 'assistant.tool.executed';
     status: 'success' | 'denied' | 'failed';
     details?: Record<string, unknown>;
   }): Promise<void> {

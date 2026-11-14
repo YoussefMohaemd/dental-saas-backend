@@ -11,6 +11,8 @@ import { MongooseClinicRepository } from '../../clinics/infrastructure/mongoose-
 import { DoctorService } from '../../doctors/application/doctor-service';
 import { MongooseDoctorRepository } from '../../doctors/infrastructure/mongoose-doctor-repository';
 import { MongooseAssistantCatalogRepository } from '../infrastructure/persistence/mongoose/mongoose-assistant-catalog-repository';
+import { MongooseAssistantLlmCallRepository } from '../infrastructure/persistence/mongoose/mongoose-assistant-llm-call-repository';
+import { AssistantLlmLogService } from './assistant-llm-log-service';
 import { PatientService } from '../../patients/application/patient-service';
 import { MongoosePatientRepository } from '../../patients/infrastructure/mongoose-patient-repository';
 
@@ -30,12 +32,14 @@ export function createAssistantService(): AssistantService {
     geminiApiKey: env.AI_ASSISTANT_GEMINI_API_KEY,
     plannerPromptVersion: env.AI_ASSISTANT_PLANNER_PROMPT_VERSION,
   });
+  const llmLogService = new AssistantLlmLogService(new MongooseAssistantLlmCallRepository());
 
   return AssistantService.create({
     provider,
     conversationRepository: new MongooseAssistantConversationRepository(),
     pendingActionRepository: new MongooseAssistantPendingActionRepository(),
     auditRepository: new MongooseAssistantAuditRepository(),
+    llmLogService,
     ordersService: new OrdersService(new MongooseOrdersRepository()),
     patientService: new PatientService(new MongoosePatientRepository()),
     doctorService: new DoctorService(new MongooseDoctorRepository()),
@@ -47,6 +51,7 @@ export function createAssistantService(): AssistantService {
       maxInputChars: env.AI_ASSISTANT_MAX_INPUT_CHARS,
       confirmationTtlSeconds: env.AI_ASSISTANT_CONFIRMATION_TTL_SECONDS,
       createToolsEnabled: env.AI_ASSISTANT_CREATE_TOOLS_ENABLED,
+      plannerPromptVersion: env.AI_ASSISTANT_PLANNER_PROMPT_VERSION,
     },
   });
 }

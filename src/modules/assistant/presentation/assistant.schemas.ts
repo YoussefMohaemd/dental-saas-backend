@@ -31,3 +31,15 @@ export const assistantConfirmBodySchema = z
     confirmationToken: z.string().trim().min(16).max(256),
   })
   .strict();
+
+export const assistantLlmCallsQuerySchema = z
+  .object({
+    conversationId: z.string().trim().min(1).optional(),
+    userId: z.string().trim().min(1).optional(),
+    from: z.coerce.date().optional(),
+    to: z.coerce.date().optional(),
+    status: z.enum(['success', 'failed']).optional(),
+    page: z.coerce.number().int().min(1).max(100_000).optional(),
+    pageSize: z.coerce.number().int().min(1).max(100).optional(),
+  })
+  .strict();

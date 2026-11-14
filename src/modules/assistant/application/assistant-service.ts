@@ -39,6 +39,8 @@ import {
 import { MockAssistantLlmProvider } from '../infrastructure/providers/mock-llm-provider';
 import { type AssistantPlanAction } from '../domain/assistant.types';
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
+import { type AssistantLlmLogService } from './assistant-llm-log-service';
+import { type AssistantLlmCallRecord } from './assistant-repositories';
 import { type OrdersService } from '../../orders/application/orders-service';
 import { type PatientService } from '../../patients/application/patient-service';
 import { type DoctorService } from '../../doctors/application/doctor-service';
@@ -50,6 +52,7 @@ interface AssistantOptions {
   maxInputChars: number;
   confirmationTtlSeconds: number;
   createToolsEnabled?: boolean;
+  plannerPromptVersion?: string;
 }
 
 export interface AssistantPrincipalContext {
@@ -71,6 +74,7 @@ interface AssistantServiceDependencies {
   auditService: AssistantAuditService;
   options: AssistantOptions;
   createToolsEnabled: boolean;
+  llmLogService?: AssistantLlmLogService;
 }
 
 export interface AssistantConversationView {
@@ -161,6 +165,7 @@ export class AssistantService {
     conversationRepository: AssistantConversationRepository;
     pendingActionRepository: AssistantPendingActionRepository;
     auditRepository: AssistantAuditRepository;
+    llmLogService?: AssistantLlmLogService;
     ordersService: OrdersService;
     patientService: PatientService;
     doctorService: DoctorService;
@@ -203,11 +208,49 @@ export class AssistantService {
       auditService,
       options: params.options,
       createToolsEnabled,
+      ...(params.llmLogService ? { llmLogService: params.llmLogService } : {}),
     });
   }
 
   public getCapabilities(): AssistantCapabilitiesView {
     return { createEnabled: this.dependencies.createToolsEnabled };
+  }
+
+  public async listLlmCalls(
+    principal: AssistantPrincipalContext,
+    input: {
+      conversationId?: string | undefined;
+      userId?: string | undefined;
+      from?: Date | undefined;
+      to?: Date | undefined;
+      status?: 'success' | 'failed' | undefined;
+      page?: number | undefined;
+      pageSize?: number | undefined;
+    },
+  ): Promise<{ items: AssistantLlmCallRecord[]; total: number; page: number; pageSize: number }> {
+    const effectiveCapabilities = new Set(resolveRoleCapabilities(principal.roles));
+    this.dependencies.permissionGuard.assertCapabilities(
+      effectiveCapabilities,
+      ['assistant.audit.read'],
+      'all',
+    );
+    if (!this.dependencies.llmLogService) {
+      return { items: [], total: 0, page: 1, pageSize: 25 };
+    }
+
+    const page = Math.min(Math.max(input.page ?? 1, 1), 100_000);
+    const pageSize = Math.min(Math.max(input.pageSize ?? 25, 1), 100);
+    const result = await this.dependencies.llmLogService.list({
+      tenantId: principal.tenantId,
+      ...(input.conversationId ? { conversationId: input.conversationId } : {}),
+      ...(input.userId ? { userId: input.userId } : {}),
+      ...(input.from ? { from: input.from } : {}),
+      ...(input.to ? { to: input.to } : {}),
+      ...(input.status ? { status: input.status } : {}),
+      page,
+      pageSize,
+    });
+    return { ...result, page, pageSize };
   }
 
   public getSuggestions(
@@ -336,7 +379,23 @@ export class AssistantService {
     });
 
     const effectiveCapabilities = new Set(resolveRoleCapabilities(principal.roles));
-    const llmCompletion = await this.completePlanWithFallback(content, history);
+    const llmStartedAt = Date.now();
+    let llmCompletion: AssistantLlmCompletionResult;
+    try {
+      llmCompletion = await this.completePlanWithFallback(content, history);
+    } catch (error) {
+      await this.recordLlmCall({
+        principal,
+        conversationId: input.conversationId,
+        messageId: userMessage.id,
+        startedAt: llmStartedAt,
+        languageHint: detectLanguageHint(content),
+        plan: [],
+        toolResults: [],
+        error,
+      });
+      throw error;
+    }
 
     const plannedActions = llmCompletion.actions;
     const actions = this.dependencies.actionPlanner.validatePlan({
@@ -412,6 +471,15 @@ export class AssistantService {
       scope: principal.scope,
       tenantId: principal.tenantId,
     });
+    await this.recordLlmCall({
+      principal,
+      conversationId: input.conversationId,
+      messageId: userMessage.id,
+      startedAt: llmStartedAt,
+      languageHint: detectLanguageHint(content),
+      plan: normalizedActions,
+      toolResults: executions,
+    });
     const result: AssistantMessageResult =
       pendingActions.length > 0
         ? {
@@ -468,6 +536,53 @@ export class AssistantService {
       messageId: assistantMessage.id,
       result,
     };
+  }
+
+  private async recordLlmCall(input: {
+    principal: AssistantPrincipalContext;
+    conversationId: string;
+    messageId: string;
+    startedAt: number;
+    languageHint: 'ar' | 'en' | 'mixed';
+    plan: AssistantPlanAction[];
+    toolResults: AssistantActionExecutionSummary[];
+    error?: unknown;
+  }): Promise<void> {
+    if (!this.dependencies.llmLogService) {
+      return;
+    }
+
+    await this.dependencies.llmLogService.record({
+      tenantId: input.principal.tenantId,
+      userId: input.principal.userId,
+      conversationId: input.conversationId,
+      messageId: input.messageId,
+      provider: this.dependencies.provider.name,
+      model: this.dependencies.provider.model ?? 'unknown',
+      promptVersion: this.dependencies.options.plannerPromptVersion ?? 'unknown',
+      languageHint: input.languageHint,
+      latencyMs: Date.now() - input.startedAt,
+      plan: input.plan.map((action) => ({
+        tool: action.tool,
+        arguments: action.arguments,
+      })),
+      toolResults: input.toolResults.map((execution) => ({
+        tool: execution.tool,
+        status: execution.status,
+        summary:
+          execution.status === 'failed'
+            ? execution.error ?? 'Tool execution failed'
+            : summarizeToolResult(execution.result),
+      })),
+      ...(input.error
+        ? {
+            error: {
+              code: input.error instanceof ApplicationError ? input.error.code : 'PROVIDER_ERROR',
+              message: input.error instanceof Error ? input.error.message : String(input.error),
+            },
+          }
+        : {}),
+    });
   }
 
   private async completePlan(
@@ -966,6 +1081,17 @@ function buildWriteConfirmationText(
   }
 
   return `Action confirmed and executed: ${execution.tool}.`;
+}
+
+export function summarizeToolResult(result: unknown): string {
+  if (Array.isArray(result)) {
+    return `Returned ${result.length} items`;
+  }
+  if (result && typeof result === 'object') {
+    const keys = Object.keys(result);
+    return `Returned object with fields: ${keys.slice(0, 12).join(', ')}`;
+  }
+  return result === undefined ? 'Completed without a result' : `Returned ${String(result)}`;
 }
 
 export function isStructuredOutputError(error: unknown): boolean {

@@ -106,7 +106,9 @@ export interface AssistantAuditEventRecord {
     | 'assistant.message.responded'
     | 'assistant.confirmation.created'
     | 'assistant.confirmation.accepted'
-    | 'assistant.permission.denied';
+    | 'assistant.permission.denied'
+    | 'assistant.llm.called'
+    | 'assistant.tool.executed';
   status: 'success' | 'denied' | 'failed';
   details?: Record<string, unknown>;
   createdAt: Date;
@@ -114,4 +116,47 @@ export interface AssistantAuditEventRecord {
 
 export interface AssistantAuditRepository {
   create(event: AssistantAuditEventRecord): Promise<void>;
+}
+
+export interface AssistantLlmCallPlanItem {
+  tool: string;
+  arguments: Record<string, unknown>;
+}
+
+export interface AssistantLlmCallToolResult {
+  tool: string;
+  status: string;
+  summary: string;
+}
+
+export interface AssistantLlmCallRecord {
+  callId: string;
+  tenantId: string;
+  userId: string;
+  conversationId: string;
+  messageId: string;
+  provider: string;
+  model: string;
+  promptVersion: string;
+  languageHint: 'ar' | 'en' | 'mixed';
+  latencyMs: number;
+  usage?: { inputTokens: number; outputTokens: number };
+  plan: AssistantLlmCallPlanItem[];
+  toolResults: AssistantLlmCallToolResult[];
+  error?: { code: string; message: string };
+  createdAt: Date;
+}
+
+export interface AssistantLlmCallRepository {
+  create(record: AssistantLlmCallRecord): Promise<void>;
+  list(params: {
+    tenantId: string;
+    conversationId?: string;
+    userId?: string;
+    from?: Date;
+    to?: Date;
+    status?: 'success' | 'failed';
+    page: number;
+    pageSize: number;
+  }): Promise<{ items: AssistantLlmCallRecord[]; total: number }>;
 }

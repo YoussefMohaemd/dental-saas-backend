@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import { assistantRateLimit } from '../../../middleware/assistant-rate-limit';
+import { requireAnyCapability } from '../../auth/presentation/auth.middleware';
 import { createAssistantService } from '../application/assistant-service-factory';
 import { AssistantController } from './assistant.controller';
 
@@ -16,11 +17,21 @@ assistantRouter.post('/assistant/conversations', assistantController.createConve
 assistantRouter.get('/assistant/conversations/:conversationId', assistantController.getConversation);
 assistantRouter.post('/assistant/conversations/:conversationId/messages', assistantController.postMessage);
 assistantRouter.post('/assistant/actions/:actionId/confirm', assistantController.confirmAction);
+assistantRouter.get(
+  '/assistant/admin/llm-calls',
+  requireAnyCapability(['assistant.audit.read']),
+  assistantController.listLlmCalls,
+);
 assistantRouter.get('/ai/suggestions', assistantController.getSuggestions);
 assistantRouter.get('/ai/conversations', assistantController.listConversations);
 assistantRouter.post('/ai/conversations', assistantController.createConversation);
 assistantRouter.get('/ai/conversations/:conversationId', assistantController.getConversation);
 assistantRouter.post('/ai/conversations/:conversationId/messages', assistantController.postMessage);
 assistantRouter.post('/ai/actions/:actionId/confirm', assistantController.confirmAction);
+assistantRouter.get(
+  '/ai/admin/llm-calls',
+  requireAnyCapability(['assistant.audit.read']),
+  assistantController.listLlmCalls,
+);
 
 export { assistantRouter };

@@ -18,6 +18,8 @@ const assistantAuditEventSchema = new Schema(
         'assistant.confirmation.created',
         'assistant.confirmation.accepted',
         'assistant.permission.denied',
+        'assistant.llm.called',
+        'assistant.tool.executed',
       ],
       required: true,
     },

@@ -1,6 +1,8 @@
 import {
   type AssistantAuditEventRecord,
   type AssistantAuditRepository,
+  type AssistantLlmCallRecord,
+  type AssistantLlmCallRepository,
   type AssistantConversationRecord,
   type AssistantConversationRepository,
   type AssistantPendingActionRecord,
@@ -208,6 +210,41 @@ export class InMemoryAssistantAuditRepository implements AssistantAuditRepositor
   public create(event: AssistantAuditEventRecord): Promise<void> {
     this.events.push({ ...event });
     return Promise.resolve();
+  }
+}
+
+export class InMemoryAssistantLlmCallRepository implements AssistantLlmCallRepository {
+  public readonly records: AssistantLlmCallRecord[] = [];
+
+  public create(record: AssistantLlmCallRecord): Promise<void> {
+    this.records.push({ ...record });
+    return Promise.resolve();
+  }
+
+  public list(params: {
+    tenantId: string;
+    conversationId?: string;
+    userId?: string;
+    from?: Date;
+    to?: Date;
+    status?: 'success' | 'failed';
+    page: number;
+    pageSize: number;
+  }): Promise<{ items: AssistantLlmCallRecord[]; total: number }> {
+    const filtered = this.records.filter((record) => {
+      if (record.tenantId !== params.tenantId) return false;
+      if (params.conversationId && record.conversationId !== params.conversationId) return false;
+      if (params.userId && record.userId !== params.userId) return false;
+      if (params.from && record.createdAt < params.from) return false;
+      if (params.to && record.createdAt > params.to) return false;
+      if (params.status && (params.status === 'failed') !== Boolean(record.error)) return false;
+      return true;
+    });
+    const start = (params.page - 1) * params.pageSize;
+    return Promise.resolve({
+      items: filtered.slice(start, start + params.pageSize).map((record) => ({ ...record })),
+      total: filtered.length,
+    });
   }
 }
 

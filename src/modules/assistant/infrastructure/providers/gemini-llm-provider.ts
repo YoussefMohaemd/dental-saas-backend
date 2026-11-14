@@ -32,10 +32,12 @@ interface GeminiProviderOptions {
 
 export class GeminiAssistantLlmProvider implements AssistantLlmProvider {
   public readonly name = 'gemini' as const;
+  public readonly model: string;
 
   private readonly client: GeminiClient;
 
   public constructor(private readonly options: GeminiProviderOptions) {
+    this.model = options.model;
     this.client =
       options.client ??
       new GoogleGenAI({

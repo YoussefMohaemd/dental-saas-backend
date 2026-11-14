@@ -15,6 +15,7 @@ import {
   assistantConversationIdParamSchema,
   assistantCreateConversationBodySchema,
   assistantListConversationsQuerySchema,
+  assistantLlmCallsQuerySchema,
   assistantMessageBodySchema,
 } from './assistant.schemas';
 
@@ -80,6 +81,13 @@ export class AssistantController {
       actionId,
       confirmationToken: payload.confirmationToken,
     });
+    sendOk(res, result, buildRequestMeta(req));
+  };
+
+  public listLlmCalls = async (req: Request, res: Response): Promise<void> => {
+    const principal = await readPrincipal(req);
+    const query = assistantLlmCallsQuerySchema.parse(req.query);
+    const result = await this.assistantService.listLlmCalls(principal, query);
     sendOk(res, result, buildRequestMeta(req));
   };
 }
