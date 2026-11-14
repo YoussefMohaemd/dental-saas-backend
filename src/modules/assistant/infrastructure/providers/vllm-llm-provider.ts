@@ -91,10 +91,7 @@ export class VllmAssistantLlmProvider implements AssistantLlmProvider {
             function: {
               name: tool.name,
               description: tool.description,
-              parameters: {
-                type: 'object',
-                additionalProperties: true,
-              },
+              parameters: tool.parameters ?? { type: 'object', additionalProperties: true },
             },
           })),
         }),

@@ -89,6 +89,8 @@ Assistant write-safety behavior in current implementation:
 - A single assistant message can produce **at most one write action** (create/update) for confirmation.
 - Write actions always require confirmation tokens before execution.
 - Read actions can still run in the same message response.
+- `create_order` can now auto-create a minimal patient record when `patientName` is provided but no existing patient matches.
+- For `create_order`, if `format`/`shade` are not provided, assistant defaults are applied server-side (`STL` / `A2`).
 
 ## 5) Quality and build checks
 

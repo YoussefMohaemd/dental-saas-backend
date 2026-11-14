@@ -93,6 +93,15 @@ const ASSISTANT_TOOLS: AssistantToolDefinition[] = [
     'read',
     ['clinics.read'],
     { domain: 'clinics', action: 'search' },
+    {
+      type: 'object',
+      properties: {
+        search: { type: 'string', description: 'Clinic name or city to search for' },
+        page: { type: 'integer', minimum: 1 },
+        pageSize: { type: 'integer', minimum: 1, maximum: 100 },
+      },
+      additionalProperties: false,
+    },
   ),
   createTool(
     'search_doctors',
@@ -189,11 +198,13 @@ function createTool(
   operationType: AssistantToolDefinition['operationType'],
   requiredCapabilities: DentalCapability[],
   auditMetadata: AssistantToolDefinition['auditMetadata'],
+  parameters?: AssistantToolDefinition['parameters'],
 ): AssistantToolDefinition {
   return {
     name,
     description,
     argumentsHint,
+    ...(parameters ? { parameters } : {}),
     operationType,
     requiredCapabilities,
     capabilityMatchMode: 'all',

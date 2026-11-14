@@ -4,6 +4,12 @@ export type AssistantIntent = 'single_action' | 'multiple_actions' | 'question' 
 export type AssistantOperationType = 'read' | 'write' | 'delete';
 export type CapabilityMatchMode = 'any' | 'all';
 
+export interface AssistantToolParameters {
+  type: 'object';
+  properties?: Record<string, Record<string, unknown>>;
+  additionalProperties?: boolean;
+}
+
 export interface AssistantPlanAction {
   id: string;
   tool: string;
@@ -20,6 +26,7 @@ export interface AssistantToolDefinition {
   name: string;
   description: string;
   argumentsHint: string;
+  parameters?: AssistantToolParameters;
   operationType: AssistantOperationType;
   requiredCapabilities: DentalCapability[];
   capabilityMatchMode: CapabilityMatchMode;

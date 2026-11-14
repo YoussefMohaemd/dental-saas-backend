@@ -854,16 +854,18 @@ export class AssistantActionExecutor {
       .strict();
 
     const parsed = this.parseStrictToolArgs(schema, payload, 'create_order.payload');
-    const patientId = await this.resolvePatientId(
+    const resolvedPatientId = await this.resolvePatientId(
       parsed.patientId,
       parsed.patientName,
       context.scope,
+      { allowMissingByName: true },
     );
-    const patient = await this.dependencies.patientService.getPatientById(patientId, context.scope);
-    const patientDoctorId =
-      typeof patient.doctorId === 'string' ? patient.doctorId.trim() : '';
-    const patientClinicId =
-      typeof patient.clinicId === 'string' ? patient.clinicId.trim() : '';
+    const patient =
+      resolvedPatientId !== null
+        ? await this.dependencies.patientService.getPatientById(resolvedPatientId, context.scope)
+        : null;
+    const patientDoctorId = patient && typeof patient.doctorId === 'string' ? patient.doctorId.trim() : '';
+    const patientClinicId = patient && typeof patient.clinicId === 'string' ? patient.clinicId.trim() : '';
     const doctorId = await this.resolveDoctorId(
       parsed.doctorId ?? (parsed.doctorName ? undefined : patientDoctorId),
       parsed.doctorName,
@@ -885,10 +887,16 @@ export class AssistantActionExecutor {
       context.scope,
     );
     await this.dependencies.clinicService.getClinicById(clinicId, context.scope);
+    const patientId =
+      resolvedPatientId ??
+      (await this.createAssistantPatientFromName({
+        patientName: parsed.patientName,
+        doctorId,
+        clinicId,
+        scope: context.scope,
+      }));
     const defaults = await this.deriveAssistantOrderDefaults(parsed.creationData?.services, context.tenantId);
     const missingFields: string[] = [];
-    if (!parsed.format) missingFields.push('format');
-    if (!parsed.shade) missingFields.push('shade');
     if (!parsed.dueDate) missingFields.push('dueDate');
     if (!parsed.restoration && !defaults.restoration) missingFields.push('restoration');
     if (!parsed.arch && !defaults.arch) missingFields.push('arch');
@@ -912,6 +920,8 @@ export class AssistantActionExecutor {
       orderNumber: parsed.orderNumber ?? this.buildAssistantOrderNumber(now),
       restoration: parsed.restoration ?? defaults.restoration,
       arch: parsed.arch ?? defaults.arch,
+      format: parsed.format ?? 'STL',
+      shade: parsed.shade ?? 'A2',
       units: parsed.units ?? defaults.units,
       amount: parsed.amount ?? defaults.amount,
       hasNotes: parsed.hasNotes ?? parsed.notes.trim().length > 0,
@@ -920,13 +930,10 @@ export class AssistantActionExecutor {
   }
 
   private buildAssistantOrderNumber(now: Date): string {
-    const date = now.toISOString().slice(2, 10).replace(/-/g, '');
-    const time = now.toISOString().slice(11, 16).replace(':', '');
-    const timestamp = `${date}${time}`;
     const random = Math.floor(Math.random() * 1_000_000)
       .toString()
       .padStart(6, '0');
-    return `AI-${timestamp}-${random}`;
+    return `AI-${random}`;
   }
 
   private async deriveAssistantOrderDefaults(
@@ -1119,7 +1126,8 @@ export class AssistantActionExecutor {
     patientId: string | undefined,
     patientName: string | undefined,
     scope: DataVisibilityScope,
-  ): Promise<string> {
+    options?: { allowMissingByName?: boolean },
+  ): Promise<string | null> {
     if (patientId && objectIdRegex.test(patientId)) {
       return patientId;
     }
@@ -1161,12 +1169,51 @@ export class AssistantActionExecutor {
         expose: true,
       });
     }
+    if (options?.allowMissingByName) {
+      return null;
+    }
     throw new ApplicationError({
       message: `Patient '${patientName}' was not found`,
       statusCode: 404,
       code: APPLICATION_ERROR_CODES.NOT_FOUND,
       expose: true,
     });
+  }
+
+  private async createAssistantPatientFromName(input: {
+    patientName: string | undefined;
+    doctorId: string;
+    clinicId: string;
+    scope: DataVisibilityScope;
+  }): Promise<string> {
+    const name = input.patientName?.trim();
+    if (!name) {
+      throw new ApplicationError({
+        message: 'create_order requires patientId or patientName',
+        statusCode: 400,
+        code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+        expose: true,
+      });
+    }
+
+    const now = new Date();
+    const nonce = `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+    const created = await this.dependencies.patientService.createPatient(
+      {
+        name,
+        dob: new Date('1990-01-01T00:00:00.000Z'),
+        gender: 'M',
+        phone: `ai-${nonce}`,
+        email: `ai-${nonce}@assistant.local`,
+        clinicId: input.clinicId,
+        doctorId: input.doctorId,
+        status: 'Active',
+        lastVisit: now,
+      },
+      input.scope,
+    );
+
+    return created.id;
   }
 
   private async resolveDoctorId(

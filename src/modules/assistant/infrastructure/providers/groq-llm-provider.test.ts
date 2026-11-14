@@ -69,6 +69,44 @@ describe('GroqAssistantLlmProvider', () => {
     expect(body.messages[0]?.content).toContain('"status"?: string[]');
   });
 
+  it('sends the clinic search argument schema to the model', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: JSON.stringify({ reply: 'Done', actions: [] }) } }],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const provider = new GroqAssistantLlmProvider({
+      model: 'test-model',
+      timeoutMs: 1_000,
+      apiKey: 'test-key',
+    });
+
+    await provider.completePlan({
+      userMessage: 'Search clinics for Dental Care Clinic 7',
+      systemPrompt: 'You are Dental SaaS assistant.',
+      tools: buildAssistantToolRegistry().list(),
+      languageHint: 'en',
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as {
+      tools: Array<{
+        function?: {
+          name?: string;
+          parameters?: { properties?: Record<string, unknown> };
+        };
+      }>;
+    };
+    const clinicTool = body.tools.find((tool) => tool.function?.name === 'search_clinics');
+
+    expect(clinicTool?.function?.parameters?.properties).toHaveProperty('search');
+  });
+
   it('uses json response_format when no tools are provided', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(

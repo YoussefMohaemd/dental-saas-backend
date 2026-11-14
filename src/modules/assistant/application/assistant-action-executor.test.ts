@@ -303,7 +303,7 @@ describe('AssistantActionExecutor', () => {
 
     expect(createOrder).toHaveBeenCalledWith(
       expect.objectContaining({
-        orderNumber: expect.stringMatching(/^AI-\d{10}-\d{6}$/),
+        orderNumber: expect.stringMatching(/^AI-\d{6}$/),
         units: 3,
         amount: 250,
       }),
@@ -431,6 +431,76 @@ describe('AssistantActionExecutor', () => {
 
     expect(getPatientById).not.toHaveBeenCalled();
     expect(createOrder).not.toHaveBeenCalled();
+  });
+
+  it('creates a new patient for create_order when patient name is not found', async () => {
+    const createOrder = vi.fn().mockResolvedValue({ id: 'order-new-patient' });
+    const createSubOrders = vi.fn().mockResolvedValue([]);
+    const createPatient = vi.fn().mockResolvedValue({
+      id: '66f100000000000000000444',
+      name: 'New Patient',
+      doctorId: '66f100000000000000000222',
+      clinicId: '66f100000000000000000333',
+    });
+    const listPatients = vi.fn().mockResolvedValue({
+      items: [],
+      meta: { totalItems: 0, page: 1, pageSize: 100, totalPages: 0 },
+    });
+    const doctorId = '66f100000000000000000222';
+    const clinicId = '66f100000000000000000333';
+
+    const executor = new AssistantActionExecutor({
+      ordersService: { createOrder, createSubOrders } as never,
+      patientService: { listPatients, createPatient } as never,
+      doctorService: {
+        getDoctorById: vi.fn().mockResolvedValue({ id: doctorId, clinicId }),
+      } as never,
+      clinicService: {
+        getClinicById: vi.fn().mockResolvedValue({ id: clinicId }),
+      } as never,
+      catalogRepository: { listServices: vi.fn().mockResolvedValue([]) } as never,
+    });
+
+    await executor.executeConfirmedWriteAction({
+      actionId: 'a-create-order-new-patient',
+      toolName: 'create_order',
+      payload: {
+        payload: {
+          patientName: 'New Patient',
+          doctorId,
+          dueDate: '2026-11-20T00:00:00.000Z',
+          creationData: {
+            services: [
+              {
+                serviceId: 'treatment-plan',
+                selectedTeeth: [12, 22],
+              },
+            ],
+          },
+        },
+      },
+      context,
+    });
+
+    expect(createPatient).toHaveBeenCalledTimes(1);
+    expect(createPatient).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'New Patient',
+        doctorId,
+        clinicId,
+      }),
+      context.scope,
+    );
+    expect(createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        patientId: '66f100000000000000000444',
+        doctorId,
+        clinicId,
+        format: 'STL',
+        shade: 'A2',
+      }),
+      context.scope,
+    );
   });
 
   it('keeps explicit clinicId even when patient clinicId is stale', async () => {
