@@ -15,6 +15,60 @@ import { MongooseAssistantLlmCallRepository } from '../infrastructure/persistenc
 import { AssistantLlmLogService } from './assistant-llm-log-service';
 import { PatientService } from '../../patients/application/patient-service';
 import { MongoosePatientRepository } from '../../patients/infrastructure/mongoose-patient-repository';
+import { AssistantLookupService } from './assistant-lookup-service';
+
+export function createAssistantLookupService(): AssistantLookupService {
+  const patientService = new PatientService(new MongoosePatientRepository());
+  const doctorService = new DoctorService(new MongooseDoctorRepository());
+  const clinicService = new ClinicService(new MongooseClinicRepository());
+  const catalogRepository = new MongooseAssistantCatalogRepository();
+
+  return new AssistantLookupService({
+    patients: async (scope, clinicId) => {
+      const result = await patientService.listPatients(
+        { scope, search: undefined, sortBy: 'name', sortDirection: 'asc', statuses: [] },
+        { page: 1, pageSize: 20 },
+      );
+      return result.items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        phone: item.phone,
+      }));
+    },
+    doctors: async (scope, clinicId) => {
+      const result = await doctorService.listDoctors(
+        {
+          scope,
+          sortBy: 'name',
+          sortDirection: 'asc',
+          statuses: [],
+          ...(clinicId ? { clinicId } : {}),
+        },
+        { page: 1, pageSize: 20 },
+      );
+      return result.items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        specialty: item.specialty,
+      }));
+    },
+    clinics: async (scope) => {
+      const result = await clinicService.listClinics(
+        { scope, sortBy: 'name', sortDirection: 'asc', statuses: [] },
+        { page: 1, pageSize: 20 },
+      );
+      return result.items.map((item) => ({ id: item.id, name: item.name, city: item.city }));
+    },
+    services: async (scope) => {
+      const services = await catalogRepository.listServices(String(scope.tenantId));
+      return services.map((item) => ({
+        id: item.serviceId,
+        name: item.name,
+        description: item.description,
+      }));
+    },
+  });
+}
 
 export function createAssistantService(): AssistantService {
   const provider = createAssistantLlmProvider({

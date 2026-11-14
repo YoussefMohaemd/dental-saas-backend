@@ -17,10 +17,16 @@ import {
   assistantListConversationsQuerySchema,
   assistantLlmCallsQuerySchema,
   assistantMessageBodySchema,
+  assistantLookupKindParamSchema,
+  assistantLookupQuerySchema,
 } from './assistant.schemas';
+import { type AssistantLookupService } from '../application/assistant-lookup-service';
 
 export class AssistantController {
-  public constructor(private readonly assistantService: AssistantService) {}
+  public constructor(
+    private readonly assistantService: AssistantService,
+    private readonly lookupService?: AssistantLookupService,
+  ) {}
 
   public getSuggestions = async (req: Request, res: Response): Promise<void> => {
     const principal = await readPrincipal(req);
@@ -88,6 +94,27 @@ export class AssistantController {
     const principal = await readPrincipal(req);
     const query = assistantLlmCallsQuerySchema.parse(req.query);
     const result = await this.assistantService.listLlmCalls(principal, query);
+    sendOk(res, result, buildRequestMeta(req));
+  };
+
+  public lookup = async (req: Request, res: Response): Promise<void> => {
+    if (!this.lookupService) {
+      throw new ApplicationError({
+        message: 'Assistant lookup is not configured',
+        statusCode: 503,
+        code: APPLICATION_ERROR_CODES.INTERNAL_ERROR,
+      });
+    }
+    const principal = await readPrincipal(req);
+    const { kind } = assistantLookupKindParamSchema.parse(req.params);
+    const query = assistantLookupQuerySchema.parse(req.query);
+    const result = await this.lookupService.lookup({
+      kind,
+      query: query.q,
+      scope: principal.scope,
+      ...(query.clinicId ? { clinicId: query.clinicId } : {}),
+      limit: query.limit,
+    });
     sendOk(res, result, buildRequestMeta(req));
   };
 }

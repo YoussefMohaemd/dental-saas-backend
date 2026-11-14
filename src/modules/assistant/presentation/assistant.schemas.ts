@@ -43,3 +43,15 @@ export const assistantLlmCallsQuerySchema = z
     pageSize: z.coerce.number().int().min(1).max(100).optional(),
   })
   .strict();
+
+export const assistantLookupQuerySchema = z
+  .object({
+    q: z.string().trim().min(1).max(120),
+    clinicId: z.string().trim().min(1).optional(),
+    limit: z.coerce.number().int().min(1).max(20).default(10),
+  })
+  .strict();
+
+export const assistantLookupKindParamSchema = z.object({
+  kind: z.enum(['patients', 'doctors', 'clinics', 'services', 'orders']),
+});

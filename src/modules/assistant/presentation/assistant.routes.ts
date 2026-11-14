@@ -2,16 +2,17 @@ import { Router } from 'express';
 
 import { assistantRateLimit } from '../../../middleware/assistant-rate-limit';
 import { requireAnyCapability } from '../../auth/presentation/auth.middleware';
-import { createAssistantService } from '../application/assistant-service-factory';
+import { createAssistantLookupService, createAssistantService } from '../application/assistant-service-factory';
 import { AssistantController } from './assistant.controller';
 
 const assistantRouter = Router();
 const assistantService = createAssistantService();
-const assistantController = new AssistantController(assistantService);
+const assistantController = new AssistantController(assistantService, createAssistantLookupService());
 
 assistantRouter.use('/assistant', assistantRateLimit);
 assistantRouter.use('/ai', assistantRateLimit);
 assistantRouter.get('/assistant/suggestions', assistantController.getSuggestions);
+assistantRouter.get('/assistant/lookup/:kind', assistantController.lookup);
 assistantRouter.get('/assistant/conversations', assistantController.listConversations);
 assistantRouter.post('/assistant/conversations', assistantController.createConversation);
 assistantRouter.get('/assistant/conversations/:conversationId', assistantController.getConversation);
@@ -23,6 +24,7 @@ assistantRouter.get(
   assistantController.listLlmCalls,
 );
 assistantRouter.get('/ai/suggestions', assistantController.getSuggestions);
+assistantRouter.get('/ai/lookup/:kind', assistantController.lookup);
 assistantRouter.get('/ai/conversations', assistantController.listConversations);
 assistantRouter.post('/ai/conversations', assistantController.createConversation);
 assistantRouter.get('/ai/conversations/:conversationId', assistantController.getConversation);
