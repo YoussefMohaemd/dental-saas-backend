@@ -91,4 +91,36 @@ describe('createAssistantLlmProvider', () => {
     ).toThrow('Groq provider requires AI_ASSISTANT_GROQ_API_KEY');
   });
 
+  it('builds Gemini provider when configured', () => {
+    const provider = createAssistantLlmProvider({
+      provider: 'gemini',
+      model: 'gemini-3.5-flash',
+      timeoutMs: 15_000,
+      vllmBaseUrl: 'http://localhost:8000/v1',
+      vllmApiKey: undefined,
+      groqApiKey: undefined,
+      groqBaseUrl: undefined,
+      geminiApiKey: 'test-key',
+      plannerPromptVersion: 'v1',
+    });
+
+    expect(provider.name).toBe('gemini');
+  });
+
+  it('throws when Gemini provider is configured without API key', () => {
+    expect(() =>
+      createAssistantLlmProvider({
+        provider: 'gemini',
+        model: 'gemini-3.5-flash',
+        timeoutMs: 15_000,
+        vllmBaseUrl: 'http://localhost:8000/v1',
+        vllmApiKey: undefined,
+        groqApiKey: undefined,
+        groqBaseUrl: undefined,
+        geminiApiKey: undefined,
+        plannerPromptVersion: 'v1',
+      }),
+    ).toThrow('Gemini provider requires AI_ASSISTANT_GEMINI_API_KEY');
+  });
+
 });

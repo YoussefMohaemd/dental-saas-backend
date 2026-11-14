@@ -17,13 +17,17 @@ import { MongoosePatientRepository } from '../../patients/infrastructure/mongoos
 export function createAssistantService(): AssistantService {
   const provider = createAssistantLlmProvider({
     provider: env.AI_ASSISTANT_PROVIDER,
-    model: env.AI_ASSISTANT_MODEL,
+    model:
+      env.AI_ASSISTANT_PROVIDER === 'gemini'
+        ? env.AI_ASSISTANT_GEMINI_MODEL
+        : env.AI_ASSISTANT_MODEL,
     timeoutMs: env.AI_ASSISTANT_TIMEOUT_MS,
     vllmBaseUrl: env.AI_ASSISTANT_VLLM_BASE_URL,
     vllmApiKey: env.AI_ASSISTANT_VLLM_API_KEY,
     groqApiKey: env.AI_ASSISTANT_GROQ_API_KEY,
     groqBaseUrl: env.AI_ASSISTANT_GROQ_BASE_URL,
     groqMaxCompletionTokens: env.AI_ASSISTANT_GROQ_MAX_COMPLETION_TOKENS,
+    geminiApiKey: env.AI_ASSISTANT_GEMINI_API_KEY,
     plannerPromptVersion: env.AI_ASSISTANT_PLANNER_PROMPT_VERSION,
   });
 

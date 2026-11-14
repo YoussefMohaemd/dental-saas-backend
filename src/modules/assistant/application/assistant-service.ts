@@ -940,10 +940,12 @@ function buildWriteConfirmationText(
   return `Action confirmed and executed: ${execution.tool}.`;
 }
 
-function isStructuredOutputError(error: unknown): boolean {
+export function isStructuredOutputError(error: unknown): boolean {
   return (
     error instanceof ApplicationError &&
-    /valid JSON object|structured assistant completion payload/i.test(error.message)
+    /valid JSON object|structured assistant completion payload|did not return assistant content/i.test(
+      error.message,
+    )
   );
 }
 
@@ -957,7 +959,7 @@ function shouldRetryWithoutHistory(error: unknown): boolean {
   );
 }
 
-function isRateLimitError(error: unknown): boolean {
+export function isRateLimitError(error: unknown): boolean {
   if (!(error instanceof ApplicationError)) {
     return false;
   }
