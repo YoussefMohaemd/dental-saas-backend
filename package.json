@@ -12,6 +12,7 @@
     "seed:assistant-catalog": "tsx src/scripts/seed-assistant-catalog.ts",
     "test": "vitest run",
     "test:watch": "vitest",
+    "eval:assistant": "tsx src/scripts/assistant-eval.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format:check": "prettier --check .",

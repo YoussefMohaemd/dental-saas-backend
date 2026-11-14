@@ -41,6 +41,7 @@ import { type AssistantPlanAction } from '../domain/assistant.types';
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 import { type AssistantLlmLogService } from './assistant-llm-log-service';
 import { type AssistantLlmCallRecord } from './assistant-repositories';
+import { verifyReply, type AssistantVerificationResult } from './response-verifier';
 import { type OrdersService } from '../../orders/application/orders-service';
 import { type PatientService } from '../../patients/application/patient-service';
 import { type DoctorService } from '../../doctors/application/doctor-service';
@@ -111,6 +112,7 @@ export interface AssistantMessageResultText {
   text: string;
   plannedActions: number;
   executions: AssistantActionExecutionSummary[];
+  verification: AssistantVerificationResult;
 }
 
 export interface AssistantMessageResultConfirmation {
@@ -123,6 +125,7 @@ export interface AssistantMessageResultConfirmation {
     confirmationToken: string;
     payload: Record<string, unknown>;
   }>;
+  verification: AssistantVerificationResult;
 }
 
 export type AssistantMessageResult = AssistantMessageResultText | AssistantMessageResultConfirmation;
@@ -430,6 +433,24 @@ export class AssistantService {
       });
     }
 
+    const executions = await this.dependencies.actionExecutor.executeReadActions(normalizedActions, toolByActionId, {
+      scope: principal.scope,
+      tenantId: principal.tenantId,
+    });
+    const verification = verifyReply({
+      replyText: llmCompletion.reply,
+      executions,
+    });
+    if (verification.status === 'warnings' && normalizedActions.some((action) => toolByActionId.get(action.id)?.operationType === 'write')) {
+      throw new ApplicationError({
+        message: 'The proposed write contains values that could not be verified from trusted data',
+        statusCode: 422,
+        code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+        expose: true,
+        details: { verification },
+      });
+    }
+
     const pendingActions = [];
     for (const action of normalizedActions) {
       const tool = toolByActionId.get(action.id);
@@ -467,10 +488,6 @@ export class AssistantService {
       });
     }
 
-    const executions = await this.dependencies.actionExecutor.executeReadActions(normalizedActions, toolByActionId, {
-      scope: principal.scope,
-      tenantId: principal.tenantId,
-    });
     await this.recordLlmCall({
       principal,
       conversationId: input.conversationId,
@@ -488,12 +505,14 @@ export class AssistantService {
               llmCompletion.reply ||
               'Draft actions are prepared. Review and confirm before execution.',
             pendingActions,
+            verification,
           }
         : {
             type: 'text',
             text: composeReadReply(llmCompletion.reply, executions, normalizedActions),
             plannedActions: normalizedActions.length,
             executions,
+            verification,
           };
 
     const assistantMessage = await this.dependencies.conversationService.appendMessage({
