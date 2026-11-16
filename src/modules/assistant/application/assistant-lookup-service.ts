@@ -1,4 +1,5 @@
 import { normalizeArabic } from '../../../shared/application/text/arabic-normalize';
+import { matchesBilingualText } from '../../../shared/application/text/bilingual-search';
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 
 export type AssistantLookupKind = 'patients' | 'doctors' | 'clinics' | 'services' | 'orders';
@@ -41,7 +42,11 @@ export class AssistantLookupService {
     const normalizedQuery = normalizeArabic(input.query);
     const matches = records
       .map((record) => ({ record, value: normalizeArabic(this.labelFor(input.kind, record)) }))
-      .filter(({ value }) => value.startsWith(normalizedQuery) || value.includes(normalizedQuery))
+      .filter(({ record, value }) =>
+        matchesBilingualText(normalizedQuery, this.labelFor(input.kind, record)) ||
+        value.startsWith(normalizedQuery) ||
+        value.includes(normalizedQuery),
+      )
       .sort((left, right) => {
         const leftPrefix = left.value.startsWith(normalizedQuery) ? 0 : 1;
         const rightPrefix = right.value.startsWith(normalizedQuery) ? 0 : 1;

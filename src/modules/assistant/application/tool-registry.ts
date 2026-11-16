@@ -3,21 +3,198 @@ import {
   APPLICATION_ERROR_CODES,
   ApplicationError,
 } from '../../../shared/application/errors/application-error';
-import { type AssistantToolDefinition } from '../domain/assistant.types';
+import {
+  type AssistantToolDefinition,
+  type AssistantToolParameters,
+} from '../domain/assistant.types';
+import { ORDER_RESTORATION_VALUES } from '../../orders/domain/order';
+
+const createOrderParameters: AssistantToolParameters = {
+  type: 'object',
+  properties: {
+    payload: {
+      type: 'object',
+      description:
+        'Order fields. Use canonical IDs when available; patientName, doctorName, clinicName, and serviceName are accepted for bilingual resolution.',
+      properties: {
+        patientId: { type: 'string', description: 'Canonical patient ID' },
+        patientName: { type: 'string', description: 'Patient name in Arabic or English' },
+        doctorId: { type: 'string', description: 'Canonical doctor ID' },
+        doctorName: { type: 'string', description: 'Doctor name in Arabic or English' },
+        clinicId: { type: 'string', description: 'Canonical clinic ID' },
+        clinicName: { type: 'string', description: 'Clinic name in Arabic or English' },
+        status: {
+          type: 'string',
+          enum: [
+            'New',
+            'Review',
+            'Design',
+            'Production',
+            'Quality Check',
+            'Ready',
+            'Completed',
+            'Cancelled',
+          ],
+        },
+        priority: { type: 'string', enum: ['Low', 'Normal', 'High', 'Urgent'] },
+        restoration: { type: 'string', enum: [...ORDER_RESTORATION_VALUES] },
+        arch: { type: 'string', enum: ['Maxilla', 'Mandible', 'Both'] },
+        notes: { type: 'string', description: 'Preserve the user-provided notes verbatim' },
+        creationData: {
+          type: 'object',
+          properties: {
+            services: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  serviceId: { type: 'string', description: 'Canonical service ID' },
+                  serviceName: { type: 'string', description: 'Service name in Arabic or English' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  additionalProperties: false,
+};
+
+const updateOrderParameters: AssistantToolParameters = {
+  type: 'object',
+  properties: {
+    orderId: { type: 'string', description: 'Canonical order ID or order number' },
+    payload: createOrderParameters.properties?.payload ?? {
+      type: 'object',
+    },
+  },
+  additionalProperties: false,
+};
+
+const updatePatientParameters: AssistantToolParameters = {
+  type: 'object',
+  properties: {
+    patientId: {
+      type: 'string',
+      description: 'Canonical patient ID; takes precedence over patientName',
+    },
+    patientName: { type: 'string', description: 'Patient name in Arabic or English' },
+    payload: {
+      type: 'object',
+      description: 'Only patient fields to change; preserve user-provided values',
+      additionalProperties: true,
+    },
+  },
+  additionalProperties: false,
+};
+
+const updateDoctorParameters: AssistantToolParameters = {
+  type: 'object',
+  properties: {
+    doctorId: {
+      type: 'string',
+      description: 'Canonical doctor ID; takes precedence over doctorName',
+    },
+    doctorName: { type: 'string', description: 'Doctor name in Arabic or English' },
+    payload: {
+      type: 'object',
+      description: 'Only doctor fields to change; preserve user-provided values',
+      additionalProperties: true,
+    },
+  },
+  additionalProperties: false,
+};
+
+const updateClinicParameters: AssistantToolParameters = {
+  type: 'object',
+  properties: {
+    clinicId: {
+      type: 'string',
+      description: 'Canonical clinic ID; takes precedence over clinicName',
+    },
+    clinicName: { type: 'string', description: 'Clinic name in Arabic or English' },
+    payload: {
+      type: 'object',
+      description: 'Only clinic fields to change; preserve user-provided values',
+      additionalProperties: true,
+    },
+  },
+  additionalProperties: false,
+};
+
+const createPatientParameters: AssistantToolParameters = {
+  type: 'object',
+  properties: {
+    payload: {
+      type: 'object',
+      description: 'Complete patient data using real values, not invented placeholders',
+      properties: {
+        name: { type: 'string' },
+        dob: { type: 'string', description: 'YYYY-MM-DD' },
+        gender: { type: 'string', enum: ['M', 'F'] },
+        phone: { type: 'string' },
+        email: { type: 'string' },
+        clinicId: { type: 'string', description: 'Canonical clinic ID' },
+        clinicName: { type: 'string', description: 'Clinic name in Arabic or English' },
+        doctorId: { type: 'string', description: 'Canonical doctor ID' },
+        doctorName: { type: 'string', description: 'Doctor name in Arabic or English' },
+      },
+    },
+  },
+  additionalProperties: false,
+};
+
+const createDoctorParameters: AssistantToolParameters = {
+  type: 'object',
+  properties: {
+    payload: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        gender: { type: 'string', enum: ['M', 'F'] },
+        specialty: { type: 'string' },
+        clinicId: { type: 'string', description: 'Canonical clinic ID' },
+        email: { type: 'string' },
+        phone: { type: 'string' },
+        joinedDate: { type: 'string', description: 'YYYY-MM-DD' },
+      },
+    },
+  },
+  additionalProperties: false,
+};
+
+const createClinicParameters: AssistantToolParameters = {
+  type: 'object',
+  properties: {
+    payload: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        address: { type: 'string' },
+        city: { type: 'string' },
+        phone: { type: 'string' },
+        email: { type: 'string' },
+        accountManager: { type: 'string' },
+      },
+    },
+  },
+  additionalProperties: false,
+};
 
 const ASSISTANT_TOOLS: AssistantToolDefinition[] = [
   createTool(
     'search_orders',
-    'Search orders by filters and keywords',
-    '{"search"?: string, "status"?: string[] using "New"|"Review"|"Design"|"Production"|"Quality Check"|"Ready"|"Completed"|"Cancelled", "duration"?: "today"|"week"|"month"|"2-months"|"3-months"|"6-months", "service"?: string[], "overdue"?: boolean (true = open orders past their due date, for late-order reports), "sortBy"?: "orderNumber"|"status"|"priority"|"restoration"|"receivedAt"|"dueDate"|"amount"|"createdAt"|"updatedAt", "sortDirection"?: "asc"|"desc", "page"?: integer, "pageSize"?: integer}',
+    'Search orders by filters and keywords, including patient, doctor, or clinic names in Arabic, English, or transliteration',
+    '{"search"?: string (order number, patient/doctor/clinic name, Arabic text, English text, or common transliteration variants such as sief/Saif), "status"?: string[] using "New"|"Review"|"Design"|"Production"|"Quality Check"|"Ready"|"Completed"|"Cancelled", "duration"?: "today"|"week"|"month"|"2-months"|"3-months"|"6-months", "service"?: string[], "overdue"?: boolean (true = open orders past their due date, for late-order reports), "sortBy"?: "orderNumber"|"status"|"priority"|"restoration"|"receivedAt"|"dueDate"|"amount"|"createdAt"|"updatedAt", "sortDirection"?: "asc"|"desc", "page"?: integer, "pageSize"?: integer}',
     'read',
     ['orders.read'],
     { domain: 'orders', action: 'search' },
   ),
   createTool(
     'get_order_details',
-    'Get order details by order id',
-    '{"orderId": string}',
+    'Get order details by order ID, order number, or a patient name when it identifies a unique order; use search_orders when multiple orders match',
+    '{"orderId": string (order ID, order number, or patient name for one unique order; transliteration is supported)}',
     'read',
     ['orders.read'],
     { domain: 'orders', action: 'details' },
@@ -29,6 +206,7 @@ const ASSISTANT_TOOLS: AssistantToolDefinition[] = [
     'write',
     ['orders.create'],
     { domain: 'orders', action: 'create' },
+    createOrderParameters,
   ),
   createTool(
     'update_order',
@@ -37,6 +215,7 @@ const ASSISTANT_TOOLS: AssistantToolDefinition[] = [
     'write',
     ['orders.update'],
     { domain: 'orders', action: 'update' },
+    updateOrderParameters,
   ),
   createTool(
     'search_patients',
@@ -118,14 +297,16 @@ const ASSISTANT_TOOLS: AssistantToolDefinition[] = [
     'write',
     ['patients.create'],
     { domain: 'patients', action: 'create' },
+    createPatientParameters,
   ),
   createTool(
     'update_patient',
     'Update an existing patient',
-    '{"patientId": string, "payload": object containing only patient fields to change}',
+    '{"patientId"?: string, "patientName"?: string, "payload": object containing only patient fields to change; provide one target field}',
     'write',
     ['patients.update'],
     { domain: 'patients', action: 'update' },
+    updatePatientParameters,
   ),
   createTool(
     'create_doctor',
@@ -134,14 +315,16 @@ const ASSISTANT_TOOLS: AssistantToolDefinition[] = [
     'write',
     ['doctors.manage'],
     { domain: 'doctors', action: 'create' },
+    createDoctorParameters,
   ),
   createTool(
     'update_doctor',
     'Update an existing doctor',
-    '{"doctorId": string, "payload": object containing only doctor fields to change}',
+    '{"doctorId"?: string, "doctorName"?: string, "payload": object containing only doctor fields to change; provide one target field}',
     'write',
     ['doctors.manage'],
     { domain: 'doctors', action: 'update' },
+    updateDoctorParameters,
   ),
   createTool(
     'create_clinic',
@@ -150,14 +333,16 @@ const ASSISTANT_TOOLS: AssistantToolDefinition[] = [
     'write',
     ['clinics.manage'],
     { domain: 'clinics', action: 'create' },
+    createClinicParameters,
   ),
   createTool(
     'update_clinic',
     'Update an existing clinic',
-    '{"clinicId": string, "payload": object containing only clinic fields to change}',
+    '{"clinicId"?: string, "clinicName"?: string, "payload": object containing only clinic fields to change; provide one target field}',
     'write',
     ['clinics.manage'],
     { domain: 'clinics', action: 'update' },
+    updateClinicParameters,
   ),
 ];
 

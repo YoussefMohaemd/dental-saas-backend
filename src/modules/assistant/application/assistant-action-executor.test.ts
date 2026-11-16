@@ -18,6 +18,120 @@ const context = {
 } as const;
 
 describe('AssistantActionExecutor', () => {
+  it('resolves Arabic patient, doctor, clinic, and service names for create_order', async () => {
+    const createOrder = vi.fn().mockResolvedValue({ id: 'order-1' });
+    const createSubOrders = vi.fn().mockResolvedValue([]);
+    const listServices = vi.fn().mockResolvedValue([
+      {
+        serviceId: 'treatment-plan',
+        name: 'Treatment Plan',
+        basePrice: 125,
+        scanRequirements: [],
+      },
+    ]);
+    const executor = new AssistantActionExecutor({
+      ordersService: { createOrder, createSubOrders } as never,
+      patientService: {
+        listPatients: vi.fn().mockResolvedValue({
+          items: [{ id: 'patient-1', name: 'Saif', doctorId: 'doctor-1', clinicId: 'clinic-1' }],
+          meta: { totalItems: 1, page: 1, pageSize: 100, totalPages: 1 },
+        }),
+        getPatientById: vi.fn().mockResolvedValue({
+          id: 'patient-1',
+          doctorId: 'doctor-1',
+          clinicId: 'clinic-1',
+        }),
+      } as never,
+      doctorService: {
+        listDoctors: vi.fn().mockResolvedValue({
+          items: [{ id: 'doctor-1', name: 'Omar Khalil', clinicId: 'clinic-1' }],
+          meta: { totalItems: 1, page: 1, pageSize: 100, totalPages: 1 },
+        }),
+        getDoctorById: vi.fn().mockResolvedValue({ id: 'doctor-1', clinicId: 'clinic-1' }),
+      } as never,
+      clinicService: {
+        listClinics: vi.fn().mockResolvedValue({
+          items: [{ id: 'clinic-1', name: 'Dental Care Clinic' }],
+          meta: { totalItems: 1, page: 1, pageSize: 100, totalPages: 1 },
+        }),
+        getClinicById: vi.fn().mockResolvedValue({ id: 'clinic-1' }),
+      } as never,
+      catalogRepository: { listServices } as never,
+    });
+
+    await executor.executeConfirmedWriteAction({
+      actionId: 'a-create-order-arabic',
+      toolName: 'create_order',
+      payload: {
+        payload: {
+          patientName: 'سيف',
+          doctorName: 'عمر خليل',
+          clinicName: 'دنتال كير كلينك',
+          format: 'STL',
+          shade: 'A2',
+          dueDate: '2026-11-20T00:00:00.000Z',
+          creationData: {
+            services: [{ serviceId: 'تريتمنت بلان', selectedTeeth: [13] }],
+          },
+        },
+      },
+      context,
+    });
+
+    expect(createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        patientId: 'patient-1',
+        doctorId: 'doctor-1',
+        clinicId: 'clinic-1',
+        creationData: {
+          services: [expect.objectContaining({ serviceId: 'treatment-plan' })],
+        },
+      }),
+      context.scope,
+    );
+    expect(listServices).toHaveBeenCalled();
+  });
+
+  it('resolves an Arabic patient name for update_patient and rejects ambiguity', async () => {
+    const updatePatient = vi.fn().mockResolvedValue({ id: 'patient-1' });
+    const listPatients = vi.fn().mockResolvedValue({
+      items: [{ id: 'patient-1', name: 'Saif' }],
+      meta: { totalItems: 1, page: 1, pageSize: 100, totalPages: 1 },
+    });
+    const executor = new AssistantActionExecutor({
+      ordersService: {} as never,
+      patientService: { listPatients, updatePatient } as never,
+      doctorService: {} as never,
+      clinicService: {} as never,
+      catalogRepository: {} as never,
+    });
+
+    await executor.executeConfirmedWriteAction({
+      actionId: 'a-update-patient-arabic',
+      toolName: 'update_patient',
+      payload: { patientName: 'سيف', payload: { phone: '0100' } },
+      context,
+    });
+
+    expect(updatePatient).toHaveBeenCalledWith('patient-1', { phone: '0100' }, context.scope);
+
+    listPatients.mockResolvedValueOnce({
+      items: [
+        { id: 'patient-1', name: 'Saif' },
+        { id: 'patient-2', name: 'Saif' },
+      ],
+      meta: { totalItems: 2, page: 1, pageSize: 100, totalPages: 1 },
+    });
+    await expect(
+      executor.executeConfirmedWriteAction({
+        actionId: 'a-update-patient-ambiguous',
+        toolName: 'update_patient',
+        payload: { patientName: 'سيف', payload: { phone: '0101' } },
+        context,
+      }),
+    ).rejects.toThrow(/multiple patients match/i);
+  });
+
   it('resolves order-number input for get_order_details before fetching details', async () => {
     const listOrders = vi.fn().mockResolvedValue({
       items: [{ id: '66f100000000000000000123', orderNumber: 'DL-026015' }],
@@ -68,11 +182,178 @@ describe('AssistantActionExecutor', () => {
     );
 
     expect(listOrders).toHaveBeenCalledTimes(1);
-    expect(getOrderById).toHaveBeenCalledWith(
-      '66f100000000000000000123',
-      context.scope,
-    );
+    expect(getOrderById).toHaveBeenCalledWith('66f100000000000000000123', context.scope);
     expect(actions[0]?.tool).toBe('get_order_details');
+  });
+
+  it('resolves transliterated patient names for get_order_details', async () => {
+    const listOrders = vi
+      .fn()
+      .mockResolvedValueOnce({
+        items: [],
+        meta: { totalItems: 2, page: 1, pageSize: 100, totalPages: 2 },
+      })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            id: '66f100000000000000000125',
+            orderNumber: 'DL-026016',
+            patientName: 'Saif',
+          },
+        ],
+        meta: { totalItems: 2, page: 2, pageSize: 100, totalPages: 2 },
+      });
+    const getOrderById = vi.fn().mockResolvedValue({
+      id: '66f100000000000000000125',
+      orderNumber: 'DL-026016',
+      patientName: 'Saif',
+      subOrders: [],
+    });
+    const executor = new AssistantActionExecutor({
+      ordersService: { listOrders, getOrderById } as never,
+      patientService: {} as never,
+      doctorService: {} as never,
+      clinicService: {} as never,
+      catalogRepository: { listServices: vi.fn().mockResolvedValue([]) } as never,
+    });
+
+    await executor.executeReadActions(
+      [
+        {
+          id: 'a1',
+          tool: 'get_order_details',
+          arguments: { orderId: 'sief' },
+          dependsOn: [],
+        },
+      ],
+      new Map([
+        [
+          'a1',
+          {
+            name: 'get_order_details',
+            description: 'Get order details by order id',
+            argumentsHint: '{"orderId": string}',
+            operationType: 'read',
+            requiredCapabilities: [],
+            capabilityMatchMode: 'all',
+            requiresConfirmation: false,
+            timeoutMs: 20000,
+            auditMetadata: { domain: 'orders', action: 'details' },
+          },
+        ],
+      ]),
+      context,
+    );
+
+    expect(getOrderById).toHaveBeenCalledWith('66f100000000000000000125', context.scope);
+    expect(listOrders).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects patient-name order details when multiple orders match', async () => {
+    const listOrders = vi.fn().mockResolvedValue({
+      items: [
+        { id: '66f100000000000000000126', orderNumber: 'DL-026017', patientName: 'Saif' },
+        { id: '66f100000000000000000127', orderNumber: 'DL-026018', patientName: 'Saif' },
+      ],
+      meta: { totalItems: 2, page: 1, pageSize: 100, totalPages: 1 },
+    });
+    const getOrderById = vi.fn();
+    const executor = new AssistantActionExecutor({
+      ordersService: { listOrders, getOrderById } as never,
+      patientService: {} as never,
+      doctorService: {} as never,
+      clinicService: {} as never,
+      catalogRepository: { listServices: vi.fn().mockResolvedValue([]) } as never,
+    });
+
+    const actions = await executor.executeReadActions(
+      [
+        {
+          id: 'a1',
+          tool: 'get_order_details',
+          arguments: { orderId: 'sief' },
+          dependsOn: [],
+        },
+      ],
+      new Map([
+        [
+          'a1',
+          {
+            name: 'get_order_details',
+            description: 'Get order details by order id',
+            argumentsHint: '{"orderId": string}',
+            operationType: 'read',
+            requiredCapabilities: [],
+            capabilityMatchMode: 'all',
+            requiresConfirmation: false,
+            timeoutMs: 20000,
+            auditMetadata: { domain: 'orders', action: 'details' },
+          },
+        ],
+      ]),
+      context,
+    );
+
+    expect(actions[0]).toEqual(
+      expect.objectContaining({
+        status: 'failed',
+        error: expect.stringMatching(/multiple orders match patient/i),
+      }),
+    );
+    expect(getOrderById).not.toHaveBeenCalled();
+  });
+
+  it('does not resolve a partial order number to a different order', async () => {
+    const listOrders = vi.fn().mockResolvedValue({
+      items: [
+        { id: '66f100000000000000000123', orderNumber: 'DL-010' },
+        { id: '66f100000000000000000124', orderNumber: 'DL-0100' },
+      ],
+      meta: { totalItems: 2, page: 1, pageSize: 20, totalPages: 1 },
+    });
+    const getOrderById = vi.fn();
+    const executor = new AssistantActionExecutor({
+      ordersService: { listOrders, getOrderById } as never,
+      patientService: {} as never,
+      doctorService: {} as never,
+      clinicService: {} as never,
+      catalogRepository: { listServices: vi.fn().mockResolvedValue([]) } as never,
+    });
+
+    const actions = await executor.executeReadActions(
+      [
+        {
+          id: 'a1',
+          tool: 'get_order_details',
+          arguments: { orderId: 'DL-01' },
+          dependsOn: [],
+        },
+      ],
+      new Map([
+        [
+          'a1',
+          {
+            name: 'get_order_details',
+            description: 'Get order details by order id',
+            argumentsHint: '{"orderId": string}',
+            operationType: 'read',
+            requiredCapabilities: [],
+            capabilityMatchMode: 'all',
+            requiresConfirmation: false,
+            timeoutMs: 20000,
+            auditMetadata: { domain: 'orders', action: 'details' },
+          },
+        ],
+      ]),
+      context,
+    );
+    expect(actions[0]).toEqual(
+      expect.objectContaining({
+        status: 'failed',
+        error: expect.stringMatching(/order .*not found/i),
+      }),
+    );
+    expect(getOrderById).not.toHaveBeenCalled();
   });
 
   it('auto-creates missing clinic and doctor when creating patient with names', async () => {
@@ -138,7 +419,9 @@ describe('AssistantActionExecutor', () => {
         }),
       } as never,
       doctorService: {
-        getDoctorById: vi.fn().mockResolvedValue({ id: patientDoctorId, clinicId: patientClinicId }),
+        getDoctorById: vi
+          .fn()
+          .mockResolvedValue({ id: patientDoctorId, clinicId: patientClinicId }),
       } as never,
       clinicService: {
         getClinicById: vi.fn().mockResolvedValue({ id: patientClinicId }),
@@ -427,13 +710,13 @@ describe('AssistantActionExecutor', () => {
         },
         context,
       }),
-    ).rejects.toThrow('create_order requires valid patientId or patientName');
+    ).rejects.toThrow(/invalid patientId/i);
 
     expect(getPatientById).not.toHaveBeenCalled();
     expect(createOrder).not.toHaveBeenCalled();
   });
 
-  it('creates a new patient for create_order when patient name is not found', async () => {
+  it('rejects a missing patient name for create_order without creating a patient', async () => {
     const createOrder = vi.fn().mockResolvedValue({ id: 'order-new-patient' });
     const createSubOrders = vi.fn().mockResolvedValue([]);
     const createPatient = vi.fn().mockResolvedValue({
@@ -461,46 +744,59 @@ describe('AssistantActionExecutor', () => {
       catalogRepository: { listServices: vi.fn().mockResolvedValue([]) } as never,
     });
 
-    await executor.executeConfirmedWriteAction({
-      actionId: 'a-create-order-new-patient',
-      toolName: 'create_order',
-      payload: {
+    await expect(
+      executor.executeConfirmedWriteAction({
+        actionId: 'a-create-order-new-patient',
+        toolName: 'create_order',
         payload: {
-          patientName: 'New Patient',
-          doctorId,
-          dueDate: '2026-11-20T00:00:00.000Z',
-          creationData: {
-            services: [
-              {
-                serviceId: 'treatment-plan',
-                selectedTeeth: [12, 22],
-              },
-            ],
+          payload: {
+            patientName: 'New Patient',
+            doctorId,
+            dueDate: '2026-11-20T00:00:00.000Z',
+            creationData: {
+              services: [
+                {
+                  serviceId: 'treatment-plan',
+                  selectedTeeth: [12, 22],
+                },
+              ],
+            },
           },
         },
-      },
-      context,
+        context,
+      }),
+    ).rejects.toThrow(/patient .*not found/i);
+
+    expect(createPatient).not.toHaveBeenCalled();
+    expect(createOrder).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid explicit patientId instead of resolving a provided name', async () => {
+    const listPatients = vi.fn();
+    const updatePatient = vi.fn();
+    const executor = new AssistantActionExecutor({
+      ordersService: {} as never,
+      patientService: { listPatients, updatePatient } as never,
+      doctorService: {} as never,
+      clinicService: {} as never,
+      catalogRepository: {} as never,
     });
 
-    expect(createPatient).toHaveBeenCalledTimes(1);
-    expect(createPatient).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: 'New Patient',
-        doctorId,
-        clinicId,
+    await expect(
+      executor.executeConfirmedWriteAction({
+        actionId: 'a-update-patient-invalid-id',
+        toolName: 'update_patient',
+        payload: {
+          patientId: 'not-an-object-id',
+          patientName: 'Omar Khalil',
+          payload: { phone: '0100' },
+        },
+        context,
       }),
-      context.scope,
-    );
-    expect(createOrder).toHaveBeenCalledWith(
-      expect.objectContaining({
-        patientId: '66f100000000000000000444',
-        doctorId,
-        clinicId,
-        format: 'STL',
-        shade: 'A2',
-      }),
-      context.scope,
-    );
+    ).rejects.toThrow(/invalid patientId/i);
+
+    expect(listPatients).not.toHaveBeenCalled();
+    expect(updatePatient).not.toHaveBeenCalled();
   });
 
   it('keeps explicit clinicId even when patient clinicId is stale', async () => {
@@ -581,7 +877,9 @@ describe('AssistantActionExecutor', () => {
         getDoctorById: vi.fn().mockResolvedValue({ id: doctorId, clinicId: missingClinicId }),
       } as never,
       clinicService: {
-        getClinicById: vi.fn().mockRejectedValue(new Error(`Clinic ${missingClinicId} was not found`)),
+        getClinicById: vi
+          .fn()
+          .mockRejectedValue(new Error(`Clinic ${missingClinicId} was not found`)),
       } as never,
       catalogRepository: {} as never,
     });
@@ -675,6 +973,60 @@ describe('AssistantActionExecutor', () => {
     expect(listOrders).toHaveBeenCalledTimes(2);
     expect(actions[0]?.tool).toBe('search_orders');
     expect((actions[0]?.result as { items: Array<{ id: string }> }).items).toHaveLength(2);
+  });
+
+  it('resolves bilingual service names before searching orders', async () => {
+    const listOrders = vi.fn().mockResolvedValue({
+      items: [],
+      meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 1 },
+    });
+    const executor = new AssistantActionExecutor({
+      ordersService: { listOrders } as never,
+      patientService: {} as never,
+      doctorService: {} as never,
+      clinicService: {} as never,
+      catalogRepository: {
+        listServices: vi.fn().mockResolvedValue([
+          {
+            serviceId: 'treatment-plan',
+            name: 'Treatment Plan',
+          },
+        ]),
+      } as never,
+    });
+
+    await executor.executeReadActions(
+      [
+        {
+          id: 'a1',
+          tool: 'search_orders',
+          arguments: { service: ['تريتمنت بلان'], status: [] },
+          dependsOn: [],
+        },
+      ],
+      new Map([
+        [
+          'a1',
+          {
+            name: 'search_orders',
+            description: 'Search orders',
+            argumentsHint: '{}',
+            operationType: 'read',
+            requiredCapabilities: [],
+            capabilityMatchMode: 'all',
+            requiresConfirmation: false,
+            timeoutMs: 20000,
+            auditMetadata: { domain: 'orders', action: 'search' },
+          },
+        ],
+      ]),
+      context,
+    );
+
+    expect(listOrders).toHaveBeenCalledWith(
+      expect.objectContaining({ serviceIds: ['treatment-plan'] }),
+      expect.anything(),
+    );
   });
 
   it('prefers explicit doctorId and clinicId over patient-linked values in create_order', async () => {

@@ -38,6 +38,7 @@ import {
   type SubOrderWritePayload,
 } from '../domain/sub-order';
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
+import { buildBilingualSearchRegexes } from '../../../shared/application/text/bilingual-search';
 
 const orderSortFields: Record<OrderListQuery['sortBy'], string> = {
   orderNumber: 'orderNumber',
@@ -599,19 +600,39 @@ export class MongooseOrdersRepository implements OrderRepository {
     }
 
     if (query.search !== undefined) {
-      const escapedSearch = escapeRegExp(query.search);
-      const searchRegex = new RegExp(escapedSearch, 'i');
+      const searchRegexes = buildBilingualSearchRegexes(query.search);
+      const effectiveSearchRegexes =
+        searchRegexes.length > 0
+          ? searchRegexes
+          : [new RegExp(escapeRegExp(query.search), 'i')];
       const [patientIds, doctorIds, clinicIds] = await Promise.all([
-        patientModel.distinct('_id', { tenantId: query.scope.tenantId, name: searchRegex }).exec(),
-        doctorModel.distinct('_id', { tenantId: query.scope.tenantId, name: searchRegex }).exec(),
-        clinicModel.distinct('_id', { tenantId: query.scope.tenantId, name: searchRegex }).exec(),
+        patientModel
+          .distinct('_id', {
+            tenantId: query.scope.tenantId,
+            name: { $in: effectiveSearchRegexes },
+          })
+          .exec(),
+        doctorModel
+          .distinct('_id', {
+            tenantId: query.scope.tenantId,
+            name: { $in: effectiveSearchRegexes },
+          })
+          .exec(),
+        clinicModel
+          .distinct('_id', {
+            tenantId: query.scope.tenantId,
+            name: { $in: effectiveSearchRegexes },
+          })
+          .exec(),
       ]);
 
       filter.$or = [
-        { orderNumber: searchRegex },
-        { notes: searchRegex },
-        { format: searchRegex },
-        { shade: searchRegex },
+        ...effectiveSearchRegexes.flatMap((regex) => [
+          { orderNumber: regex },
+          { notes: regex },
+          { format: regex },
+          { shade: regex },
+        ]),
         ...(patientIds.length > 0 ? [{ patientId: { $in: patientIds } }] : []),
         ...(doctorIds.length > 0 ? [{ doctorId: { $in: doctorIds } }] : []),
         ...(clinicIds.length > 0 ? [{ clinicId: { $in: clinicIds } }] : []),

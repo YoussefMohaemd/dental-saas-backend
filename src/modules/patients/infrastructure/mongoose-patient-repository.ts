@@ -17,6 +17,7 @@ import {
   type PatientRepository,
 } from '../domain/patient-repository';
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
+import { buildBilingualSearchRegexes } from '../../../shared/application/text/bilingual-search';
 
 const patientSortFields: Record<PatientListQuery['sortBy'], string> = {
   name: 'name',
@@ -50,15 +51,25 @@ export class MongoosePatientRepository implements PatientRepository {
   }
 
   public async list(query: PatientListQuery): Promise<PatientListResult> {
+    const searchRegexes =
+      query.search === undefined
+        ? []
+        : buildBilingualSearchRegexes(query.search);
+    const effectiveSearchRegexes =
+      searchRegexes.length > 0
+        ? searchRegexes
+        : query.search === undefined
+          ? []
+          : [new RegExp(escapeRegExp(query.search), 'i')];
     const filter: FilterQuery<PatientRecord> = {
       tenantId: query.scope.tenantId,
       ...(query.search !== undefined
         ? {
-            $or: [
-              { name: new RegExp(escapeRegExp(query.search), 'i') },
-              { email: new RegExp(escapeRegExp(query.search), 'i') },
-              { phone: new RegExp(escapeRegExp(query.search), 'i') },
-            ],
+            $or: effectiveSearchRegexes.flatMap((regex) => [
+              { name: regex },
+              { email: regex },
+              { phone: regex },
+            ]),
           }
         : {}),
       ...(query.statuses.length > 0 ? { status: { $in: query.statuses } } : {}),

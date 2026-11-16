@@ -17,9 +17,7 @@ import {
 
 interface GeminiClient {
   models: {
-    generateContent: (
-      parameters: GenerateContentParameters,
-    ) => Promise<GenerateContentResponse>;
+    generateContent: (parameters: GenerateContentParameters) => Promise<GenerateContentResponse>;
   };
 }
 
@@ -134,7 +132,7 @@ function toGeminiFunctionDeclaration(
 ): FunctionDeclaration {
   return {
     name: tool.name,
-    description: tool.description,
+    description: `${tool.description}\nArguments: ${tool.argumentsHint}`,
     parametersJsonSchema: tool.parameters ?? {
       type: 'object',
       additionalProperties: true,
@@ -153,6 +151,10 @@ function parseGeminiResponse(response: GenerateContentResponse): AssistantLlmCom
       code: APPLICATION_ERROR_CODES.INTERNAL_ERROR,
       expose: true,
     });
+  }
+
+  if (functionCalls.length === 0) {
+    return parseGeminiTextPlan(reply);
   }
 
   return {
@@ -177,6 +179,71 @@ function parseGeminiResponse(response: GenerateContentResponse): AssistantLlmCom
   };
 }
 
+function parseGeminiTextPlan(text: string): AssistantLlmCompletionResult {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text) as unknown;
+  } catch {
+    return {
+      reply: text,
+      actions: [],
+    };
+  }
+
+  if (!isRecord(parsed) || typeof parsed.reply !== 'string' || !Array.isArray(parsed.actions)) {
+    throw invalidGeminiPlanError();
+  }
+
+  return {
+    reply: parsed.reply.trim(),
+    actions: parsed.actions.map((action, index) => parseGeminiTextAction(action, index)),
+  };
+}
+
+function parseGeminiTextAction(
+  value: unknown,
+  index: number,
+): AssistantLlmCompletionResult['actions'][number] {
+  if (!isRecord(value)) {
+    throw invalidGeminiPlanError();
+  }
+
+  const id = value.id;
+  const tool = value.tool;
+  const argumentsValue = value.arguments;
+  const dependsOn = value.dependsOn;
+  if (
+    (id !== undefined && (typeof id !== 'string' || id.trim().length === 0)) ||
+    typeof tool !== 'string' ||
+    tool.trim().length === 0 ||
+    !isRecord(argumentsValue) ||
+    !Array.isArray(dependsOn) ||
+    dependsOn.some((dependency) => typeof dependency !== 'string')
+  ) {
+    throw invalidGeminiPlanError();
+  }
+
+  return {
+    id: typeof id === 'string' ? id : `a${index + 1}`,
+    tool,
+    arguments: argumentsValue,
+    dependsOn,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function invalidGeminiPlanError(): ApplicationError {
+  return new ApplicationError({
+    message: 'Gemini returned an invalid JSON object',
+    statusCode: 502,
+    code: APPLICATION_ERROR_CODES.INTERNAL_ERROR,
+    expose: true,
+  });
+}
+
 function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === 'AbortError';
 }
@@ -186,7 +253,8 @@ function getUpstreamStatus(error: unknown): number | undefined {
     return undefined;
   }
 
-  const status = (error as { status?: unknown; statusCode?: unknown }).status ??
+  const status =
+    (error as { status?: unknown; statusCode?: unknown }).status ??
     (error as { statusCode?: unknown }).statusCode;
   return typeof status === 'number' ? status : undefined;
 }

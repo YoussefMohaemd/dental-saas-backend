@@ -25,4 +25,21 @@ describe('AssistantLookupService', () => {
       ],
     });
   });
+
+  it('returns a Latin record for an Arabic name query', async () => {
+    const service = new AssistantLookupService({
+      patients: async () => [{ id: 'p1', name: 'Saif', phone: '0100' }],
+    });
+
+    await expect(
+      service.lookup({
+        kind: 'patients',
+        query: 'سيف',
+        scope: { tenantId: 'tenant-1' } as never,
+        limit: 20,
+      }),
+    ).resolves.toEqual({
+      items: [{ id: 'p1', label: 'Saif', sublabel: '0100' }],
+    });
+  });
 });

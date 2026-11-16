@@ -13,6 +13,7 @@ import {
 } from '../domain/doctor';
 import { type DoctorListResult, type DoctorRepository } from '../domain/doctor-repository';
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
+import { buildBilingualSearchRegexes } from '../../../shared/application/text/bilingual-search';
 
 const doctorSortFields: Record<DoctorListQuery['sortBy'], string> = {
   name: 'name',
@@ -45,16 +46,26 @@ export class MongooseDoctorRepository implements DoctorRepository {
   }
 
   public async list(query: DoctorListQuery): Promise<DoctorListResult> {
+    const searchRegexes =
+      query.search === undefined
+        ? []
+        : buildBilingualSearchRegexes(query.search);
+    const effectiveSearchRegexes =
+      searchRegexes.length > 0
+        ? searchRegexes
+        : query.search === undefined
+          ? []
+          : [new RegExp(escapeRegExp(query.search), 'i')];
     const filter: FilterQuery<DoctorRecord> = {
       tenantId: query.scope.tenantId,
       ...(query.search !== undefined
         ? {
-            $or: [
-              { name: new RegExp(escapeRegExp(query.search), 'i') },
-              { specialty: new RegExp(escapeRegExp(query.search), 'i') },
-              { email: new RegExp(escapeRegExp(query.search), 'i') },
-              { phone: new RegExp(escapeRegExp(query.search), 'i') },
-            ],
+            $or: effectiveSearchRegexes.flatMap((regex) => [
+              { name: regex },
+              { specialty: regex },
+              { email: regex },
+              { phone: regex },
+            ]),
           }
         : {}),
       ...(query.statuses.length > 0 ? { status: { $in: query.statuses } } : {}),

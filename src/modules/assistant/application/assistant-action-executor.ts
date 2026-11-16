@@ -8,9 +8,18 @@ import {
 import { type DataVisibilityScope } from '../../../shared/application/contracts/data-scope';
 import { type ClinicService } from '../../clinics/application/clinic-service';
 import { type DoctorService } from '../../doctors/application/doctor-service';
-import { createClinicBodySchema, updateClinicBodySchema } from '../../clinics/presentation/clinics.schemas';
-import { createDoctorBodySchema, updateDoctorBodySchema } from '../../doctors/presentation/doctors.schemas';
-import { createPatientBodySchema, updatePatientBodySchema } from '../../patients/presentation/patients.schemas';
+import {
+  createClinicBodySchema,
+  updateClinicBodySchema,
+} from '../../clinics/presentation/clinics.schemas';
+import {
+  createDoctorBodySchema,
+  updateDoctorBodySchema,
+} from '../../doctors/presentation/doctors.schemas';
+import {
+  createPatientBodySchema,
+  updatePatientBodySchema,
+} from '../../patients/presentation/patients.schemas';
 import { type OrdersService } from '../../orders/application/orders-service';
 import { type PatientService } from '../../patients/application/patient-service';
 import {
@@ -27,6 +36,10 @@ import {
 import { type SubOrderWritePayload } from '../../orders/domain/sub-order';
 import { type AssistantCatalogRepository } from './assistant-catalog';
 import { type AssistantPlanAction, type AssistantToolDefinition } from '../domain/assistant.types';
+import {
+  matchesBilingualEntityName,
+  matchesBilingualText,
+} from '../../../shared/application/text/bilingual-search';
 
 export interface AssistantActionExecutionSummary {
   actionId: string;
@@ -47,6 +60,20 @@ interface AssistantActionExecutorDependencies {
 interface AssistantExecutionContext {
   scope: DataVisibilityScope;
   tenantId: string;
+}
+
+interface AssistantServiceRowInput {
+  serviceId?: string | undefined;
+  serviceName?: string | undefined;
+  serviceDetails: Record<string, string>;
+  serviceForm: Record<string, string>;
+  selectedTeeth: number[];
+  scanRequirements: string[];
+  fileReferences: string[];
+}
+
+interface AssistantServiceRow extends Omit<AssistantServiceRowInput, 'serviceId' | 'serviceName'> {
+  serviceId: string;
 }
 
 const emptyArgsSchema = z.object({}).strict();
@@ -93,8 +120,9 @@ const searchOrdersArgsSchema = z
   })
   .strict();
 
-const OPEN_ORDER_STATUSES: Array<(typeof ORDER_STATUS_VALUES)[number]> =
-  ORDER_STATUS_VALUES.filter((status) => status !== 'Completed' && status !== 'Cancelled');
+const OPEN_ORDER_STATUSES: Array<(typeof ORDER_STATUS_VALUES)[number]> = ORDER_STATUS_VALUES.filter(
+  (status) => status !== 'Completed' && status !== 'Cancelled',
+);
 
 const getOrderDetailsArgsSchema = z
   .object({
@@ -136,22 +164,34 @@ const updateOrderArgsSchema = z
 
 const updatePatientArgsSchema = z
   .object({
-    patientId: z.string().trim().min(1),
+    patientId: z.string().trim().min(1).optional(),
+    patientName: z.string().trim().min(1).optional(),
     payload: z.record(z.string(), z.unknown()),
+  })
+  .refine((value) => value.patientId !== undefined || value.patientName !== undefined, {
+    message: 'patientId or patientName is required',
   })
   .strict();
 
 const updateDoctorArgsSchema = z
   .object({
-    doctorId: z.string().trim().min(1),
+    doctorId: z.string().trim().min(1).optional(),
+    doctorName: z.string().trim().min(1).optional(),
     payload: z.record(z.string(), z.unknown()),
+  })
+  .refine((value) => value.doctorId !== undefined || value.doctorName !== undefined, {
+    message: 'doctorId or doctorName is required',
   })
   .strict();
 
 const updateClinicArgsSchema = z
   .object({
-    clinicId: z.string().trim().min(1),
+    clinicId: z.string().trim().min(1).optional(),
+    clinicName: z.string().trim().min(1).optional(),
     payload: z.record(z.string(), z.unknown()),
+  })
+  .refine((value) => value.clinicId !== undefined || value.clinicName !== undefined, {
+    message: 'clinicId or clinicName is required',
   })
   .strict();
 const objectIdRegex = /^[a-f0-9]{24}$/i;
@@ -161,19 +201,33 @@ const createPatientAssistantPayloadSchema = z
     dob: z.coerce.date(),
     gender: z.enum(['M', 'F']),
     phone: z.string().trim().min(1),
-    email: z.string().trim().email().transform((value) => value.toLowerCase()),
+    email: z
+      .string()
+      .trim()
+      .email()
+      .transform((value) => value.toLowerCase()),
     clinicId: z.string().trim().min(1).optional(),
     clinicName: z.string().trim().min(1).optional(),
     clinicCity: z.string().trim().min(1).optional(),
     clinicAddress: z.string().trim().min(1).optional(),
     clinicPhone: z.string().trim().min(1).optional(),
-    clinicEmail: z.string().trim().email().transform((value) => value.toLowerCase()).optional(),
+    clinicEmail: z
+      .string()
+      .trim()
+      .email()
+      .transform((value) => value.toLowerCase())
+      .optional(),
     accountManager: z.string().trim().min(1).optional(),
     doctorId: z.string().trim().min(1).optional(),
     doctorName: z.string().trim().min(1).optional(),
     doctorSpecialty: z.string().trim().min(1).optional(),
     doctorPhone: z.string().trim().min(1).optional(),
-    doctorEmail: z.string().trim().email().transform((value) => value.toLowerCase()).optional(),
+    doctorEmail: z
+      .string()
+      .trim()
+      .email()
+      .transform((value) => value.toLowerCase())
+      .optional(),
     doctorGender: z.enum(['M', 'F']).optional(),
     status: z.enum(['Active', 'Inactive']).default('Active'),
     lastVisit: z.coerce.date().optional(),
@@ -263,7 +317,11 @@ export class AssistantActionExecutor {
 
     if (input.toolName === 'update_patient') {
       const args = this.parseStrictToolArgs(updatePatientArgsSchema, input.payload, input.toolName);
-      const payload = this.parseStrictToolArgs(updatePatientBodySchema, args.payload, 'update_patient.payload');
+      const payload = this.parseStrictToolArgs(
+        updatePatientBodySchema,
+        args.payload,
+        'update_patient.payload',
+      );
       if (Object.keys(payload).length === 0) {
         throw new ApplicationError({
           message: 'Update patient payload must contain at least one field',
@@ -277,7 +335,11 @@ export class AssistantActionExecutor {
 
     if (input.toolName === 'update_doctor') {
       const args = this.parseStrictToolArgs(updateDoctorArgsSchema, input.payload, input.toolName);
-      const payload = this.parseStrictToolArgs(updateDoctorBodySchema, args.payload, 'update_doctor.payload');
+      const payload = this.parseStrictToolArgs(
+        updateDoctorBodySchema,
+        args.payload,
+        'update_doctor.payload',
+      );
       if (Object.keys(payload).length === 0) {
         throw new ApplicationError({
           message: 'Update doctor payload must contain at least one field',
@@ -291,7 +353,11 @@ export class AssistantActionExecutor {
 
     if (input.toolName === 'update_clinic') {
       const args = this.parseStrictToolArgs(updateClinicArgsSchema, input.payload, input.toolName);
-      const payload = this.parseStrictToolArgs(updateClinicBodySchema, args.payload, 'update_clinic.payload');
+      const payload = this.parseStrictToolArgs(
+        updateClinicBodySchema,
+        args.payload,
+        'update_clinic.payload',
+      );
       if (Object.keys(payload).length === 0) {
         throw new ApplicationError({
           message: 'Update clinic payload must contain at least one field',
@@ -411,7 +477,7 @@ export class AssistantActionExecutor {
             : [...OPEN_ORDER_STATUSES]
           : args.status,
         ...(args.duration ? { duration: args.duration } : {}),
-        serviceIds: args.service,
+        serviceIds: await this.resolveAssistantServiceIds(args.service, context.tenantId),
       };
 
       const result = args.overdue
@@ -436,7 +502,10 @@ export class AssistantActionExecutor {
             ? {
                 ...result.meta,
                 totalItems: items.length,
-                totalPages: Math.max(1, Math.ceil(items.length / Math.max(1, result.meta.pageSize))),
+                totalPages: Math.max(
+                  1,
+                  Math.ceil(items.length / Math.max(1, result.meta.pageSize)),
+                ),
                 overdueOnThisPage: items.length,
                 overdueTotalItems: items.length,
               }
@@ -498,7 +567,10 @@ export class AssistantActionExecutor {
         action.arguments,
         action.tool,
       );
-      const result = await this.dependencies.patientService.getPatientById(args.patientId, context.scope);
+      const result = await this.dependencies.patientService.getPatientById(
+        args.patientId,
+        context.scope,
+      );
       return {
         actionId: action.id,
         tool: action.tool,
@@ -628,12 +700,20 @@ export class AssistantActionExecutor {
     }
 
     if (input.toolName === 'create_doctor') {
-      const body = this.parseStrictToolArgs(createDoctorBodySchema, args.payload, 'create_doctor.payload');
+      const body = this.parseStrictToolArgs(
+        createDoctorBodySchema,
+        args.payload,
+        'create_doctor.payload',
+      );
       const result = await this.dependencies.doctorService.createDoctor(body, scope);
       return { actionId: input.actionId, tool: input.toolName, status: 'executed', result };
     }
 
-    const body = this.parseStrictToolArgs(createClinicBodySchema, args.payload, 'create_clinic.payload');
+    const body = this.parseStrictToolArgs(
+      createClinicBodySchema,
+      args.payload,
+      'create_clinic.payload',
+    );
     const result = await this.dependencies.clinicService.createClinic(body, scope);
     return { actionId: input.actionId, tool: input.toolName, status: 'executed', result };
   }
@@ -678,7 +758,12 @@ export class AssistantActionExecutor {
       payload,
       input.context.scope,
     );
-    await this.replaceAssistantSubOrdersIfNeeded(normalized.orderId, payload, result, input.context);
+    await this.replaceAssistantSubOrdersIfNeeded(
+      normalized.orderId,
+      payload,
+      result,
+      input.context,
+    );
     return {
       actionId: input.actionId,
       tool: input.toolName,
@@ -697,7 +782,11 @@ export class AssistantActionExecutor {
 
     if (input.toolName === 'update_patient') {
       const args = this.parseStrictToolArgs(updatePatientArgsSchema, input.payload, input.toolName);
-      const payload = this.parseStrictToolArgs(updatePatientBodySchema, args.payload, 'update_patient.payload');
+      const payload = this.parseStrictToolArgs(
+        updatePatientBodySchema,
+        args.payload,
+        'update_patient.payload',
+      );
       if (Object.keys(payload).length === 0) {
         throw new ApplicationError({
           message: 'Update patient payload must contain at least one field',
@@ -706,13 +795,22 @@ export class AssistantActionExecutor {
           expose: true,
         });
       }
-      const result = await this.dependencies.patientService.updatePatient(args.patientId, payload, scope);
+      const patientId = await this.resolvePatientId(args.patientId, args.patientName, scope);
+      const result = await this.dependencies.patientService.updatePatient(
+        patientId,
+        payload,
+        scope,
+      );
       return { actionId: input.actionId, tool: input.toolName, status: 'executed', result };
     }
 
     if (input.toolName === 'update_doctor') {
       const args = this.parseStrictToolArgs(updateDoctorArgsSchema, input.payload, input.toolName);
-      const payload = this.parseStrictToolArgs(updateDoctorBodySchema, args.payload, 'update_doctor.payload');
+      const payload = this.parseStrictToolArgs(
+        updateDoctorBodySchema,
+        args.payload,
+        'update_doctor.payload',
+      );
       if (Object.keys(payload).length === 0) {
         throw new ApplicationError({
           message: 'Update doctor payload must contain at least one field',
@@ -721,12 +819,17 @@ export class AssistantActionExecutor {
           expose: true,
         });
       }
-      const result = await this.dependencies.doctorService.updateDoctor(args.doctorId, payload, scope);
+      const doctorId = await this.resolveDoctorId(args.doctorId, args.doctorName, scope);
+      const result = await this.dependencies.doctorService.updateDoctor(doctorId, payload, scope);
       return { actionId: input.actionId, tool: input.toolName, status: 'executed', result };
     }
 
     const args = this.parseStrictToolArgs(updateClinicArgsSchema, input.payload, input.toolName);
-    const payload = this.parseStrictToolArgs(updateClinicBodySchema, args.payload, 'update_clinic.payload');
+    const payload = this.parseStrictToolArgs(
+      updateClinicBodySchema,
+      args.payload,
+      'update_clinic.payload',
+    );
     if (Object.keys(payload).length === 0) {
       throw new ApplicationError({
         message: 'Update clinic payload must contain at least one field',
@@ -735,7 +838,8 @@ export class AssistantActionExecutor {
         expose: true,
       });
     }
-    const result = await this.dependencies.clinicService.updateClinic(args.clinicId, payload, scope);
+    const clinicId = await this.resolveClinicId(args.clinicId, args.clinicName, scope);
+    const result = await this.dependencies.clinicService.updateClinic(clinicId, payload, scope);
     return { actionId: input.actionId, tool: input.toolName, status: 'executed', result };
   }
 
@@ -758,22 +862,63 @@ export class AssistantActionExecutor {
       return orderIdOrNumber;
     }
 
-    const candidates = await this.dependencies.ordersService.listOrders(
-      {
-        scope: context.scope,
-        search: orderIdOrNumber,
-        sortBy: 'createdAt',
-        sortDirection: 'desc',
-        statuses: [],
-        serviceIds: [],
-      },
-      { page: 1, pageSize: 20 },
+    const query = {
+      scope: context.scope,
+      search: orderIdOrNumber,
+      sortBy: 'createdAt' as const,
+      sortDirection: 'desc' as const,
+      statuses: [],
+      serviceIds: [],
+    };
+    const firstPage = await this.dependencies.ordersService.listOrders(query, {
+      page: 1,
+      pageSize: 100,
+    });
+    const candidateItems = [...firstPage.items];
+    for (let page = 2; page <= firstPage.meta.totalPages; page += 1) {
+      const nextPage = await this.dependencies.ordersService.listOrders(query, {
+        page,
+        pageSize: 100,
+      });
+      candidateItems.push(...nextPage.items);
+    }
+
+    const exactMatches = candidateItems.filter((item) =>
+      matchesBilingualEntityName(orderIdOrNumber, item.orderNumber),
     );
-    const exactMatch = candidates.items.find(
-      (item) => item.orderNumber.toLowerCase() === orderIdOrNumber.toLowerCase(),
+    if (exactMatches.length === 1) {
+      const [exactMatch] = exactMatches;
+      if (exactMatch) {
+        return exactMatch.id;
+      }
+    }
+    if (exactMatches.length > 1) {
+      throw new ApplicationError({
+        message: `Multiple orders match '${orderIdOrNumber}'. Please provide orderId.`,
+        statusCode: 400,
+        code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+        expose: true,
+      });
+    }
+
+    const patientMatches = candidateItems.filter(
+      (item) =>
+        typeof item.patientName === 'string' &&
+        matchesBilingualEntityName(orderIdOrNumber, item.patientName),
     );
-    if (exactMatch) {
-      return exactMatch.id;
+    if (patientMatches.length === 1) {
+      const [patientMatch] = patientMatches;
+      if (patientMatch) {
+        return patientMatch.id;
+      }
+    }
+    if (patientMatches.length > 1) {
+      throw new ApplicationError({
+        message: `Multiple orders match patient '${orderIdOrNumber}'. Please provide orderId.`,
+        statusCode: 400,
+        code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+        expose: true,
+      });
     }
 
     throw new ApplicationError({
@@ -826,14 +971,20 @@ export class AssistantActionExecutor {
         creationData: z
           .object({
             services: z.array(
-              z.object({
-                serviceId: z.string().trim().min(1),
-                serviceDetails: z.record(z.string(), z.string()).default({}),
-                serviceForm: z.record(z.string(), z.string()).default({}),
-                selectedTeeth: z.array(z.coerce.number().int().min(1).max(99)).default([]),
-                scanRequirements: z.array(z.string()).default([]),
-                fileReferences: z.array(z.string()).default([]),
-              }),
+              z
+                .object({
+                  serviceId: z.string().trim().min(1).optional(),
+                  serviceName: z.string().trim().min(1).optional(),
+                  serviceDetails: z.record(z.string(), z.string()).default({}),
+                  serviceForm: z.record(z.string(), z.string()).default({}),
+                  selectedTeeth: z.array(z.coerce.number().int().min(1).max(99)).default([]),
+                  scanRequirements: z.array(z.string()).default([]),
+                  fileReferences: z.array(z.string()).default([]),
+                })
+                .refine(
+                  (service) => service.serviceId !== undefined || service.serviceName !== undefined,
+                  { message: 'serviceId or serviceName is required' },
+                ),
             ),
             communication: z
               .object({
@@ -854,23 +1005,27 @@ export class AssistantActionExecutor {
       .strict();
 
     const parsed = this.parseStrictToolArgs(schema, payload, 'create_order.payload');
+    const serviceRows = await this.resolveAssistantServiceRows(
+      parsed.creationData?.services,
+      context.tenantId,
+    );
     const resolvedPatientId = await this.resolvePatientId(
       parsed.patientId,
       parsed.patientName,
       context.scope,
-      { allowMissingByName: true },
     );
-    const patient =
-      resolvedPatientId !== null
-        ? await this.dependencies.patientService.getPatientById(resolvedPatientId, context.scope)
-        : null;
-    const patientDoctorId = patient && typeof patient.doctorId === 'string' ? patient.doctorId.trim() : '';
-    const patientClinicId = patient && typeof patient.clinicId === 'string' ? patient.clinicId.trim() : '';
-    const doctorId = await this.resolveDoctorId(
-      parsed.doctorId ?? (parsed.doctorName ? undefined : patientDoctorId),
-      parsed.doctorName,
+    const patient = await this.dependencies.patientService.getPatientById(
+      resolvedPatientId,
       context.scope,
     );
+    const patientDoctorId =
+      patient && typeof patient.doctorId === 'string' ? patient.doctorId.trim() : '';
+    const patientClinicId =
+      patient && typeof patient.clinicId === 'string' ? patient.clinicId.trim() : '';
+    const doctorId =
+      parsed.doctorId !== undefined || parsed.doctorName !== undefined
+        ? await this.resolveDoctorId(parsed.doctorId, parsed.doctorName, context.scope)
+        : patientDoctorId || (await this.resolveDoctorId(undefined, undefined, context.scope));
     const doctor = await this.dependencies.doctorService.getDoctorById(doctorId, context.scope);
     const doctorClinicId =
       typeof (doctor as { clinicId?: unknown }).clinicId === 'string'
@@ -881,21 +1036,13 @@ export class AssistantActionExecutor {
       requestedClinicId && requestedClinicId.length > 0
         ? requestedClinicId
         : doctorClinicId || patientClinicId;
-    const clinicId = await this.resolveClinicId(
-      preferredClinicId,
-      parsed.clinicName,
-      context.scope,
-    );
+    const clinicId =
+      parsed.clinicId !== undefined || parsed.clinicName !== undefined
+        ? await this.resolveClinicId(parsed.clinicId, parsed.clinicName, context.scope)
+        : preferredClinicId || (await this.resolveClinicId(undefined, undefined, context.scope));
     await this.dependencies.clinicService.getClinicById(clinicId, context.scope);
-    const patientId =
-      resolvedPatientId ??
-      (await this.createAssistantPatientFromName({
-        patientName: parsed.patientName,
-        doctorId,
-        clinicId,
-        scope: context.scope,
-      }));
-    const defaults = await this.deriveAssistantOrderDefaults(parsed.creationData?.services, context.tenantId);
+    const patientId = resolvedPatientId;
+    const defaults = await this.deriveAssistantOrderDefaults(serviceRows, context.tenantId);
     const missingFields: string[] = [];
     if (!parsed.dueDate) missingFields.push('dueDate');
     if (!parsed.restoration && !defaults.restoration) missingFields.push('restoration');
@@ -917,6 +1064,14 @@ export class AssistantActionExecutor {
       patientId,
       doctorId,
       clinicId,
+      ...(parsed.creationData
+        ? {
+            creationData: {
+              ...parsed.creationData,
+              services: serviceRows,
+            },
+          }
+        : {}),
       orderNumber: parsed.orderNumber ?? this.buildAssistantOrderNumber(now),
       restoration: parsed.restoration ?? defaults.restoration,
       arch: parsed.arch ?? defaults.arch,
@@ -934,6 +1089,133 @@ export class AssistantActionExecutor {
       .toString()
       .padStart(6, '0');
     return `AI-${random}`;
+  }
+
+  private async resolveAssistantServiceRows(
+    services: AssistantServiceRowInput[] | undefined,
+    tenantId: string,
+  ): Promise<AssistantServiceRow[]> {
+    if (!services || services.length === 0) {
+      return [];
+    }
+
+    if (typeof this.dependencies.catalogRepository.listServices !== 'function') {
+      return services.map((service) => {
+        if (service.serviceId === undefined) {
+          throw new ApplicationError({
+            message: `Service '${service.serviceName ?? ''}' was not found`,
+            statusCode: 404,
+            code: APPLICATION_ERROR_CODES.NOT_FOUND,
+            expose: true,
+          });
+        }
+        return {
+          serviceId: service.serviceId,
+          serviceDetails: service.serviceDetails,
+          serviceForm: service.serviceForm,
+          selectedTeeth: service.selectedTeeth,
+          scanRequirements: service.scanRequirements,
+          fileReferences: service.fileReferences,
+        };
+      });
+    }
+
+    const catalog = await this.dependencies.catalogRepository.listServices(tenantId);
+    return services.map((service) => {
+      const lookupValue = service.serviceId ?? service.serviceName ?? '';
+      if (service.serviceId !== undefined && catalog.length === 0) {
+        return {
+          serviceId: service.serviceId,
+          serviceDetails: service.serviceDetails,
+          serviceForm: service.serviceForm,
+          selectedTeeth: service.selectedTeeth,
+          scanRequirements: service.scanRequirements,
+          fileReferences: service.fileReferences,
+        };
+      }
+      const idMatch =
+        service.serviceId !== undefined
+          ? catalog.filter((catalogService) => catalogService.serviceId === service.serviceId)
+          : [];
+      const matches =
+        idMatch.length > 0
+          ? idMatch
+          : catalog.filter(
+              (catalogService) =>
+                matchesBilingualEntityName(lookupValue, catalogService.serviceId) ||
+                matchesBilingualEntityName(lookupValue, catalogService.name),
+            );
+
+      if (matches.length === 0) {
+        throw new ApplicationError({
+          message: `Service '${lookupValue}' was not found`,
+          statusCode: 404,
+          code: APPLICATION_ERROR_CODES.NOT_FOUND,
+          expose: true,
+        });
+      }
+      if (matches.length > 1) {
+        throw new ApplicationError({
+          message: `Multiple services match '${lookupValue}'. Please provide serviceId.`,
+          statusCode: 400,
+          code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+          expose: true,
+        });
+      }
+
+      const [match] = matches;
+      if (!match) {
+        throw new ApplicationError({
+          message: `Service '${lookupValue}' was not found`,
+          statusCode: 404,
+          code: APPLICATION_ERROR_CODES.NOT_FOUND,
+          expose: true,
+        });
+      }
+      return {
+        serviceId: match.serviceId,
+        serviceDetails: service.serviceDetails,
+        serviceForm: service.serviceForm,
+        selectedTeeth: service.selectedTeeth,
+        scanRequirements: service.scanRequirements,
+        fileReferences: service.fileReferences,
+      };
+    });
+  }
+
+  private async resolveAssistantServiceIds(
+    serviceReferences: string[],
+    tenantId: string,
+  ): Promise<string[]> {
+    if (serviceReferences.length === 0) {
+      return [];
+    }
+
+    if (typeof this.dependencies.catalogRepository.listServices !== 'function') {
+      return serviceReferences;
+    }
+
+    const catalog = await this.dependencies.catalogRepository.listServices(tenantId);
+    if (catalog.length === 0) {
+      return serviceReferences;
+    }
+
+    return serviceReferences.map((reference) => {
+      const matches = catalog.filter(
+        (service) =>
+          matchesBilingualEntityName(reference, service.serviceId) ||
+          matchesBilingualEntityName(reference, service.name),
+      );
+      if (matches.length > 1) {
+        throw new ApplicationError({
+          message: `Multiple services match '${reference}'. Please provide serviceId.`,
+          statusCode: 400,
+          code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+          expose: true,
+        });
+      }
+      return matches[0]?.serviceId ?? reference;
+    });
   }
 
   private async deriveAssistantOrderDefaults(
@@ -1032,7 +1314,7 @@ export class AssistantActionExecutor {
 
   private async replaceAssistantSubOrdersIfNeeded(
     orderId: string,
-    payload: ReturnType<AssistantActionExecutor['parseUpdateOrderPayload']>,
+    payload: OrderUpdatePayload,
     updatedOrder: {
       priority: 'Low' | 'Normal' | 'High' | 'Urgent';
       dueDate: string;
@@ -1126,16 +1408,21 @@ export class AssistantActionExecutor {
     patientId: string | undefined,
     patientName: string | undefined,
     scope: DataVisibilityScope,
-    options?: { allowMissingByName?: boolean },
-  ): Promise<string | null> {
-    if (patientId && objectIdRegex.test(patientId)) {
-      return patientId;
+  ): Promise<string> {
+    if (patientId !== undefined) {
+      if (objectIdRegex.test(patientId)) {
+        return patientId;
+      }
+      throw new ApplicationError({
+        message: `Invalid patientId '${patientId}'`,
+        statusCode: 400,
+        code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+        expose: true,
+      });
     }
     if (!patientName) {
       throw new ApplicationError({
-        message: patientId
-          ? 'create_order requires valid patientId or patientName'
-          : 'create_order requires patientId or patientName',
+        message: 'create_order requires patientId or patientName',
         statusCode: 400,
         code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
         expose: true,
@@ -1152,9 +1439,7 @@ export class AssistantActionExecutor {
       },
       { page: 1, pageSize: 100 },
     );
-    const exact = result.items.filter(
-      (item) => item.name.trim().toLowerCase() === patientName.trim().toLowerCase(),
-    );
+    const exact = result.items.filter((item) => matchesBilingualEntityName(patientName, item.name));
     if (exact.length === 1) {
       const [match] = exact;
       if (match) {
@@ -1169,9 +1454,6 @@ export class AssistantActionExecutor {
         expose: true,
       });
     }
-    if (options?.allowMissingByName) {
-      return null;
-    }
     throw new ApplicationError({
       message: `Patient '${patientName}' was not found`,
       statusCode: 404,
@@ -1180,49 +1462,21 @@ export class AssistantActionExecutor {
     });
   }
 
-  private async createAssistantPatientFromName(input: {
-    patientName: string | undefined;
-    doctorId: string;
-    clinicId: string;
-    scope: DataVisibilityScope;
-  }): Promise<string> {
-    const name = input.patientName?.trim();
-    if (!name) {
-      throw new ApplicationError({
-        message: 'create_order requires patientId or patientName',
-        statusCode: 400,
-        code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
-        expose: true,
-      });
-    }
-
-    const now = new Date();
-    const nonce = `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
-    const created = await this.dependencies.patientService.createPatient(
-      {
-        name,
-        dob: new Date('1990-01-01T00:00:00.000Z'),
-        gender: 'M',
-        phone: `ai-${nonce}`,
-        email: `ai-${nonce}@assistant.local`,
-        clinicId: input.clinicId,
-        doctorId: input.doctorId,
-        status: 'Active',
-        lastVisit: now,
-      },
-      input.scope,
-    );
-
-    return created.id;
-  }
-
   private async resolveDoctorId(
     doctorId: string | undefined,
     doctorName: string | undefined,
     scope: DataVisibilityScope,
   ): Promise<string> {
-    if (doctorId && objectIdRegex.test(doctorId)) {
-      return doctorId;
+    if (doctorId !== undefined) {
+      if (objectIdRegex.test(doctorId)) {
+        return doctorId;
+      }
+      throw new ApplicationError({
+        message: `Invalid doctorId '${doctorId}'`,
+        statusCode: 400,
+        code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+        expose: true,
+      });
     }
     if (doctorName) {
       const result = await this.dependencies.doctorService.listDoctors(
@@ -1235,8 +1489,8 @@ export class AssistantActionExecutor {
         },
         { page: 1, pageSize: 100 },
       );
-      const exact = result.items.filter(
-        (item) => item.name.trim().toLowerCase() === doctorName.trim().toLowerCase(),
+      const exact = result.items.filter((item) =>
+        matchesBilingualEntityName(doctorName, item.name),
       );
       if (exact.length === 1) {
         const [match] = exact;
@@ -1259,14 +1513,6 @@ export class AssistantActionExecutor {
         expose: true,
       });
     }
-    if (doctorId) {
-      throw new ApplicationError({
-        message: 'create_order requires valid doctorId or doctorName',
-        statusCode: 400,
-        code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
-        expose: true,
-      });
-    }
     throw new ApplicationError({
       message: 'create_order requires doctorId or doctorName',
       statusCode: 400,
@@ -1280,8 +1526,16 @@ export class AssistantActionExecutor {
     clinicName: string | undefined,
     scope: DataVisibilityScope,
   ): Promise<string> {
-    if (clinicId && objectIdRegex.test(clinicId)) {
-      return clinicId;
+    if (clinicId !== undefined) {
+      if (objectIdRegex.test(clinicId)) {
+        return clinicId;
+      }
+      throw new ApplicationError({
+        message: `Invalid clinicId '${clinicId}'`,
+        statusCode: 400,
+        code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+        expose: true,
+      });
     }
     if (clinicName) {
       const result = await this.dependencies.clinicService.listClinics(
@@ -1294,8 +1548,8 @@ export class AssistantActionExecutor {
         },
         { page: 1, pageSize: 100 },
       );
-      const exact = result.items.filter(
-        (item) => item.name.trim().toLowerCase() === clinicName.trim().toLowerCase(),
+      const exact = result.items.filter((item) =>
+        matchesBilingualEntityName(clinicName, item.name),
       );
       if (exact.length === 1) {
         const [match] = exact;
@@ -1318,14 +1572,6 @@ export class AssistantActionExecutor {
         expose: true,
       });
     }
-    if (clinicId) {
-      throw new ApplicationError({
-        message: 'create_order requires valid clinicId or clinicName',
-        statusCode: 400,
-        code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
-        expose: true,
-      });
-    }
     throw new ApplicationError({
       message: 'create_order requires clinicId or clinicName',
       statusCode: 400,
@@ -1339,8 +1585,11 @@ export class AssistantActionExecutor {
       .object({
         orderNumber: z.string().trim().min(1).optional(),
         patientId: z.string().trim().min(1).optional(),
+        patientName: z.string().trim().min(1).optional(),
         doctorId: z.string().trim().min(1).optional(),
+        doctorName: z.string().trim().min(1).optional(),
         clinicId: z.string().trim().min(1).optional(),
+        clinicName: z.string().trim().min(1).optional(),
         scanCenterId: z.string().trim().min(1).optional(),
         status: z.enum(ORDER_STATUS_VALUES).optional(),
         priority: z.enum(['Low', 'Normal', 'High', 'Urgent']).optional(),
@@ -1373,14 +1622,20 @@ export class AssistantActionExecutor {
         creationData: z
           .object({
             services: z.array(
-              z.object({
-                serviceId: z.string().trim().min(1),
-                serviceDetails: z.record(z.string(), z.string()).default({}),
-                serviceForm: z.record(z.string(), z.string()).default({}),
-                selectedTeeth: z.array(z.coerce.number().int().min(1).max(99)).default([]),
-                scanRequirements: z.array(z.string()).default([]),
-                fileReferences: z.array(z.string()).default([]),
-              }),
+              z
+                .object({
+                  serviceId: z.string().trim().min(1).optional(),
+                  serviceName: z.string().trim().min(1).optional(),
+                  serviceDetails: z.record(z.string(), z.string()).default({}),
+                  serviceForm: z.record(z.string(), z.string()).default({}),
+                  selectedTeeth: z.array(z.coerce.number().int().min(1).max(99)).default([]),
+                  scanRequirements: z.array(z.string()).default([]),
+                  fileReferences: z.array(z.string()).default([]),
+                })
+                .refine(
+                  (service) => service.serviceId !== undefined || service.serviceName !== undefined,
+                  { message: 'serviceId or serviceName is required' },
+                ),
             ),
             communication: z
               .object({
@@ -1437,7 +1692,15 @@ export class AssistantActionExecutor {
     payload: z.infer<typeof createPatientAssistantPayloadSchema>,
     scope: DataVisibilityScope,
   ): Promise<{ clinicId: string }> {
-    if (payload.clinicId) {
+    if (payload.clinicId !== undefined) {
+      if (!objectIdRegex.test(payload.clinicId)) {
+        throw new ApplicationError({
+          message: `Invalid clinicId '${payload.clinicId}'`,
+          statusCode: 400,
+          code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+          expose: true,
+        });
+      }
       return { clinicId: payload.clinicId };
     }
 
@@ -1460,8 +1723,8 @@ export class AssistantActionExecutor {
       },
       { page: 1, pageSize: 100 },
     );
-    const exactMatches = clinics.items.filter(
-      (clinic) => clinic.name.toLowerCase() === payload.clinicName?.toLowerCase(),
+    const exactMatches = clinics.items.filter((clinic) =>
+      matchesBilingualEntityName(payload.clinicName ?? '', clinic.name),
     );
     if (exactMatches.length === 1) {
       const [exact] = exactMatches;
@@ -1494,7 +1757,15 @@ export class AssistantActionExecutor {
     clinicId: string,
     scope: DataVisibilityScope,
   ): Promise<{ doctorId: string }> {
-    if (payload.doctorId) {
+    if (payload.doctorId !== undefined) {
+      if (!objectIdRegex.test(payload.doctorId)) {
+        throw new ApplicationError({
+          message: `Invalid doctorId '${payload.doctorId}'`,
+          statusCode: 400,
+          code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+          expose: true,
+        });
+      }
       return { doctorId: payload.doctorId };
     }
 
@@ -1518,8 +1789,8 @@ export class AssistantActionExecutor {
       },
       { page: 1, pageSize: 100 },
     );
-    const exactMatches = doctors.items.filter(
-      (doctor) => doctor.name.toLowerCase() === payload.doctorName?.toLowerCase(),
+    const exactMatches = doctors.items.filter((doctor) =>
+      matchesBilingualEntityName(payload.doctorName ?? '', doctor.name),
     );
     if (exactMatches.length === 1) {
       const [exact] = exactMatches;
@@ -1577,11 +1848,55 @@ export class AssistantActionExecutor {
   private async normalizeUpdateOrderArgs(
     payload: Record<string, unknown>,
     context: AssistantExecutionContext,
-  ): Promise<{ orderId: string; payload: ReturnType<AssistantActionExecutor['parseUpdateOrderPayload']> }> {
+  ): Promise<{ orderId: string; payload: OrderUpdatePayload }> {
     const args = this.parseStrictToolArgs(updateOrderArgsSchema, payload, 'update_order');
     const resolvedOrderId = await this.resolveOrderIdForDetails(args.orderId, context);
     const parsedPayload = this.parseUpdateOrderPayload(args.payload);
-    return { orderId: resolvedOrderId, payload: parsedPayload };
+    const {
+      patientName: _patientName,
+      doctorName: _doctorName,
+      clinicName: _clinicName,
+      creationData: parsedCreationData,
+      ...orderFields
+    } = parsedPayload;
+    const normalizedPayload: OrderUpdatePayload = { ...orderFields };
+
+    if (parsedPayload.patientId !== undefined || parsedPayload.patientName !== undefined) {
+      const patientId = await this.resolvePatientId(
+        parsedPayload.patientId,
+        parsedPayload.patientName,
+        context.scope,
+      );
+      normalizedPayload.patientId = patientId;
+    }
+    if (parsedPayload.doctorId !== undefined || parsedPayload.doctorName !== undefined) {
+      normalizedPayload.doctorId = await this.resolveDoctorId(
+        parsedPayload.doctorId,
+        parsedPayload.doctorName,
+        context.scope,
+      );
+    }
+    if (parsedPayload.clinicId !== undefined || parsedPayload.clinicName !== undefined) {
+      normalizedPayload.clinicId = await this.resolveClinicId(
+        parsedPayload.clinicId,
+        parsedPayload.clinicName,
+        context.scope,
+      );
+    }
+    if (parsedCreationData) {
+      normalizedPayload.creationData = {
+        ...parsedCreationData,
+        services: await this.resolveAssistantServiceRows(
+          parsedCreationData.services,
+          context.tenantId,
+        ),
+      };
+    }
+
+    return {
+      orderId: resolvedOrderId,
+      payload: normalizedPayload,
+    };
   }
 }
 

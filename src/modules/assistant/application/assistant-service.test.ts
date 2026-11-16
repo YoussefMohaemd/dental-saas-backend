@@ -10,7 +10,7 @@ import {
   InMemoryAssistantConversationRepository,
   InMemoryAssistantPendingActionRepository,
 } from '../infrastructure/persistence/in-memory-assistant-repositories';
-import { AssistantService } from './assistant-service';
+import { AssistantService, buildSystemPrompt } from './assistant-service';
 
 function principal(roles: string[]) {
   return {
@@ -31,6 +31,28 @@ function principal(roles: string[]) {
 }
 
 describe('AssistantService', () => {
+  it('uses native function-calling guidance for Gemini without the JSON-only contract', () => {
+    const prompt = buildSystemPrompt(new Date('2026-01-01T00:00:00.000Z'), 'gemini');
+
+    expect(prompt).toContain('Use native function calling');
+    expect(prompt).not.toContain('Return strict JSON object');
+  });
+
+  it('keeps the strict JSON planner contract for text-based providers', () => {
+    const prompt = buildSystemPrompt(new Date('2026-01-01T00:00:00.000Z'), 'vllm');
+
+    expect(prompt).toContain('Return strict JSON object');
+    expect(prompt).not.toContain('Use native function calling');
+  });
+
+  it('guides bilingual entity resolution without rewriting names or notes', () => {
+    const prompt = buildSystemPrompt(new Date('2026-01-01T00:00:00.000Z'), 'gemini');
+
+    expect(prompt).toContain('Update tools also accept the corresponding name field');
+    expect(prompt).toContain('Preserve user-provided entity names and free-form notes exactly');
+    expect(prompt).toContain('never invent ids');
+  });
+
   it('rejects create plans when create tools are disabled', async () => {
     const service = AssistantService.createForTests({
       createToolsEnabled: false,
@@ -606,18 +628,30 @@ describe('AssistantService', () => {
         create: async () => undefined,
       },
       ordersService: {
-        listOrders: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        listOrders: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+        }),
         getOrderById: async () => ({}),
       } as never,
       patientService: {
-        listPatients: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        listPatients: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+        }),
         getPatientById: async () => ({}),
       } as never,
       doctorService: {
-        listDoctors: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        listDoctors: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+        }),
       } as never,
       clinicService: {
-        listClinics: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        listClinics: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+        }),
       } as never,
       catalogRepository: {
         listServices: async () => [
@@ -738,14 +772,23 @@ describe('AssistantService', () => {
         getOrderById: async () => ({}),
       } as never,
       patientService: {
-        listPatients: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        listPatients: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+        }),
         getPatientById: async () => ({}),
       } as never,
       doctorService: {
-        listDoctors: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        listDoctors: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+        }),
       } as never,
       clinicService: {
-        listClinics: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        listClinics: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+        }),
       } as never,
       catalogRepository: {
         listServices: async () => [],
@@ -861,18 +904,30 @@ describe('AssistantService', () => {
         create: async () => undefined,
       },
       ordersService: {
-        listOrders: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        listOrders: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+        }),
         getOrderById: async () => ({}),
       } as never,
       patientService: {
-        listPatients: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        listPatients: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+        }),
         getPatientById: async () => ({}),
       } as never,
       doctorService: {
-        listDoctors: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        listDoctors: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+        }),
       } as never,
       clinicService: {
-        listClinics: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        listClinics: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+        }),
       } as never,
       catalogRepository: {
         listServices: async () => [],
@@ -899,7 +954,8 @@ describe('AssistantService', () => {
 
     expect(response.result.type).toBe('text');
     expect(provider.completePlan).toHaveBeenCalledTimes(2);
-    const secondCallArgs = provider.completePlan.mock.calls[1]?.[0] as { history?: unknown[] } | undefined;
+    const secondCallArgs = provider.completePlan.mock.calls[1]?.[0] as
+      { history?: unknown[] } | undefined;
     expect(secondCallArgs?.history).toEqual([]);
   });
 
@@ -979,14 +1035,23 @@ describe('AssistantService', () => {
         updateOrder,
       } as never,
       patientService: {
-        listPatients: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        listPatients: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+        }),
         getPatientById: async () => ({}),
       } as never,
       doctorService: {
-        listDoctors: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        listDoctors: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+        }),
       } as never,
       clinicService: {
-        listClinics: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        listClinics: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+        }),
       } as never,
       catalogRepository: {
         listServices: async () => [],
@@ -1091,18 +1156,30 @@ describe('AssistantService', () => {
         create: async () => undefined,
       },
       ordersService: {
-        listOrders: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        listOrders: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+        }),
         getOrderById: async () => ({}),
       } as never,
       patientService: {
-        listPatients: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        listPatients: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+        }),
         getPatientById: async () => ({}),
       } as never,
       doctorService: {
-        listDoctors: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        listDoctors: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+        }),
       } as never,
       clinicService: {
-        listClinics: async () => ({ items: [], meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 } }),
+        listClinics: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+        }),
       } as never,
       catalogRepository: {
         listServices: async () => [
@@ -1133,7 +1210,7 @@ describe('AssistantService', () => {
 
     const response = await service.postMessage(principal(['staff']), {
       conversationId: conversation.id,
-      content: 'Show the price of every service.',
+      content: 'ما أسعار الخدمات؟',
     });
 
     expect(response.result.type).toBe('text');
@@ -1144,6 +1221,7 @@ describe('AssistantService', () => {
     expect(response.result.executions.map((execution) => execution.tool)).toContain(
       'list_service_prices',
     );
+    expect(response.result.text).toContain('المساعد مشغول');
   });
 
   it('does not force overdue search when model returns no actions', async () => {

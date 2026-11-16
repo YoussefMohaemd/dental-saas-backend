@@ -46,6 +46,7 @@ import { type OrdersService } from '../../orders/application/orders-service';
 import { type PatientService } from '../../patients/application/patient-service';
 import { type DoctorService } from '../../doctors/application/doctor-service';
 import { type ClinicService } from '../../clinics/application/clinic-service';
+import { normalizeArabic } from '../../../shared/application/text/arabic-normalize';
 
 interface AssistantOptions {
   maxActionsPerMessage: number;
@@ -128,7 +129,8 @@ export interface AssistantMessageResultConfirmation {
   verification: AssistantVerificationResult;
 }
 
-export type AssistantMessageResult = AssistantMessageResultText | AssistantMessageResultConfirmation;
+export type AssistantMessageResult =
+  AssistantMessageResultText | AssistantMessageResultConfirmation;
 
 export class AssistantService {
   public constructor(private readonly dependencies: AssistantServiceDependencies) {}
@@ -433,15 +435,22 @@ export class AssistantService {
       });
     }
 
-    const executions = await this.dependencies.actionExecutor.executeReadActions(normalizedActions, toolByActionId, {
-      scope: principal.scope,
-      tenantId: principal.tenantId,
-    });
+    const executions = await this.dependencies.actionExecutor.executeReadActions(
+      normalizedActions,
+      toolByActionId,
+      {
+        scope: principal.scope,
+        tenantId: principal.tenantId,
+      },
+    );
     const verification = verifyReply({
       replyText: llmCompletion.reply,
       executions,
     });
-    if (verification.status === 'warnings' && normalizedActions.some((action) => toolByActionId.get(action.id)?.operationType === 'write')) {
+    if (
+      verification.status === 'warnings' &&
+      normalizedActions.some((action) => toolByActionId.get(action.id)?.operationType === 'write')
+    ) {
       throw new ApplicationError({
         message: 'The proposed write contains values that could not be verified from trusted data',
         statusCode: 422,
@@ -590,7 +599,7 @@ export class AssistantService {
         status: execution.status,
         summary:
           execution.status === 'failed'
-            ? execution.error ?? 'Tool execution failed'
+            ? (execution.error ?? 'Tool execution failed')
             : summarizeToolResult(execution.result),
       })),
       ...(input.error
@@ -611,7 +620,7 @@ export class AssistantService {
     const request: AssistantLlmCompletionRequest = {
       userMessage: content,
       history,
-      systemPrompt: buildSystemPrompt(new Date()),
+      systemPrompt: buildSystemPrompt(new Date(), this.dependencies.provider.name),
       tools: this.dependencies.toolRegistry.list(),
       languageHint: detectLanguageHint(content),
     };
@@ -652,8 +661,7 @@ export class AssistantService {
       const fallbackActions = buildCatalogFallbackActions(content);
       if (fallbackActions.length > 0 && isRateLimitError(error)) {
         return {
-          reply:
-            'The assistant is currently busy, so I fetched the catalog data directly.',
+          reply: buildCatalogFallbackReply(detectLanguageHint(content)),
           actions: fallbackActions,
         };
       }
@@ -707,10 +715,7 @@ export class AssistantService {
       confirmationToken: input.confirmationToken,
     });
 
-    if (
-      !this.dependencies.createToolsEnabled &&
-      confirmedAction.toolName.startsWith('create_')
-    ) {
+    if (!this.dependencies.createToolsEnabled && confirmedAction.toolName.startsWith('create_')) {
       throw new ApplicationError({
         message: 'Assistant create tools are disabled',
         statusCode: 403,
@@ -962,14 +967,14 @@ function buildReadOnlyFallbackText(actions: AssistantPlanAction[]): string {
 }
 
 function buildCatalogFallbackActions(content: string): AssistantPlanAction[] {
-  const normalized = content.toLowerCase();
+  const normalized = normalizeArabic(content);
   const isOperationalWritePrompt =
-    /(create|update|change|add|edit|new)\s+(order|patient|doctor|clinic|workflow|scan)/u.test(normalized) ||
-    /(انشاء|إنشاء|تحديث|تعديل|اضافة|إضافة|طلب|مريض|دكتور|عيادة)/u.test(normalized);
-  const asksServicePricing =
-    /(pricing|prices?|price list|cost|fees?|الاسعار|الأسعار|السعر)/u.test(
+    /(create|update|change|add|edit|new)\s+(order|patient|doctor|clinic|workflow|scan)/u.test(
       normalized,
-    );
+    ) || /(انشاء|إنشاء|تحديث|تعديل|اضافة|إضافة|طلب|مريض|دكتور|عيادة)/u.test(normalized);
+  const asksServicePricing = /(pricing|prices?|price list|cost|fees?|(?:ال)?اسعار|(?:ال)?سعر)/u.test(
+    normalized,
+  );
   const asksServiceCatalog =
     /(services?|service catalog|catalog|offerings|الخدمات|الخدمه|الخدمة)/u.test(normalized);
   const asksCompanyProfile =
@@ -1019,6 +1024,16 @@ function buildCatalogFallbackActions(content: string): AssistantPlanAction[] {
   return actions;
 }
 
+function buildCatalogFallbackReply(languageHint: 'ar' | 'en' | 'mixed'): string {
+  if (languageHint === 'ar') {
+    return 'المساعد مشغول حاليًا، لذلك جلبت بيانات الكتالوج مباشرةً.';
+  }
+  if (languageHint === 'mixed') {
+    return 'The assistant is currently busy، لذلك جلبت بيانات الكتالوج مباشرةً.';
+  }
+  return 'The assistant is currently busy, so I fetched the catalog data directly.';
+}
+
 function detectLanguageHint(content: string): 'ar' | 'en' | 'mixed' {
   const hasArabic = /[\u0600-\u06FF]/u.test(content);
   const hasEnglish = /[A-Za-z]/u.test(content);
@@ -1041,14 +1056,15 @@ function buildHistory(
   }));
 }
 
-function buildSystemPrompt(now: Date): string {
+export function buildSystemPrompt(now: Date, provider: AssistantLlmProvider['name']): string {
   return [
     `Current date/time (UTC): ${now.toISOString()}. Resolve relative dates such as "today", "tomorrow" or "next week" from it.`,
     'You can see the previous messages of this conversation. Use them to complete a request across several turns.',
     'NEVER guess ids, order numbers or required fields. If a required field is missing, ask the user for it in "reply" and return an empty actions array.',
-    'To turn a name into an id, you may call search tools, or pass patientName/doctorName/clinicName in create_order and let backend resolve them.',
+    'To turn a name into an id, you may call search tools, or pass patientName/doctorName/clinicName in create_order and let backend resolve them. Update tools also accept the corresponding name field when an id is unavailable.',
     'You are the Dental SaaS assistant for a dental laboratory platform.',
     'Reply in the same language the user writes in (Arabic, English or mixed).',
+    'Preserve user-provided entity names and free-form notes exactly; do not translate or rewrite them. Use canonical English tool enum values and service ids only when the catalog provides them, and never invent ids.',
     'Never execute delete operations.',
     'Respect authenticated user capabilities and tenant scope.',
     'NEVER invent company facts, services, prices, orders, patients, doctors or clinics. All of them come from tools.',
@@ -1061,14 +1077,18 @@ function buildSystemPrompt(now: Date): string {
     'When creating a patient, you may pass clinicName/doctorName if ids are unavailable; the system resolves exact existing matches only and returns validation errors for missing or ambiguous matches.',
     'The system appends the tool results to your reply automatically, so keep "reply" to one short sentence and do not repeat or retype the data.',
     'If the request needs no tool (greeting, general help), answer briefly in "reply" with an empty actions array.',
-    'Return strict JSON object: {"reply":string,"actions":[{"id":string,"tool":string,"arguments":object,"dependsOn":string[]}]}',
+    ...(provider === 'gemini'
+      ? [
+          'Use native function calling for every tool action; do not write planner JSON as plain text.',
+        ]
+      : [
+          'Return strict JSON object: {"reply":string,"actions":[{"id":string,"tool":string,"arguments":object,"dependsOn":string[]}]}',
+        ]),
     'Do not include chain of thought.',
   ].join('\n');
 }
 
-function buildWriteConfirmationText(
-  execution: AssistantActionExecutionSummary,
-): string {
+function buildWriteConfirmationText(execution: AssistantActionExecutionSummary): string {
   if (execution.tool === 'create_patient') {
     const result = execution.result as
       | {

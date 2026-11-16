@@ -13,6 +13,7 @@ import { ClinicModel } from '../../../shared/infrastructure/persistence/mongoose
 import { DoctorModel } from '../../../shared/infrastructure/persistence/mongoose/models/doctor.model';
 import { OrderModel } from '../../../shared/infrastructure/persistence/mongoose/models/order.model';
 import { PatientModel } from '../../../shared/infrastructure/persistence/mongoose/models/patient.model';
+import { buildBilingualSearchRegexes } from '../../../shared/application/text/bilingual-search';
 
 const clinicSortFields: Record<ClinicListQuery['sortBy'], string> = {
   name: 'name',
@@ -45,16 +46,26 @@ export class MongooseClinicRepository implements ClinicRepository {
   }
 
   public async list(query: ClinicListQuery): Promise<ClinicListResult> {
+    const searchRegexes =
+      query.search === undefined
+        ? []
+        : buildBilingualSearchRegexes(query.search);
+    const effectiveSearchRegexes =
+      searchRegexes.length > 0
+        ? searchRegexes
+        : query.search === undefined
+          ? []
+          : [new RegExp(escapeRegExp(query.search), 'i')];
     const filter: FilterQuery<ClinicRecord> = {
       tenantId: query.scope.tenantId,
       ...(query.search !== undefined
         ? {
-            $or: [
-              { name: new RegExp(escapeRegExp(query.search), 'i') },
-              { city: new RegExp(escapeRegExp(query.search), 'i') },
-              { accountManager: new RegExp(escapeRegExp(query.search), 'i') },
-              { email: new RegExp(escapeRegExp(query.search), 'i') },
-            ],
+            $or: effectiveSearchRegexes.flatMap((regex) => [
+              { name: regex },
+              { city: regex },
+              { accountManager: regex },
+              { email: regex },
+            ]),
           }
         : {}),
       ...(query.statuses.length > 0 ? { status: { $in: query.statuses } } : {}),
