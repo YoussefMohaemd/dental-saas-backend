@@ -109,6 +109,9 @@ const paginationSchema = z.object({
 const searchOrdersArgsSchema = z
   .object({
     search: z.string().trim().min(1).optional(),
+    patientName: z.string().trim().min(1).optional(),
+    doctorName: z.string().trim().min(1).optional(),
+    clinicName: z.string().trim().min(1).optional(),
     page: z.coerce.number().int().min(1).optional(),
     pageSize: z.coerce.number().int().min(1).max(100).optional(),
     sortBy: z.enum(ORDER_LIST_SORT_FIELDS).default('createdAt'),
@@ -462,13 +465,19 @@ export class AssistantActionExecutor {
   ): Promise<AssistantActionExecutionSummary> {
     if (action.tool === 'search_orders') {
       const args = this.parseStrictToolArgs(searchOrdersArgsSchema, action.arguments, action.tool);
+      const search =
+        args.search ?? args.patientName ?? args.doctorName ?? args.clinicName ?? undefined;
+      const usesEntityNameFilter =
+        args.patientName !== undefined ||
+        args.doctorName !== undefined ||
+        args.clinicName !== undefined;
       const pagination = this.resolvePagination({
         page: args.page,
         pageSize: args.overdue ? (args.pageSize ?? 100) : args.pageSize,
       });
       const query = {
         scope: context.scope,
-        ...(args.search ? { search: args.search } : {}),
+        ...(search ? { search } : {}),
         sortBy: args.overdue ? ('dueDate' as const) : args.sortBy,
         sortDirection: args.overdue ? ('asc' as const) : args.sortDirection,
         statuses: args.overdue
@@ -480,9 +489,13 @@ export class AssistantActionExecutor {
         serviceIds: await this.resolveAssistantServiceIds(args.service, context.tenantId),
       };
 
-      const result = args.overdue
-        ? await this.listOrdersAcrossAllPages(query, pagination)
-        : await this.dependencies.ordersService.listOrders(query, pagination);
+      const result =
+        args.overdue || usesEntityNameFilter
+          ? await this.listOrdersAcrossAllPages(query, {
+              page: 1,
+              pageSize: pagination.pageSize,
+            })
+          : await this.dependencies.ordersService.listOrders(query, pagination);
 
       const now = Date.now();
       const items = result.items.filter((item) => {
@@ -490,7 +503,29 @@ export class AssistantActionExecutor {
           return true;
         }
         return new Date(item.dueDate).getTime() < now;
+      }).filter((item) => {
+        if (args.patientName && !matchesBilingualEntityName(args.patientName, item.patientName)) {
+          return false;
+        }
+        if (args.doctorName && !matchesBilingualEntityName(args.doctorName, item.doctorName)) {
+          return false;
+        }
+        if (args.clinicName && !matchesBilingualEntityName(args.clinicName, item.clinicName)) {
+          return false;
+        }
+        return true;
       });
+
+      const meta =
+        args.overdue || usesEntityNameFilter
+          ? {
+              ...result.meta,
+              page: pagination.page,
+              pageSize: pagination.pageSize,
+              totalItems: items.length,
+              totalPages: Math.max(1, Math.ceil(items.length / Math.max(1, pagination.pageSize))),
+            }
+          : result.meta;
 
       return {
         actionId: action.id,
@@ -500,16 +535,11 @@ export class AssistantActionExecutor {
           items,
           meta: args.overdue
             ? {
-                ...result.meta,
-                totalItems: items.length,
-                totalPages: Math.max(
-                  1,
-                  Math.ceil(items.length / Math.max(1, result.meta.pageSize)),
-                ),
+                ...meta,
                 overdueOnThisPage: items.length,
                 overdueTotalItems: items.length,
               }
-            : result.meta,
+            : meta,
         },
       };
     }

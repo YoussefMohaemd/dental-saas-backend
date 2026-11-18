@@ -61,6 +61,68 @@ const createOrderParameters: AssistantToolParameters = {
   additionalProperties: false,
 };
 
+const searchOrdersParameters: AssistantToolParameters = {
+  type: 'object',
+  properties: {
+    search: {
+      type: 'string',
+      description: 'Free-text keyword: order number, patient, doctor, or clinic name',
+    },
+    patientName: {
+      type: 'string',
+      description: 'Patient name in Arabic or English (mapped to order search)',
+    },
+    doctorName: {
+      type: 'string',
+      description: 'Doctor name in Arabic or English (mapped to order search)',
+    },
+    clinicName: {
+      type: 'string',
+      description: 'Clinic name in Arabic or English (mapped to order search)',
+    },
+    status: {
+      type: 'array',
+      items: {
+        type: 'string',
+        enum: [
+          'New',
+          'Review',
+          'Design',
+          'Production',
+          'Quality Check',
+          'Ready',
+          'Completed',
+          'Cancelled',
+        ],
+      },
+    },
+    duration: {
+      type: 'string',
+      enum: ['today', 'week', 'month', '2-months', '3-months', '6-months'],
+    },
+    service: { type: 'array', items: { type: 'string' } },
+    overdue: { type: 'boolean' },
+    sortBy: {
+      type: 'string',
+      enum: [
+        'orderNumber',
+        'status',
+        'priority',
+        'restoration',
+        'receivedAt',
+        'dueDate',
+        'amount',
+        'createdAt',
+        'updatedAt',
+      ],
+    },
+    sortDirection: { type: 'string', enum: ['asc', 'desc'] },
+    page: { type: 'integer', minimum: 1 },
+    pageSize: { type: 'integer', minimum: 1, maximum: 100 },
+  },
+  additionalProperties: false,
+};
+
 const updateOrderParameters: AssistantToolParameters = {
   type: 'object',
   properties: {
@@ -186,10 +248,11 @@ const ASSISTANT_TOOLS: AssistantToolDefinition[] = [
   createTool(
     'search_orders',
     'Search orders by filters and keywords, including patient, doctor, or clinic names in Arabic, English, or transliteration',
-    '{"search"?: string (order number, patient/doctor/clinic name, Arabic text, English text, or common transliteration variants such as sief/Saif), "status"?: string[] using "New"|"Review"|"Design"|"Production"|"Quality Check"|"Ready"|"Completed"|"Cancelled", "duration"?: "today"|"week"|"month"|"2-months"|"3-months"|"6-months", "service"?: string[], "overdue"?: boolean (true = open orders past their due date, for late-order reports), "sortBy"?: "orderNumber"|"status"|"priority"|"restoration"|"receivedAt"|"dueDate"|"amount"|"createdAt"|"updatedAt", "sortDirection"?: "asc"|"desc", "page"?: integer, "pageSize"?: integer}',
+    '{"search"?: string (order number, patient/doctor/clinic name, Arabic text, English text, or common transliteration variants such as sief/Saif), "patientName"?: string (Arabic or English), "doctorName"?: string (Arabic or English), "clinicName"?: string (Arabic or English), "status"?: string[] using "New"|"Review"|"Design"|"Production"|"Quality Check"|"Ready"|"Completed"|"Cancelled", "duration"?: "today"|"week"|"month"|"2-months"|"3-months"|"6-months", "service"?: string[], "overdue"?: boolean (true = open orders past their due date, for late-order reports), "sortBy"?: "orderNumber"|"status"|"priority"|"restoration"|"receivedAt"|"dueDate"|"amount"|"createdAt"|"updatedAt", "sortDirection"?: "asc"|"desc", "page"?: integer, "pageSize"?: integer}',
     'read',
     ['orders.read'],
     { domain: 'orders', action: 'search' },
+    searchOrdersParameters,
   ),
   createTool(
     'get_order_details',

@@ -1029,6 +1029,156 @@ describe('AssistantActionExecutor', () => {
     );
   });
 
+  it('maps search_orders patientName to search query text', async () => {
+    const listOrders = vi.fn().mockResolvedValue({
+      items: [],
+      meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 1 },
+    });
+    const executor = new AssistantActionExecutor({
+      ordersService: { listOrders } as never,
+      patientService: {} as never,
+      doctorService: {} as never,
+      clinicService: {} as never,
+      catalogRepository: {} as never,
+    });
+
+    await executor.executeReadActions(
+      [
+        {
+          id: 'a1',
+          tool: 'search_orders',
+          arguments: { patientName: 'Youssef Mohamed', status: [] },
+          dependsOn: [],
+        },
+      ],
+      new Map([
+        [
+          'a1',
+          {
+            name: 'search_orders',
+            description: 'Search orders',
+            argumentsHint: '{}',
+            operationType: 'read',
+            requiredCapabilities: [],
+            capabilityMatchMode: 'all',
+            requiresConfirmation: false,
+            timeoutMs: 20000,
+            auditMetadata: { domain: 'orders', action: 'search' },
+          },
+        ],
+      ]),
+      context,
+    );
+
+    expect(listOrders).toHaveBeenCalledWith(
+      expect.objectContaining({ search: 'Youssef Mohamed' }),
+      expect.anything(),
+    );
+  });
+
+  it('filters search_orders results by exact patientName match', async () => {
+    const listOrders = vi.fn().mockResolvedValue({
+      items: [
+        { id: 'order-seif', orderNumber: 'AI-1', patientName: 'seif' },
+        { id: 'order-youssef', orderNumber: 'AI-2', patientName: 'youssef' },
+      ],
+      meta: { totalItems: 2, page: 1, pageSize: 20, totalPages: 1 },
+    });
+    const executor = new AssistantActionExecutor({
+      ordersService: { listOrders } as never,
+      patientService: {} as never,
+      doctorService: {} as never,
+      clinicService: {} as never,
+      catalogRepository: {} as never,
+    });
+
+    const actions = await executor.executeReadActions(
+      [
+        {
+          id: 'a1',
+          tool: 'search_orders',
+          arguments: { patientName: 'سيف', status: [] },
+          dependsOn: [],
+        },
+      ],
+      new Map([
+        [
+          'a1',
+          {
+            name: 'search_orders',
+            description: 'Search orders',
+            argumentsHint: '{}',
+            operationType: 'read',
+            requiredCapabilities: [],
+            capabilityMatchMode: 'all',
+            requiresConfirmation: false,
+            timeoutMs: 20000,
+            auditMetadata: { domain: 'orders', action: 'search' },
+          },
+        ],
+      ]),
+      context,
+    );
+
+    expect((actions[0]?.result as { items: Array<{ id: string }> }).items).toEqual([
+      expect.objectContaining({ id: 'order-seif' }),
+    ]);
+  });
+
+  it('searches all pages before applying patientName filter', async () => {
+    const listOrders = vi
+      .fn()
+      .mockResolvedValueOnce({
+        items: [{ id: 'order-youssef', orderNumber: 'AI-2', patientName: 'youssef' }],
+        meta: { totalItems: 2, page: 1, pageSize: 1, totalPages: 2 },
+      })
+      .mockResolvedValueOnce({
+        items: [{ id: 'order-seif', orderNumber: 'AI-1', patientName: 'seif' }],
+        meta: { totalItems: 2, page: 2, pageSize: 1, totalPages: 2 },
+      });
+
+    const executor = new AssistantActionExecutor({
+      ordersService: { listOrders } as never,
+      patientService: {} as never,
+      doctorService: {} as never,
+      clinicService: {} as never,
+      catalogRepository: {} as never,
+    });
+
+    const actions = await executor.executeReadActions(
+      [
+        {
+          id: 'a1',
+          tool: 'search_orders',
+          arguments: { patientName: 'سيف', page: 1, pageSize: 1, status: [] },
+          dependsOn: [],
+        },
+      ],
+      new Map([
+        [
+          'a1',
+          {
+            name: 'search_orders',
+            description: 'Search orders',
+            argumentsHint: '{}',
+            operationType: 'read',
+            requiredCapabilities: [],
+            capabilityMatchMode: 'all',
+            requiresConfirmation: false,
+            timeoutMs: 20000,
+            auditMetadata: { domain: 'orders', action: 'search' },
+          },
+        ],
+      ]),
+      context,
+    );
+
+    expect(listOrders).toHaveBeenCalledTimes(2);
+    expect((actions[0]?.result as { items: Array<{ id: string }> }).items).toEqual([
+      expect.objectContaining({ id: 'order-seif' }),
+    ]);
+  });
+
   it('prefers explicit doctorId and clinicId over patient-linked values in create_order', async () => {
     const createOrder = vi.fn().mockResolvedValue({ id: 'order-explicit-ids' });
     const createSubOrders = vi.fn().mockResolvedValue([]);
