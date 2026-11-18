@@ -9,6 +9,7 @@ import { getAuthenticatedDataScope } from '../../../shared/presentation/http/htt
 import { ensureObjectId } from '../../../shared/presentation/http/http-utils';
 import { type RequestWithContext } from '../../../shared/presentation/http/request-context';
 import { type AssistantService } from '../application/assistant-service';
+import { type TranscriptionService } from '../application/transcription-service';
 import {
   assistantActionIdParamSchema,
   assistantConfirmBodySchema,
@@ -26,6 +27,7 @@ export class AssistantController {
   public constructor(
     private readonly assistantService: AssistantService,
     private readonly lookupService?: AssistantLookupService,
+    private readonly transcriptionService?: TranscriptionService,
   ) {}
 
   public getSuggestions = async (req: Request, res: Response): Promise<void> => {
@@ -115,6 +117,47 @@ export class AssistantController {
       ...(query.clinicId ? { clinicId: query.clinicId } : {}),
       limit: query.limit,
     });
+    sendOk(res, result, buildRequestMeta(req));
+  };
+
+  public transcribe = async (req: Request, res: Response): Promise<void> => {
+    if (!this.transcriptionService) {
+      throw new ApplicationError({
+        message: 'Assistant transcription is not configured',
+        statusCode: 503,
+        code: APPLICATION_ERROR_CODES.INTERNAL_ERROR,
+      });
+    }
+    const start = Date.now();
+    const payload: unknown = req.body;
+    if (!Buffer.isBuffer(payload)) {
+      throw new ApplicationError({
+        message: 'Audio payload is required',
+        statusCode: 400,
+        code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+        expose: true,
+      });
+    }
+
+    const contentType = req.header('content-type') ?? '';
+    const result = await this.transcriptionService.transcribe({
+      audio: payload,
+      mimeType: contentType,
+    });
+    const latencyMs = Date.now() - start;
+    const requestWithLog = req as Request & {
+      log?: { info: (payload: Record<string, unknown>, message: string) => void };
+    };
+    requestWithLog.log?.info(
+      {
+        provider: result.provider,
+        sizeBytes: payload.byteLength,
+        latencyMs,
+        success: true,
+      },
+      'assistant transcription completed',
+    );
+
     sendOk(res, result, buildRequestMeta(req));
   };
 }

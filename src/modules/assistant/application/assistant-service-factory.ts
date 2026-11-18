@@ -16,6 +16,8 @@ import { AssistantLlmLogService } from './assistant-llm-log-service';
 import { PatientService } from '../../patients/application/patient-service';
 import { MongoosePatientRepository } from '../../patients/infrastructure/mongoose-patient-repository';
 import { AssistantLookupService } from './assistant-lookup-service';
+import { TranscriptionService } from './transcription-service';
+import { createSpeechToTextProvider } from '../infrastructure/providers/stt-provider-factory';
 
 export function createAssistantLookupService(): AssistantLookupService {
   const patientService = new PatientService(new MongoosePatientRepository());
@@ -24,7 +26,7 @@ export function createAssistantLookupService(): AssistantLookupService {
   const catalogRepository = new MongooseAssistantCatalogRepository();
 
   return new AssistantLookupService({
-    patients: async (scope, clinicId) => {
+    patients: async (scope) => {
       const result = await patientService.listPatients(
         { scope, search: undefined, sortBy: 'name', sortDirection: 'asc', statuses: [] },
         { page: 1, pageSize: 20 },
@@ -107,5 +109,40 @@ export function createAssistantService(): AssistantService {
       createToolsEnabled: env.AI_ASSISTANT_CREATE_TOOLS_ENABLED,
       plannerPromptVersion: env.AI_ASSISTANT_PLANNER_PROMPT_VERSION,
     },
+  });
+}
+
+export function createTranscriptionService(): TranscriptionService {
+  const baseConfig = {
+    groqModel: env.GROQ_STT_MODEL,
+    geminiModel: env.AI_ASSISTANT_GEMINI_MODEL,
+    ...(env.AI_ASSISTANT_GROQ_API_KEY
+      ? { groqApiKey: env.AI_ASSISTANT_GROQ_API_KEY }
+      : {}),
+    ...(env.AI_ASSISTANT_GROQ_BASE_URL
+      ? { groqBaseUrl: env.AI_ASSISTANT_GROQ_BASE_URL }
+      : {}),
+    ...(env.AI_ASSISTANT_GEMINI_API_KEY
+      ? { geminiApiKey: env.AI_ASSISTANT_GEMINI_API_KEY }
+      : {}),
+  };
+  const configuredProvider = createSpeechToTextProvider({
+    provider: env.STT_PROVIDER,
+    ...baseConfig,
+  });
+  const fallbackProvider =
+    configuredProvider.name === 'gemini'
+      ? createSpeechToTextProvider({
+          provider: 'groq',
+          ...baseConfig,
+        })
+      : createSpeechToTextProvider({
+          provider: 'gemini',
+          ...baseConfig,
+        });
+
+  return new TranscriptionService({
+    primary: configuredProvider,
+    fallback: fallbackProvider,
   });
 }

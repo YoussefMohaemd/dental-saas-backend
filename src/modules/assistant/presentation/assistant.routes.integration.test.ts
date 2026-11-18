@@ -30,4 +30,24 @@ describe('assistant routes integration', () => {
     expect(response.status).toBe(401);
     expect(response.body).toHaveProperty('error.code', 'UNAUTHORIZED');
   });
+
+  it('rejects assistant transcribe without bearer authentication', async () => {
+    const response = await request(app)
+      .post('/api/v1/assistant/transcribe')
+      .set('Content-Type', 'audio/webm')
+      .send(Buffer.alloc(2_048, 1));
+
+    expect(response.status).toBe(401);
+    expect(response.body).toHaveProperty('error.code', 'UNAUTHORIZED');
+  });
+
+  it('rejects ai transcribe alias without bearer authentication', async () => {
+    const response = await request(app)
+      .post('/api/v1/ai/transcribe')
+      .set('Content-Type', 'audio/webm')
+      .send(Buffer.alloc(2_048, 1));
+
+    expect(response.status).toBe(401);
+    expect(response.body).toHaveProperty('error.code', 'UNAUTHORIZED');
+  });
 });

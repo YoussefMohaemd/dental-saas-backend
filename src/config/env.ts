@@ -92,6 +92,8 @@ const envSchema = z.object({
   AI_ASSISTANT_GROQ_MAX_COMPLETION_TOKENS: z.coerce.number().int().min(64).max(2000).default(900),
   AI_ASSISTANT_GEMINI_API_KEY: optionalString,
   AI_ASSISTANT_GEMINI_MODEL: z.string().min(1).default('gemini-3.5-flash'),
+  STT_PROVIDER: z.enum(['groq', 'gemini', 'mock']).default('groq'),
+  GROQ_STT_MODEL: z.string().min(1).default('whisper-large-v3'),
   AI_ASSISTANT_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(30_000),
   AI_ASSISTANT_MAX_ACTIONS_PER_MESSAGE: z.coerce.number().int().min(1).max(20).default(8),
   AI_ASSISTANT_MAX_PLANNING_ROUNDS: z.coerce.number().int().min(1).max(12).default(4),
