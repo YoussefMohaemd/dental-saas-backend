@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "description": "Example STT evaluation manifest. Copy it to a local, uncommitted path and replace the examples with your own recordings. audioPath is resolved relative to this manifest file. Reference transcripts must be human-verified. Omit hypothesis to transcribe each recording through the configured STT providers; include it to re-score previously captured transcripts. Recordings, local manifests, and generated reports must never be committed or uploaded.",
+  "recordings": [
+    {
+      "id": "ar-001",
+      "category": "ar",
+      "audioPath": "audio/ar-001.wav",
+      "reference": "نص عربي مرجعي للتدريب",
+      "expectedEntities": [],
+      "languageHint": "ar"
+    },
+    {
+      "id": "en-001",
+      "category": "en",
+      "audioPath": "audio/en-001.wav",
+      "reference": "English reference transcript for evaluation",
+      "expectedEntities": [],
+      "languageHint": "en"
+    },
+    {
+      "id": "mixed-001",
+      "category": "mixed",
+      "audioPath": "audio/mixed-001.wav",
+      "reference": "مرجع transcript مختلط للاختبار",
+      "expectedEntities": [],
+      "languageHint": "mixed"
+    },
+    {
+      "id": "entity-001",
+      "category": "entity",
+      "audioPath": "audio/entity-001.m4a",
+      "reference": "Dr. Example ordered a molar crown for order 12345",
+      "expectedEntities": ["Dr. Example", "molar crown", "order 12345"],
+      "languageHint": "auto"
+    },
+    {
+      "id": "silence-001",
+      "category": "silence",
+      "audioPath": "audio/silence-001.webm",
+      "reference": "",
+      "expectedEntities": [],
+      "languageHint": "auto"
+    }
+  ]
+}

@@ -4,3 +4,9 @@ dist
 .env
 /docs
 /.superpowers
+
+# STT evaluation: local recordings, manifests, and generated reports stay local
+scripts/stt-eval/audio/
+scripts/stt-eval/reports/
+scripts/stt-eval/manifest.json
+scripts/stt-eval/*.local.json
