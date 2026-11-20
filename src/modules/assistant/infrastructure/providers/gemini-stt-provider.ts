@@ -4,7 +4,11 @@ import {
   APPLICATION_ERROR_CODES,
   ApplicationError,
 } from '../../../../shared/application/errors/application-error';
-import { type SpeechToTextProvider } from '../../application/speech-to-text-provider';
+import {
+  type SpeechToTextProvider,
+  type SttLanguageHint,
+  type SttTranscriptionResult,
+} from '../../application/speech-to-text-provider';
 
 interface GeminiSttClient {
   models: {
@@ -49,9 +53,9 @@ export class GeminiSttProvider implements SpeechToTextProvider {
   public async transcribe(input: {
     audio: Buffer;
     mimeType: string;
-    languageHint?: string;
+    languageHint?: SttLanguageHint;
     signal?: AbortSignal;
-  }): Promise<{ text: string }> {
+  }): Promise<SttTranscriptionResult> {
     if (!this.options.apiKey) {
       throw new ApplicationError({
         message: 'Gemini STT provider is missing API key',
@@ -71,7 +75,7 @@ export class GeminiSttProvider implements SpeechToTextProvider {
             role: 'user',
             parts: [
               {
-                text: 'Transcribe this audio exactly. Keep Arabic and English words as spoken without translation.',
+                text: buildTranscriptionPrompt(input.languageHint),
               },
               {
                 inlineData: {
@@ -89,7 +93,7 @@ export class GeminiSttProvider implements SpeechToTextProvider {
       });
 
       const text = response.text?.trim() ?? '';
-      return { text };
+      return parseGeminiTranscription(text);
     } catch (error) {
       if (error instanceof ApplicationError) {
         throw error;
@@ -114,4 +118,50 @@ export class GeminiSttProvider implements SpeechToTextProvider {
       clearTimeout(timeout);
     }
   }
+}
+
+function buildTranscriptionPrompt(languageHint?: SttLanguageHint): string {
+  const hintInstruction =
+    languageHint && languageHint !== 'auto' ? ` Primary language hint is "${languageHint}".` : '';
+  return `Transcribe this audio exactly. Keep Arabic and English words as spoken without translation.${hintInstruction} Return strict JSON only in this shape: {"text":"<transcript>","language":"<detected language>"}.`;
+}
+
+function parseGeminiTranscription(text: string): SttTranscriptionResult {
+  const candidate = extractJsonObject(text);
+  if (!candidate) {
+    return { text };
+  }
+
+  try {
+    const parsed = JSON.parse(candidate) as { text?: unknown; language?: unknown };
+    if (typeof parsed.text !== 'string') {
+      return { text };
+    }
+
+    return {
+      text: parsed.text,
+      ...(typeof parsed.language === 'string' ? { detectedLanguage: parsed.language } : {}),
+    };
+  } catch {
+    return { text };
+  }
+}
+
+function extractJsonObject(text: string): string | null {
+  const trimmed = text.trim();
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    return trimmed;
+  }
+
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fenced?.[1]) {
+    return fenced[1].trim();
+  }
+
+  const firstBrace = trimmed.indexOf('{');
+  const lastBrace = trimmed.lastIndexOf('}');
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    return trimmed.slice(firstBrace, lastBrace + 1);
+  }
+  return null;
 }

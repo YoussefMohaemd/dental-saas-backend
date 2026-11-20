@@ -4,7 +4,11 @@ import {
   APPLICATION_ERROR_CODES,
   ApplicationError,
 } from '../../../shared/application/errors/application-error';
-import { type SpeechToTextProvider } from './speech-to-text-provider';
+import {
+  type SpeechToTextProvider,
+  type SttLanguageHint,
+  type SttTranscriptionResult,
+} from './speech-to-text-provider';
 
 const MIN_AUDIO_BYTES = 1_024;
 const MAX_AUDIO_BYTES = 5_000_000;
@@ -34,7 +38,7 @@ export class TranscriptionService {
   public async transcribe(input: {
     audio: Buffer;
     mimeType: string;
-    languageHint?: string;
+    languageHint?: SttLanguageHint;
   }): Promise<{ text: string; provider: string }> {
     const mimeType = normalizeMimeType(input.mimeType);
     validateInput(input.audio, mimeType);
@@ -140,7 +144,7 @@ function shouldFallback(error: unknown): boolean {
   return false;
 }
 
-export function parseTranscriptionPayload(payload: unknown): { text: string } {
+export function parseTranscriptionPayload(payload: unknown): SttTranscriptionResult {
   const parsed = transcriptionResponseSchema.safeParse(payload);
   if (!parsed.success) {
     throw new ApplicationError({
