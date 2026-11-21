@@ -54,6 +54,7 @@ describe('GroqAssistantLlmProvider', () => {
       response_format?: unknown;
       tools?: unknown;
       max_completion_tokens?: number;
+      parallel_tool_calls?: boolean;
       messages: Array<{ role: string; content: string }>;
     };
 
@@ -64,6 +65,7 @@ describe('GroqAssistantLlmProvider', () => {
       'search_orders',
     );
     expect(body).not.toHaveProperty('response_format');
+    expect(body.parallel_tool_calls).toBe(true);
     expect(body.messages[0]?.content).toContain('search_orders');
     expect(body.messages[0]?.content).toContain('Search orders by filters and keywords');
     expect(body.messages[0]?.content).toContain('"status"?: string[]');

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const TRACKED_ENV_KEYS = [
   'AI_ASSISTANT_CREATE_TOOLS_ENABLED',
+  'AI_ASSISTANT_MAX_OUTPUT_TOKENS',
   'AI_ASSISTANT_PROVIDER',
   'AI_ASSISTANT_GEMINI_MODEL',
   'CLOUDFLARE_ACCOUNT_ID',
@@ -40,6 +41,16 @@ describe('env defaults', () => {
     const { env } = await import('./env.js');
 
     expect(env.AI_ASSISTANT_CREATE_TOOLS_ENABLED).toBe(true);
+  });
+
+  it('applies assistant speed-oriented defaults', async () => {
+    delete process.env.AI_ASSISTANT_TIMEOUT_MS;
+    delete process.env.AI_ASSISTANT_MAX_OUTPUT_TOKENS;
+
+    const { env } = await import('./env.js');
+
+    expect(env.AI_ASSISTANT_TIMEOUT_MS).toBe(15_000);
+    expect(env.AI_ASSISTANT_MAX_OUTPUT_TOKENS).toBe(450);
   });
 
   it('applies stt defaults with supported gemini stt model', async () => {

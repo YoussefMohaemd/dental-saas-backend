@@ -5,6 +5,49 @@ import { ApplicationError } from '../../../../shared/application/errors/applicat
 import { GeminiAssistantLlmProvider } from './gemini-llm-provider';
 
 describe('GeminiAssistantLlmProvider', () => {
+  it('enforces timeout even if upstream never resolves', async () => {
+    vi.useFakeTimers();
+    try {
+      const provider = new GeminiAssistantLlmProvider({
+        apiKey: 'test-key',
+        model: 'gemini-test',
+        timeoutMs: 100,
+        client: {
+          models: {
+            generateContent: vi.fn().mockImplementation(
+              () => new Promise(() => undefined),
+            ),
+          },
+        },
+      });
+
+      let settled: 'pending' | 'resolved' | 'rejected' = 'pending';
+      let capturedError: unknown;
+      void provider
+        .completePlan({
+          userMessage: 'hello',
+          systemPrompt: 'system',
+          tools: [],
+          languageHint: 'en',
+        })
+        .then(() => {
+          settled = 'resolved';
+        })
+        .catch((error: unknown) => {
+          settled = 'rejected';
+          capturedError = error;
+        });
+
+      await vi.advanceTimersByTimeAsync(101);
+
+      expect(settled).toBe('rejected');
+      expect(capturedError).toBeInstanceOf(ApplicationError);
+      expect(capturedError).toMatchObject({ statusCode: 504 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('maps Gemini text and function calls to an assistant plan', async () => {
     const generateContent = vi.fn().mockResolvedValue({
       text: 'ok',
@@ -90,6 +133,7 @@ describe('GeminiAssistantLlmProvider', () => {
     const declaration = request.config?.tools?.[0]?.functionDeclarations?.[0];
     expect(declaration?.description).toContain(tool.argumentsHint);
     expect(declaration?.parametersJsonSchema).toEqual(tool.parameters);
+    expect(request.config).toMatchObject({ maxOutputTokens: 450 });
   });
 
   it('parses a planner JSON object from Gemini text when no function calls are returned', async () => {

@@ -53,6 +53,7 @@ interface VllmProviderOptions {
   baseUrl: string;
   apiKey?: string;
   timeoutMs: number;
+  maxOutputTokens?: number;
 }
 
 export class VllmAssistantLlmProvider implements AssistantLlmProvider {
@@ -83,6 +84,9 @@ export class VllmAssistantLlmProvider implements AssistantLlmProvider {
             { role: 'user', content: request.userMessage },
           ],
           temperature: 0,
+          ...(this.options.maxOutputTokens !== undefined
+            ? { max_tokens: this.options.maxOutputTokens }
+            : {}),
           response_format: {
             type: 'json_object',
           },
@@ -94,6 +98,7 @@ export class VllmAssistantLlmProvider implements AssistantLlmProvider {
               parameters: tool.parameters ?? { type: 'object', additionalProperties: true },
             },
           })),
+          parallel_tool_calls: true,
         }),
         signal: request.signal ?? abortController.signal,
       });

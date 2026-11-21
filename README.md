@@ -43,10 +43,12 @@ Copy `.env.example` to `.env` and adjust values as needed.
 - `AI_ASSISTANT_VLLM_API_KEY` optional internal service token for vLLM gateway
 - `AI_ASSISTANT_GROQ_API_KEY` required when `AI_ASSISTANT_PROVIDER=groq`
 - `AI_ASSISTANT_GROQ_BASE_URL` optional Groq API base URL override
+- `AI_ASSISTANT_GROQ_MAX_COMPLETION_TOKENS` max completion tokens for Groq (default `450`)
 - `AI_ASSISTANT_GEMINI_API_KEY` required when `AI_ASSISTANT_PROVIDER=gemini`
 - `CLOUDFLARE_ACCOUNT_ID` required when `AI_ASSISTANT_PROVIDER=cloudflare`
 - `CLOUDFLARE_AI_API_TOKEN` required when `AI_ASSISTANT_PROVIDER=cloudflare`
-- `AI_ASSISTANT_TIMEOUT_MS` provider request timeout
+- `AI_ASSISTANT_TIMEOUT_MS` provider request timeout (default `15000`)
+- `AI_ASSISTANT_MAX_OUTPUT_TOKENS` max output tokens for assistant responses across providers (default `450`)
 - `AI_ASSISTANT_MAX_ACTIONS_PER_MESSAGE`
 - `AI_ASSISTANT_MAX_PLANNING_ROUNDS`
 - `AI_ASSISTANT_MAX_INPUT_CHARS`

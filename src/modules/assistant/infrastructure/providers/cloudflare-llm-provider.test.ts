@@ -85,6 +85,10 @@ describe('CloudflareAssistantLlmProvider', () => {
       Authorization: 'Bearer token-1',
       'Content-Type': 'application/json',
     });
+    const body = JSON.parse(init.body as string) as {
+      parallel_tool_calls?: boolean;
+    };
+    expect(body.parallel_tool_calls).toBe(true);
   });
 });
 

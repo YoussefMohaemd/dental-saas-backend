@@ -87,6 +87,7 @@ export function createAssistantService(): AssistantService {
     groqApiKey: env.AI_ASSISTANT_GROQ_API_KEY,
     groqBaseUrl: env.AI_ASSISTANT_GROQ_BASE_URL,
     groqMaxCompletionTokens: env.AI_ASSISTANT_GROQ_MAX_COMPLETION_TOKENS,
+    maxOutputTokens: env.AI_ASSISTANT_MAX_OUTPUT_TOKENS,
     geminiApiKey: env.AI_ASSISTANT_GEMINI_API_KEY,
     cloudflareAccountId: env.CLOUDFLARE_ACCOUNT_ID,
     cloudflareApiToken: env.CLOUDFLARE_AI_API_TOKEN,

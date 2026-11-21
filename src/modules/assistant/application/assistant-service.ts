@@ -1074,6 +1074,7 @@ export function buildSystemPrompt(now: Date, provider: AssistantLlmProvider['nam
     'For submission standards only, call get_submission_standards.',
     'All authenticated users can call list_services, list_service_prices, get_submission_standards and get_company_info.',
     'For orders, patients, doctors or clinics, call the matching search/details tool.',
+    'When a user asks for multiple independent results in one message, create one action per result, and use dependsOn only when one action needs output from another.',
     'When filtering orders by a specific patient/doctor/clinic, pass search text in search_orders using search or patientName/doctorName/clinicName, and do not send empty arguments unless the user explicitly asks for all orders.',
     'When creating a patient, you may pass clinicName/doctorName if ids are unavailable; the system resolves exact existing matches only and returns validation errors for missing or ambiguous matches.',
     'The system appends the tool results to your reply automatically, so keep "reply" to one short sentence and do not repeat or retype the data.',

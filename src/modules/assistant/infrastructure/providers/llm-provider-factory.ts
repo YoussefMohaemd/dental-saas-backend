@@ -14,6 +14,7 @@ export interface AssistantLlmProviderConfig {
   groqApiKey: string | undefined;
   groqBaseUrl: string | undefined;
   groqMaxCompletionTokens?: number;
+  maxOutputTokens?: number;
   geminiApiKey?: string | undefined;
   cloudflareAccountId?: string | undefined;
   cloudflareApiToken?: string | undefined;
@@ -33,6 +34,9 @@ export function createAssistantLlmProvider(
       baseUrl: config.vllmBaseUrl,
       ...(config.vllmApiKey ? { apiKey: config.vllmApiKey } : {}),
       timeoutMs: config.timeoutMs,
+      ...(config.maxOutputTokens !== undefined
+        ? { maxOutputTokens: config.maxOutputTokens }
+        : {}),
     });
   }
 
@@ -46,8 +50,10 @@ export function createAssistantLlmProvider(
       model: config.model,
       timeoutMs: config.timeoutMs,
       apiKey: config.groqApiKey,
-      ...(config.groqMaxCompletionTokens !== undefined
-        ? { maxCompletionTokens: config.groqMaxCompletionTokens }
+      ...(config.maxOutputTokens !== undefined
+        ? { maxCompletionTokens: config.maxOutputTokens }
+        : config.groqMaxCompletionTokens !== undefined
+          ? { maxCompletionTokens: config.groqMaxCompletionTokens }
         : {}),
       ...(config.groqBaseUrl ? { baseUrl: config.groqBaseUrl } : {}),
     });
@@ -62,6 +68,9 @@ export function createAssistantLlmProvider(
       model: config.model,
       timeoutMs: config.timeoutMs,
       apiKey: config.geminiApiKey,
+      ...(config.maxOutputTokens !== undefined
+        ? { maxOutputTokens: config.maxOutputTokens }
+        : {}),
     });
   }
 
@@ -77,6 +86,9 @@ export function createAssistantLlmProvider(
       apiToken: config.cloudflareApiToken,
       model: config.model,
       timeoutMs: config.timeoutMs,
+      ...(config.maxOutputTokens !== undefined
+        ? { maxOutputTokens: config.maxOutputTokens }
+        : {}),
     });
   }
 

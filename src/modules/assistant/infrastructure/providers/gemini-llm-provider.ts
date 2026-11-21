@@ -25,6 +25,7 @@ interface GeminiProviderOptions {
   apiKey: string;
   model: string;
   timeoutMs: number;
+  maxOutputTokens?: number;
   client?: GeminiClient;
 }
 
@@ -55,36 +56,59 @@ export class GeminiAssistantLlmProvider implements AssistantLlmProvider {
     }
 
     const abortController = new AbortController();
-    const timeout = setTimeout(() => abortController.abort(), this.options.timeoutMs);
+    const signal = request.signal
+      ? AbortSignal.any([request.signal, abortController.signal])
+      : abortController.signal;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeout = setTimeout(() => {
+        abortController.abort();
+        reject(
+          new ApplicationError({
+            message: 'Assistant model request timed out',
+            statusCode: 504,
+            code: APPLICATION_ERROR_CODES.INTERNAL_ERROR,
+            expose: true,
+          }),
+        );
+      }, this.options.timeoutMs);
+    });
 
     try {
-      const response = await this.client.models.generateContent({
-        model: this.options.model,
-        contents: [
-          ...(request.history ?? []).map((message) => ({
-            role: message.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: message.content }],
-          })),
-          {
-            role: 'user',
-            parts: [{ text: request.userMessage }],
+      const response = await Promise.race([
+        this.client.models.generateContent({
+          model: this.options.model,
+          contents: [
+            ...(request.history ?? []).map((message) => ({
+              role: message.role === 'assistant' ? 'model' : 'user',
+              parts: [{ text: message.content }],
+            })),
+            {
+              role: 'user',
+              parts: [{ text: request.userMessage }],
+            },
+          ],
+          config: {
+            systemInstruction: request.systemPrompt,
+            temperature: 0,
+            thinkingConfig: {
+              thinkingBudget: 0,
+            },
+            maxOutputTokens: this.options.maxOutputTokens ?? 450,
+            abortSignal: signal,
+            ...(request.tools.length > 0
+              ? {
+                  tools: [
+                    {
+                      functionDeclarations: request.tools.map(toGeminiFunctionDeclaration),
+                    },
+                  ],
+                }
+              : {}),
           },
-        ],
-        config: {
-          systemInstruction: request.systemPrompt,
-          temperature: 0,
-          abortSignal: request.signal ?? abortController.signal,
-          ...(request.tools.length > 0
-            ? {
-                tools: [
-                  {
-                    functionDeclarations: request.tools.map(toGeminiFunctionDeclaration),
-                  },
-                ],
-              }
-            : {}),
-        },
-      });
+        }),
+        timeoutPromise,
+      ]);
 
       return parseGeminiResponse(response);
     } catch (error) {
@@ -122,7 +146,9 @@ export class GeminiAssistantLlmProvider implements AssistantLlmProvider {
         },
       });
     } finally {
-      clearTimeout(timeout);
+      if (timeout) {
+        clearTimeout(timeout);
+      }
     }
   }
 }

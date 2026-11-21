@@ -69,6 +69,7 @@ interface CloudflareProviderOptions {
   apiToken: string;
   model: string;
   timeoutMs: number;
+  maxOutputTokens?: number;
 }
 
 export class CloudflareAssistantLlmProvider implements AssistantLlmProvider {
@@ -106,6 +107,9 @@ export class CloudflareAssistantLlmProvider implements AssistantLlmProvider {
               { role: 'user', content: request.userMessage },
             ],
             temperature: 0,
+            ...(this.options.maxOutputTokens !== undefined
+              ? { max_tokens: this.options.maxOutputTokens }
+              : {}),
             ...(hasTools
               ? {
                   tools: request.tools.map((tool) => ({
@@ -117,6 +121,7 @@ export class CloudflareAssistantLlmProvider implements AssistantLlmProvider {
                     },
                   })),
                   tool_choice: 'auto',
+                  parallel_tool_calls: true,
                 }
               : {}),
           }),

@@ -183,6 +183,7 @@ export class GroqAssistantLlmProvider implements AssistantLlmProvider {
               },
             })),
             tool_choice: 'auto',
+            parallel_tool_calls: true,
           }
         : {
             response_format: {

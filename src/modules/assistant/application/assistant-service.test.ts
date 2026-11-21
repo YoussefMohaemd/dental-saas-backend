@@ -53,6 +53,13 @@ describe('AssistantService', () => {
     expect(prompt).toContain('never invent ids');
   });
 
+  it('instructs the planner to split independent user asks into multiple actions', () => {
+    const prompt = buildSystemPrompt(new Date('2026-01-01T00:00:00.000Z'), 'gemini');
+
+    expect(prompt).toContain('When a user asks for multiple independent results');
+    expect(prompt).toContain('create one action per result');
+  });
+
   it('rejects create plans when create tools are disabled', async () => {
     const service = AssistantService.createForTests({
       createToolsEnabled: false,
