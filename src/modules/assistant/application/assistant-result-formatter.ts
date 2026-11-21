@@ -74,18 +74,7 @@ function formatExecution(execution: AssistantActionExecutionSummary): string {
         `**${text(row.name)}** — ${text(row.city)}, ${text(row.phone)}, id \`${text(row.id)}\``,
       );
     case 'get_order_details':
-      return formatRecord('Order', result as Row, [
-        ['orderNumber', 'Order'],
-        ['patientName', 'Patient'],
-        ['doctorName', 'Doctor'],
-        ['clinicName', 'Clinic'],
-        ['status', 'Status'],
-        ['priority', 'Priority'],
-        ['restoration', 'Restoration'],
-        ['units', 'Units'],
-        ['amount', 'Amount'],
-        ['dueDate', 'Due'],
-      ]);
+      return formatOrderDetailsResult(result);
     case 'get_patient_details':
       return formatRecord('Patient', result as Row, [
         ['name', 'Name'],
@@ -172,6 +161,42 @@ function formatRecord(title: string, row: Row, fields: ReadonlyArray<[string, st
     .filter(([key]) => row[key] !== undefined && row[key] !== null && row[key] !== '')
     .map(([key, label]) => `- **${label}:** ${key.endsWith('Date') ? shortDate(row[key]) : text(row[key])}`);
   return [`**${title}**`, ...lines].join('\n');
+}
+
+function formatOrderDetailsResult(result: unknown): string {
+  if (isOrderDetailsDisambiguation(result)) {
+    const matches = result.matches.slice(0, MAX_ROWS);
+    const lines = matches.map(
+      (item) =>
+        `- **${text(item.orderNumber)}** (${text(item.status)})\n  - Patient: ${text(item.patientName)}\n  - Doctor: ${text(item.doctorName)}\n  - Clinic: ${text(item.clinicName)}\n  - ID: \`${text(item.id)}\``,
+    );
+    const title = `**Order selection needed** (${result.matches.length})`;
+    const hint = `Please resend with orderId${result.input ? ` for "${result.input}"` : ''}.`;
+    return [title, ...lines, hint].join('\n');
+  }
+
+  return formatRecord('Order', result as Row, [
+    ['orderNumber', 'Order'],
+    ['patientName', 'Patient'],
+    ['doctorName', 'Doctor'],
+    ['clinicName', 'Clinic'],
+    ['status', 'Status'],
+    ['priority', 'Priority'],
+    ['restoration', 'Restoration'],
+    ['units', 'Units'],
+    ['amount', 'Amount'],
+    ['dueDate', 'Due'],
+  ]);
+}
+
+function isOrderDetailsDisambiguation(
+  value: unknown,
+): value is { ambiguous: true; input?: string; matches: Row[] } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  const candidate = value as { ambiguous?: unknown; matches?: unknown };
+  return candidate.ambiguous === true && Array.isArray(candidate.matches);
 }
 
 function text(value: unknown): string {

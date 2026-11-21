@@ -127,6 +127,10 @@ const updateOrderParameters: AssistantToolParameters = {
   type: 'object',
   properties: {
     orderId: { type: 'string', description: 'Canonical order ID or order number' },
+    patientName: {
+      type: 'string',
+      description: 'Patient name in Arabic or English to resolve a unique order when orderId is unknown',
+    },
     payload: createOrderParameters.properties?.payload ?? {
       type: 'object',
     },
@@ -274,7 +278,7 @@ const ASSISTANT_TOOLS: AssistantToolDefinition[] = [
   createTool(
     'update_order',
     'Update an existing order',
-    '{"orderId": string, "payload": object containing only the order fields to change}',
+    '{"orderId"?: string, "patientName"?: string (use when a single order matches this patient), "payload": object containing only the order fields to change}',
     'write',
     ['orders.update'],
     { domain: 'orders', action: 'update' },

@@ -249,7 +249,7 @@ describe('AssistantActionExecutor', () => {
     expect(listOrders).toHaveBeenCalledTimes(2);
   });
 
-  it('rejects patient-name order details when multiple orders match', async () => {
+  it('returns disambiguation options for patient-name order details when multiple orders match', async () => {
     const listOrders = vi.fn().mockResolvedValue({
       items: [
         { id: '66f100000000000000000126', orderNumber: 'DL-026017', patientName: 'Saif' },
@@ -296,8 +296,20 @@ describe('AssistantActionExecutor', () => {
 
     expect(actions[0]).toEqual(
       expect.objectContaining({
-        status: 'failed',
-        error: expect.stringMatching(/multiple orders match patient/i),
+        status: 'executed',
+        result: expect.objectContaining({
+          ambiguous: true,
+          matches: expect.arrayContaining([
+            expect.objectContaining({
+              id: '66f100000000000000000126',
+              orderNumber: 'DL-026017',
+            }),
+            expect.objectContaining({
+              id: '66f100000000000000000127',
+              orderNumber: 'DL-026018',
+            }),
+          ]),
+        }),
       }),
     );
     expect(getOrderById).not.toHaveBeenCalled();
@@ -1397,5 +1409,38 @@ describe('AssistantActionExecutor', () => {
       expect.objectContaining({ notes: 'updated' }),
       context.scope,
     );
+  });
+
+  it('accepts update_order draft by patientName and resolves to a unique order id', async () => {
+    const listOrders = vi.fn().mockResolvedValue({
+      items: [{ id: '66f100000000000000000889', orderNumber: 'DL-124', patientName: 'Youssef' }],
+      meta: { totalItems: 1, page: 1, pageSize: 20, totalPages: 1 },
+    });
+    const executor = new AssistantActionExecutor({
+      ordersService: {
+        listOrders,
+      } as never,
+      patientService: {} as never,
+      doctorService: {} as never,
+      clinicService: {} as never,
+      catalogRepository: {} as never,
+    });
+
+    const normalized = await executor.validateWriteActionDraft({
+      toolName: 'update_order',
+      payload: {
+        patientName: 'Youssef',
+        payload: { status: 'Review' },
+      },
+      context,
+    });
+
+    expect(normalized).toEqual(
+      expect.objectContaining({
+        orderId: '66f100000000000000000889',
+        payload: expect.objectContaining({ status: 'Review' }),
+      }),
+    );
+    expect(listOrders).toHaveBeenCalled();
   });
 });

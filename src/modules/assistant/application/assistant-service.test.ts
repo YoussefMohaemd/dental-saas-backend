@@ -1077,6 +1077,103 @@ describe('AssistantService', () => {
     expect(response.result.executions).toHaveLength(0);
   });
 
+  it('retries planning for multi-intent messages when the first plan returns only one action', async () => {
+    const provider = {
+      name: 'mock' as const,
+      completePlan: vi
+        .fn()
+        .mockResolvedValueOnce({
+          reply: 'Assistant planned tool execution.',
+          actions: [
+            {
+              id: 'a1',
+              tool: 'search_orders',
+              arguments: { doctorName: 'Dina Khaled' },
+              dependsOn: [],
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          reply: 'Assistant planned tool execution.',
+          actions: [
+            {
+              id: 'a1',
+              tool: 'search_orders',
+              arguments: { doctorName: 'Dina Khaled' },
+              dependsOn: [],
+            },
+            {
+              id: 'a2',
+              tool: 'get_order_details',
+              arguments: { orderId: 'Tarek Fathy' },
+              dependsOn: [],
+            },
+          ],
+        }),
+    };
+
+    const service = AssistantService.create({
+      provider,
+      conversationRepository: new InMemoryAssistantConversationRepository(),
+      pendingActionRepository: new InMemoryAssistantPendingActionRepository(),
+      auditRepository: new InMemoryAssistantAuditRepository(),
+      ordersService: {
+        listOrders: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 1 },
+        }),
+        getOrderById: async () => ({}),
+      } as never,
+      patientService: {
+        listPatients: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 1 },
+        }),
+        getPatientById: async () => ({}),
+      } as never,
+      doctorService: {
+        listDoctors: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 1 },
+        }),
+      } as never,
+      clinicService: {
+        listClinics: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 1 },
+        }),
+      } as never,
+      catalogRepository: {
+        listServices: async () => [],
+        getCompanyProfile: async () => null,
+      },
+      options: {
+        maxActionsPerMessage: 8,
+        maxPlanningRounds: 4,
+        maxInputChars: 4000,
+        confirmationTtlSeconds: 900,
+      },
+    });
+
+    const conversation = await service.createConversation({
+      tenantId: '66f100000000000000000001',
+      userId: '66f1000000000000000000aa',
+      roles: ['staff'],
+    });
+
+    const response = await service.postMessage(principal(['staff']), {
+      conversationId: conversation.id,
+      content: 'هات كل الاوردرات بتاعت الدكتور دينا خالد وهاتلي الأوردر ديتيلز بتاع المريض طارق فتحي',
+    });
+
+    expect(provider.completePlan).toHaveBeenCalledTimes(2);
+    expect(response.result.type).toBe('text');
+    if (response.result.type !== 'text') {
+      throw new Error('Expected text result');
+    }
+    expect(response.result.plannedActions).toBe(2);
+  });
+
   it('keeps pending action confirmable after transient execution failure', async () => {
     const updateOrder = vi
       .fn()

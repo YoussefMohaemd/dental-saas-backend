@@ -120,4 +120,39 @@ describe('formatExecutionsAsMarkdown', () => {
     expect(text).toContain('Showing 10 of 12');
     expect(text).not.toContain('ORD-11');
   });
+
+  it('renders get_order_details disambiguation options as a selectable list', () => {
+    const text = formatExecutionsAsMarkdown([
+      {
+        actionId: 'a1',
+        tool: 'get_order_details',
+        status: 'executed',
+        result: {
+          ambiguous: true,
+          input: 'طارق فتحي',
+          matches: [
+            {
+              id: 'o1',
+              orderNumber: 'DL-026017',
+              patientName: 'Tarek Fathy',
+              doctorName: 'Dina Khaled',
+              clinicName: 'Dental Care Clinic 7',
+            },
+            {
+              id: 'o2',
+              orderNumber: 'DL-026018',
+              patientName: 'Tarek Fathy',
+              doctorName: 'Dina Khaled',
+              clinicName: 'Dental Care Clinic 7',
+            },
+          ],
+        },
+      },
+    ]);
+
+    expect(text).toContain('Order selection needed');
+    expect(text).toContain('DL-026017');
+    expect(text).toContain('`o1`');
+    expect(text).toContain('Please resend with orderId');
+  });
 });

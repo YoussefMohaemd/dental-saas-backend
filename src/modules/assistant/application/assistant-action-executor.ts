@@ -160,8 +160,12 @@ const createOrderArgsSchema = z
 
 const updateOrderArgsSchema = z
   .object({
-    orderId: z.string().trim().min(1),
+    orderId: z.string().trim().min(1).optional(),
+    patientName: z.string().trim().min(1).optional(),
     payload: z.record(z.string(), z.unknown()),
+  })
+  .refine((value) => value.orderId !== undefined || value.patientName !== undefined, {
+    message: 'orderId or patientName is required',
   })
   .strict();
 
@@ -550,11 +554,7 @@ export class AssistantActionExecutor {
         action.arguments,
         action.tool,
       );
-      const resolvedOrderId = await this.resolveOrderIdForDetails(args.orderId, context);
-      const result = await this.dependencies.ordersService.getOrderById(
-        resolvedOrderId,
-        context.scope,
-      );
+      const result = await this.resolveOrderDetailsResult(args.orderId, context);
       return {
         actionId: action.id,
         tool: action.tool,
@@ -957,6 +957,86 @@ export class AssistantActionExecutor {
       code: APPLICATION_ERROR_CODES.NOT_FOUND,
       expose: true,
     });
+  }
+
+  private async resolveOrderDetailsResult(
+    orderIdOrNumber: string,
+    context: AssistantExecutionContext,
+  ): Promise<unknown> {
+    try {
+      const resolvedOrderId = await this.resolveOrderIdForDetails(orderIdOrNumber, context);
+      return await this.dependencies.ordersService.getOrderById(resolvedOrderId, context.scope);
+    } catch (error) {
+      if (!isOrderAmbiguityError(error)) {
+        throw error;
+      }
+
+      const matches = await this.findOrderDisambiguationMatches(orderIdOrNumber, context);
+      if (matches.length === 0) {
+        throw error;
+      }
+
+      return {
+        ambiguous: true,
+        input: orderIdOrNumber,
+        matches,
+      };
+    }
+  }
+
+  private async findOrderDisambiguationMatches(
+    orderIdOrNumber: string,
+    context: AssistantExecutionContext,
+  ): Promise<
+    Array<{
+      id: string;
+      orderNumber: string;
+      patientName: string;
+      doctorName: string;
+      clinicName: string;
+      status: string;
+      dueDate: string;
+    }>
+  > {
+    const query = {
+      scope: context.scope,
+      search: orderIdOrNumber,
+      sortBy: 'createdAt' as const,
+      sortDirection: 'desc' as const,
+      statuses: [],
+      serviceIds: [],
+    };
+    const firstPage = await this.dependencies.ordersService.listOrders(query, {
+      page: 1,
+      pageSize: 100,
+    });
+    const candidateItems = [...firstPage.items];
+    for (let page = 2; page <= firstPage.meta.totalPages; page += 1) {
+      const nextPage = await this.dependencies.ordersService.listOrders(query, {
+        page,
+        pageSize: 100,
+      });
+      candidateItems.push(...nextPage.items);
+    }
+
+    const exactMatches = candidateItems.filter((item) =>
+      matchesBilingualEntityName(orderIdOrNumber, item.orderNumber),
+    );
+    const patientMatches = candidateItems.filter(
+      (item) =>
+        typeof item.patientName === 'string' &&
+        matchesBilingualEntityName(orderIdOrNumber, item.patientName),
+    );
+    const source = exactMatches.length > 1 ? exactMatches : patientMatches;
+    return source.map((item) => ({
+      id: item.id,
+      orderNumber: item.orderNumber,
+      patientName: item.patientName,
+      doctorName: item.doctorName,
+      clinicName: item.clinicName,
+      status: item.status,
+      dueDate: item.dueDate,
+    }));
   }
 
   private async parseCreateOrderPayload(
@@ -1880,7 +1960,16 @@ export class AssistantActionExecutor {
     context: AssistantExecutionContext,
   ): Promise<{ orderId: string; payload: OrderUpdatePayload }> {
     const args = this.parseStrictToolArgs(updateOrderArgsSchema, payload, 'update_order');
-    const resolvedOrderId = await this.resolveOrderIdForDetails(args.orderId, context);
+    const orderSelector = args.orderId ?? args.patientName;
+    if (!orderSelector) {
+      throw new ApplicationError({
+        message: 'update_order requires orderId or patientName',
+        statusCode: 400,
+        code: APPLICATION_ERROR_CODES.VALIDATION_ERROR,
+        expose: true,
+      });
+    }
+    const resolvedOrderId = await this.resolveOrderIdForDetails(orderSelector, context);
     const parsedPayload = this.parseUpdateOrderPayload(args.payload);
     const {
       patientName: _patientName,
@@ -1932,6 +2021,14 @@ export class AssistantActionExecutor {
 
 function containsDeleteOperation(toolName: string): boolean {
   return /delete|remove|truncate|drop/i.test(toolName);
+}
+
+function isOrderAmbiguityError(error: unknown): boolean {
+  return (
+    error instanceof ApplicationError &&
+    error.statusCode === 400 &&
+    /multiple orders match/i.test(error.message)
+  );
 }
 
 function stripUndefined<T extends Record<string, unknown>>(value: T): T {

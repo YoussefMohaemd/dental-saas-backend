@@ -388,6 +388,7 @@ export class AssistantService {
     let llmCompletion: AssistantLlmCompletionResult;
     try {
       llmCompletion = await this.completePlanWithFallback(content, history);
+      llmCompletion = await this.retryMultiIntentPlanIfNeeded(content, history, llmCompletion);
     } catch (error) {
       await this.recordLlmCall({
         principal,
@@ -667,6 +668,32 @@ export class AssistantService {
       }
       throw error;
     }
+  }
+
+  private async retryMultiIntentPlanIfNeeded(
+    content: string,
+    history: AssistantLlmCompletionRequest['history'],
+    initialCompletion: AssistantLlmCompletionResult,
+  ): Promise<AssistantLlmCompletionResult> {
+    if (!shouldRetryMultiIntentPlanning(content, initialCompletion.actions)) {
+      return initialCompletion;
+    }
+
+    const followUpPrompt =
+      `${content}\n\n` +
+      'The user asked for multiple operations in one message. ' +
+      'Plan all requested operations as separate actions (one action per requested result).';
+
+    try {
+      const retryCompletion = await this.completePlan(followUpPrompt, history);
+      if (retryCompletion.actions.length > initialCompletion.actions.length) {
+        return retryCompletion;
+      }
+    } catch {
+      return initialCompletion;
+    }
+
+    return initialCompletion;
   }
 
   private async completePlanWithoutHistory(
@@ -1044,6 +1071,23 @@ function detectLanguageHint(content: string): 'ar' | 'en' | 'mixed' {
   return hasArabic ? 'ar' : 'en';
 }
 
+function shouldRetryMultiIntentPlanning(
+  content: string,
+  actions: AssistantLlmCompletionResult['actions'],
+): boolean {
+  if (actions.length !== 1) {
+    return false;
+  }
+
+  const normalized = normalizeArabic(content);
+  const operationMentions =
+    normalized.match(
+      /(هات|جيب|اعرض|show|get|fetch|ابحث|search|غير|عدل|update|create|انش[اأ]ء|تفاصيل|details)/giu,
+    ) ?? [];
+  const hasJoiner = /\b(and|then|also)\b/iu.test(normalized) || /\sو\S*/u.test(normalized);
+  return hasJoiner && operationMentions.length >= 2;
+}
+
 const HISTORY_MAX_MESSAGES = 10;
 const HISTORY_MAX_CHARS = 1_200;
 
@@ -1074,6 +1118,7 @@ export function buildSystemPrompt(now: Date, provider: AssistantLlmProvider['nam
     'For submission standards only, call get_submission_standards.',
     'All authenticated users can call list_services, list_service_prices, get_submission_standards and get_company_info.',
     'For orders, patients, doctors or clinics, call the matching search/details tool.',
+    'For update_order, you may pass patientName when orderId is unavailable; only do this when it can resolve to one unique order.',
     'When a user asks for multiple independent results in one message, create one action per result, and use dependsOn only when one action needs output from another.',
     'When filtering orders by a specific patient/doctor/clinic, pass search text in search_orders using search or patientName/doctorName/clinicName, and do not send empty arguments unless the user explicitly asks for all orders.',
     'When creating a patient, you may pass clinicName/doctorName if ids are unavailable; the system resolves exact existing matches only and returns validation errors for missing or ambiguous matches.',
