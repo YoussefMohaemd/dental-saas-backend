@@ -38,9 +38,8 @@ export class GroqSttProvider implements SpeechToTextProvider {
       });
     }
 
-    const abortController = new AbortController();
-    const timeout = setTimeout(() => abortController.abort(), this.options.timeoutMs ?? 20_000);
-    const signal = input.signal ?? abortController.signal;
+    const timeoutSignal = AbortSignal.timeout(this.options.timeoutMs ?? 20_000);
+    const signal = input.signal ? AbortSignal.any([input.signal, timeoutSignal]) : timeoutSignal;
     const baseUrl = stripTrailingSlash(this.options.baseUrl ?? 'https://api.groq.com/openai/v1');
     const extension = MIME_EXTENSION[input.mimeType] ?? 'webm';
     const form = new FormData();
@@ -99,7 +98,7 @@ export class GroqSttProvider implements SpeechToTextProvider {
       if (error instanceof ApplicationError) {
         throw error;
       }
-      if (error instanceof Error && error.name === 'AbortError') {
+      if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
         throw new ApplicationError({
           message: 'Groq transcription request timed out',
           statusCode: 504,
@@ -115,8 +114,6 @@ export class GroqSttProvider implements SpeechToTextProvider {
           cause: error instanceof Error ? error.message : String(error),
         },
       });
-    } finally {
-      clearTimeout(timeout);
     }
   }
 }

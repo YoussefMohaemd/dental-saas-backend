@@ -37,6 +37,11 @@ interface TranscriptionServiceOptions {
   compressionRatioThreshold?: number;
   entityCorrectionEnabled?: boolean;
   sendPatientNames?: boolean;
+  /** Hard cap for the whole request (retries + fallback included). */
+  totalDeadlineMs?: number;
+  /** Attempts per provider for transient upstream errors (429/502/503). */
+  maxAttemptsPerProvider?: number;
+  retryBaseDelayMs?: number;
 }
 
 export class TranscriptionService {
@@ -63,6 +68,9 @@ export class TranscriptionService {
       compressionRatioThreshold: options?.compressionRatioThreshold ?? 2.4,
       entityCorrectionEnabled: options?.entityCorrectionEnabled ?? false,
       sendPatientNames: options?.sendPatientNames ?? false,
+      totalDeadlineMs: options?.totalDeadlineMs ?? 30_000,
+      maxAttemptsPerProvider: options?.maxAttemptsPerProvider ?? 2,
+      retryBaseDelayMs: options?.retryBaseDelayMs ?? 400,
     };
     this.entityCorrector = dependencies?.entityCorrector ?? new EntityCorrector();
     this.vocabularyService = dependencies?.vocabularyService;
@@ -86,24 +94,35 @@ export class TranscriptionService {
       mimeType,
       language,
       vocabulary: providerVocabulary,
+      signal: AbortSignal.timeout(this.options.totalDeadlineMs),
     };
     const orderedProviders = this.resolveProviders(language);
     const primaryProvider = orderedProviders[0];
     const fallbackProvider = orderedProviders[1];
 
     try {
-      const primaryResult = await primaryProvider.transcribe(request);
+      const primaryResult = await this.callWithRetry(primaryProvider, request);
       const processedPrimary = this.postProcess(primaryResult);
       if (
         processedPrimary.shouldEscalate &&
         this.options.retryOnLowQuality &&
         fallbackProvider
       ) {
-        const fallbackResult = await fallbackProvider.transcribe(request);
-        return {
-          ...this.finalizeResult(this.postProcess(fallbackResult).text, vocabularySnapshot),
-          provider: fallbackProvider.name,
-        };
+        try {
+          const fallbackResult = await this.callWithRetry(fallbackProvider, request);
+          return {
+            ...this.finalizeResult(this.postProcess(fallbackResult).text, vocabularySnapshot),
+            provider: fallbackProvider.name,
+          };
+        } catch (escalationError) {
+          if (!shouldFallback(escalationError)) {
+            throw toClientError(escalationError);
+          }
+          return {
+            ...this.finalizeResult(processedPrimary.text, vocabularySnapshot),
+            provider: primaryProvider.name,
+          };
+        }
       }
 
       return {
@@ -112,15 +131,47 @@ export class TranscriptionService {
       };
     } catch (error) {
       if (!fallbackProvider || !shouldFallback(error)) {
-        throw error;
+        throw toClientError(error);
       }
 
-      const fallbackResult = await fallbackProvider.transcribe(request);
-      return {
-        ...this.finalizeResult(this.postProcess(fallbackResult).text, vocabularySnapshot),
-        provider: fallbackProvider.name,
-      };
+      try {
+        const fallbackResult = await this.callWithRetry(fallbackProvider, request);
+        return {
+          ...this.finalizeResult(this.postProcess(fallbackResult).text, vocabularySnapshot),
+          provider: fallbackProvider.name,
+        };
+      } catch (fallbackError) {
+        throw toClientError(fallbackError);
+      }
     }
+  }
+
+  /**
+   * Retries a provider on transient upstream errors (429/502/503) with jittered
+   * exponential backoff, never beyond the request's overall deadline.
+   */
+  private async callWithRetry(
+    provider: SpeechToTextProvider,
+    request: Parameters<SpeechToTextProvider['transcribe']>[0],
+  ): Promise<SttResult> {
+    const { maxAttemptsPerProvider, retryBaseDelayMs } = this.options;
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= maxAttemptsPerProvider; attempt += 1) {
+      try {
+        return await provider.transcribe(request);
+      } catch (error) {
+        lastError = error;
+        if (!isRetryableUpstreamError(error) || attempt === maxAttemptsPerProvider) {
+          throw error;
+        }
+        const delayMs = retryBaseDelayMs * 2 ** (attempt - 1) + Math.random() * 150;
+        if (request.signal?.aborted) {
+          throw error;
+        }
+        await sleep(delayMs, request.signal);
+      }
+    }
+    throw lastError;
   }
 
   private finalizeResult(
@@ -276,6 +327,44 @@ function validateInput(audio: Buffer, mimeType: string): void {
       },
     });
   }
+}
+
+function isRetryableUpstreamError(error: unknown): boolean {
+  return (
+    error instanceof ApplicationError &&
+    (error.statusCode === 429 ||
+      error.statusCode === 502 ||
+      error.statusCode === 503 ||
+      error.statusCode === 504)
+  );
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      { once: true },
+    );
+  });
+}
+
+/** Turns upstream provider failures into a safe, retryable error for the client. */
+function toClientError(error: unknown): unknown {
+  if (!(error instanceof ApplicationError) || error.statusCode < 500) {
+    return error;
+  }
+  return new ApplicationError({
+    message: 'Voice transcription is temporarily unavailable. Please try again.',
+    statusCode: 503,
+    code: APPLICATION_ERROR_CODES.INTERNAL_ERROR,
+    expose: true,
+    details: { retryable: true, upstreamStatus: error.statusCode },
+  });
 }
 
 function shouldFallback(error: unknown): boolean {

@@ -188,6 +188,8 @@ export function createTranscriptionService(): TranscriptionService {
     vocabularyService,
     entityCorrector: new EntityCorrector(),
   }, {
+    totalDeadlineMs: env.STT_TOTAL_DEADLINE_MS,
+    maxAttemptsPerProvider: env.STT_MAX_ATTEMPTS_PER_PROVIDER,
     escalationConfidence: env.STT_ESCALATION_CONFIDENCE,
     retryOnLowQuality: env.STT_RETRY_ON_LOW_QUALITY,
     noSpeechProbThreshold: env.STT_NO_SPEECH_PROB_THRESHOLD,

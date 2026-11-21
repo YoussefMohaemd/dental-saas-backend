@@ -5,6 +5,7 @@ const TRACKED_ENV_KEYS = [
   'AI_ASSISTANT_GEMINI_MODEL',
   'STT_GEMINI_MODEL',
   'STT_TIMEOUT_MS',
+  'STT_TOTAL_DEADLINE_MS',
   'STT_ESCALATION_CONFIDENCE',
   'STT_SEND_PATIENT_NAMES',
   'STT_ENTITY_CORRECTION',
@@ -38,6 +39,7 @@ describe('env defaults', () => {
   it('applies stt defaults with supported gemini stt model', async () => {
     delete process.env.STT_GEMINI_MODEL;
     delete process.env.STT_TIMEOUT_MS;
+    delete process.env.STT_TOTAL_DEADLINE_MS;
     delete process.env.STT_ESCALATION_CONFIDENCE;
     delete process.env.STT_SEND_PATIENT_NAMES;
     delete process.env.STT_ENTITY_CORRECTION;
@@ -45,7 +47,8 @@ describe('env defaults', () => {
     const { env } = await import('./env.js');
 
     expect(env.STT_GEMINI_MODEL).toBe('gemini-3.8-flash');
-    expect(env.STT_TIMEOUT_MS).toBe(45_000);
+    expect(env.STT_TIMEOUT_MS).toBe(15_000);
+    expect(env.STT_TOTAL_DEADLINE_MS).toBe(40_000);
     expect(env.STT_ESCALATION_CONFIDENCE).toBe(0.8);
     expect(env.STT_SEND_PATIENT_NAMES).toBe(false);
     expect(env.STT_ENTITY_CORRECTION).toBe(false);
@@ -54,6 +57,7 @@ describe('env defaults', () => {
   it('accepts explicit stt overrides', async () => {
     process.env.STT_GEMINI_MODEL = 'gemini-stt-custom';
     process.env.STT_TIMEOUT_MS = '55000';
+    process.env.STT_TOTAL_DEADLINE_MS = '110000';
     process.env.STT_ESCALATION_CONFIDENCE = '0.65';
     process.env.STT_SEND_PATIENT_NAMES = 'true';
     process.env.STT_ENTITY_CORRECTION = 'true';
@@ -62,6 +66,7 @@ describe('env defaults', () => {
 
     expect(env.STT_GEMINI_MODEL).toBe('gemini-stt-custom');
     expect(env.STT_TIMEOUT_MS).toBe(55_000);
+    expect(env.STT_TOTAL_DEADLINE_MS).toBe(110_000);
     expect(env.STT_ESCALATION_CONFIDENCE).toBe(0.65);
     expect(env.STT_SEND_PATIENT_NAMES).toBe(true);
     expect(env.STT_ENTITY_CORRECTION).toBe(true);

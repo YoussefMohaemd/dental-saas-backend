@@ -68,6 +68,29 @@ describe('TranscriptionService', () => {
     });
   });
 
+  it('keeps primary transcript when low-quality escalation fallback fails transiently', async () => {
+    const primaryTranscribe = vi
+      .fn<(input: SttRequest) => Promise<SttResult>>()
+      .mockResolvedValue({ text: 'usable primary text', confidence: 0.2 });
+    const fallbackTranscribe = vi
+      .fn<(input: SttRequest) => Promise<SttResult>>()
+      .mockRejectedValue(appError(504, 'UPSTREAM_TIMEOUT'));
+
+    const service = new TranscriptionService(
+      {
+        primary: { name: 'groq', transcribe: primaryTranscribe },
+        fallback: { name: 'gemini', transcribe: fallbackTranscribe },
+      },
+      undefined,
+      { escalationConfidence: 0.8, retryOnLowQuality: true, retryBaseDelayMs: 1 },
+    );
+
+    await expect(service.transcribe({ audio, mimeType: 'audio/webm' })).resolves.toEqual({
+      provider: 'groq',
+      text: 'usable primary text',
+    });
+  });
+
   it('routes mixed hint directly to gemini primary path', async () => {
     const primaryTranscribe = vi
       .fn<(input: SttRequest) => Promise<SttResult>>()
@@ -206,6 +229,7 @@ describe('TranscriptionService', () => {
       mimeType: 'audio/webm',
       language: 'auto',
       vocabulary: [],
+      signal: expect.any(AbortSignal),
     });
   });
 
@@ -233,6 +257,7 @@ describe('TranscriptionService', () => {
       mimeType: 'audio/webm',
       language: 'ar',
       vocabulary: ['تاج', 'crown'],
+      signal: expect.any(AbortSignal),
     };
     expect(primaryTranscribe).toHaveBeenCalledWith(expectedRequest);
     expect(fallbackTranscribe).toHaveBeenCalledWith(expectedRequest);
@@ -337,6 +362,115 @@ describe('TranscriptionService', () => {
       mimeType: 'audio/webm',
       language: 'auto',
       vocabulary: ['crown', 'Dr Ahmed'],
+      signal: expect.any(AbortSignal),
+    });
+  });
+
+  describe('upstream resilience', () => {
+    const fast = { retryBaseDelayMs: 1 };
+
+    it('retries the same provider once on a transient 503 before falling back', async () => {
+      const primary = vi
+        .fn<(input: SttRequest) => Promise<SttResult>>()
+        .mockRejectedValueOnce(appError(503, 'UNAVAILABLE'))
+        .mockResolvedValueOnce({ text: 'recovered' });
+      const fallback = vi.fn<(input: SttRequest) => Promise<SttResult>>();
+      const service = new TranscriptionService(
+        {
+          primary: { name: 'groq', transcribe: primary },
+          fallback: { name: 'gemini', transcribe: fallback },
+        },
+        undefined,
+        fast,
+      );
+
+      const result = await service.transcribe({ audio, mimeType: 'audio/webm' });
+
+      expect(result).toMatchObject({ text: 'recovered', provider: 'groq' });
+      expect(primary).toHaveBeenCalledTimes(2);
+      expect(fallback).not.toHaveBeenCalled();
+    });
+
+    it('retries the same provider once on a transient 504 before falling back', async () => {
+      const primary = vi
+        .fn<(input: SttRequest) => Promise<SttResult>>()
+        .mockRejectedValueOnce(appError(504, 'TIMEOUT'))
+        .mockResolvedValueOnce({ text: 'recovered after timeout' });
+      const fallback = vi
+        .fn<(input: SttRequest) => Promise<SttResult>>()
+        .mockRejectedValue(appError(500, 'FALLBACK_SHOULD_NOT_RUN'));
+      const service = new TranscriptionService(
+        {
+          primary: { name: 'groq', transcribe: primary },
+          fallback: { name: 'gemini', transcribe: fallback },
+        },
+        undefined,
+        fast,
+      );
+
+      const result = await service.transcribe({ audio, mimeType: 'audio/webm' });
+
+      expect(result).toMatchObject({ text: 'recovered after timeout', provider: 'groq' });
+      expect(primary).toHaveBeenCalledTimes(2);
+      expect(fallback).not.toHaveBeenCalled();
+    });
+
+    it('does not retry non-transient errors', async () => {
+      const primary = vi
+        .fn<(input: SttRequest) => Promise<SttResult>>()
+        .mockRejectedValue(appError(400, 'BAD'));
+      const service = new TranscriptionService(
+        {
+          primary: { name: 'groq', transcribe: primary },
+          fallback: provider('gemini', () => Promise.resolve({ text: 'unused' })),
+        },
+        undefined,
+        fast,
+      );
+
+      await expect(service.transcribe({ audio, mimeType: 'audio/webm' })).rejects.toMatchObject({
+        statusCode: 400,
+      });
+      expect(primary).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns an exposed, retryable 503 when every provider is overloaded', async () => {
+      const overloaded = (): Promise<SttResult> => Promise.reject(appError(503, 'UNAVAILABLE'));
+      const service = new TranscriptionService(
+        {
+          primary: { name: 'groq', transcribe: vi.fn(overloaded) },
+          fallback: { name: 'gemini', transcribe: vi.fn(overloaded) },
+        },
+        undefined,
+        fast,
+      );
+
+      await expect(service.transcribe({ audio, mimeType: 'audio/webm' })).rejects.toMatchObject({
+        statusCode: 503,
+        expose: true,
+        details: { retryable: true },
+      });
+    });
+
+    it('gives every provider call the same overall deadline signal', async () => {
+      const signals: Array<AbortSignal | undefined> = [];
+      const capture = (input: SttRequest): Promise<SttResult> => {
+        signals.push(input.signal);
+        return Promise.reject(appError(503, 'UNAVAILABLE'));
+      };
+      const service = new TranscriptionService(
+        {
+          primary: { name: 'groq', transcribe: capture },
+          fallback: { name: 'gemini', transcribe: capture },
+        },
+        undefined,
+        fast,
+      );
+
+      await service.transcribe({ audio, mimeType: 'audio/webm' }).catch(() => undefined);
+
+      expect(signals).toHaveLength(4);
+      expect(new Set(signals).size).toBe(1);
     });
   });
 });

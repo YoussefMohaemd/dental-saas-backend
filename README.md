@@ -43,12 +43,19 @@ Copy `.env.example` to `.env` and adjust values as needed.
 - `AI_ASSISTANT_VLLM_API_KEY` optional internal service token for vLLM gateway
 - `AI_ASSISTANT_GROQ_API_KEY` required when `AI_ASSISTANT_PROVIDER=groq`
 - `AI_ASSISTANT_GROQ_BASE_URL` optional Groq API base URL override
+- `AI_ASSISTANT_GEMINI_API_KEY` required when `AI_ASSISTANT_PROVIDER=gemini`
 - `AI_ASSISTANT_TIMEOUT_MS` provider request timeout
 - `AI_ASSISTANT_MAX_ACTIONS_PER_MESSAGE`
 - `AI_ASSISTANT_MAX_PLANNING_ROUNDS`
 - `AI_ASSISTANT_MAX_INPUT_CHARS`
 - `AI_ASSISTANT_CONFIRMATION_TTL_SECONDS`
 - `AI_ASSISTANT_PLANNER_PROMPT_VERSION`
+- `STT_PROVIDER` (`groq` | `gemini` | `mock`, default `groq`)
+- `GROQ_STT_MODEL` (default `whisper-large-v3`)
+- `STT_GEMINI_MODEL` (default `gemini-3.8-flash`)
+- `STT_TIMEOUT_MS` single provider timeout in ms (default `15000`)
+- `STT_TOTAL_DEADLINE_MS` total request deadline across retries/fallback in ms (default `40000`)
+- `STT_MAX_ATTEMPTS_PER_PROVIDER` retry attempts per provider for transient failures (default `2`)
 
 ## Included baseline
 

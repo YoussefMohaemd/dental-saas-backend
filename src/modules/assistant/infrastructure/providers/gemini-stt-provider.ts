@@ -59,8 +59,7 @@ export class GeminiSttProvider implements SpeechToTextProvider {
       });
     }
 
-    const abortController = new AbortController();
-    const timeout = setTimeout(() => abortController.abort(), this.options.timeoutMs ?? 20_000);
+    const timeoutSignal = AbortSignal.timeout(this.options.timeoutMs ?? 20_000);
 
     try {
       const response = await this.client.models.generateContent({
@@ -83,7 +82,7 @@ export class GeminiSttProvider implements SpeechToTextProvider {
         ],
         config: {
           temperature: 0,
-          abortSignal: input.signal ?? abortController.signal,
+          abortSignal: input.signal ? AbortSignal.any([input.signal, timeoutSignal]) : timeoutSignal,
         },
       });
 
@@ -93,7 +92,7 @@ export class GeminiSttProvider implements SpeechToTextProvider {
       if (error instanceof ApplicationError) {
         throw error;
       }
-      if (error instanceof Error && error.name === 'AbortError') {
+      if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
         throw new ApplicationError({
           message: 'Gemini transcription request timed out',
           statusCode: 504,
@@ -101,16 +100,21 @@ export class GeminiSttProvider implements SpeechToTextProvider {
           expose: true,
         });
       }
+      const upstreamStatus = readUpstreamStatus(error);
       throw new ApplicationError({
         message: 'Gemini transcription request failed',
-        statusCode: 502,
-        code: APPLICATION_ERROR_CODES.INTERNAL_ERROR,
+        // Preserve 429/503 so the service can retry or fall back; anything else is a bad gateway.
+        statusCode: upstreamStatus === 429 || upstreamStatus === 503 ? upstreamStatus : 502,
+        code:
+          upstreamStatus === 429
+            ? APPLICATION_ERROR_CODES.RATE_LIMITED
+            : APPLICATION_ERROR_CODES.INTERNAL_ERROR,
         details: {
+          upstream: 'gemini',
+          ...(upstreamStatus ? { upstreamStatus } : {}),
           cause: error instanceof Error ? error.message : String(error),
         },
       });
-    } finally {
-      clearTimeout(timeout);
     }
   }
 }
@@ -159,4 +163,15 @@ function extractJsonObject(text: string): string | null {
     return trimmed.slice(firstBrace, lastBrace + 1);
   }
   return null;
+}
+
+function readUpstreamStatus(error: unknown): number | undefined {
+  if (typeof error === 'object' && error !== null && 'status' in error) {
+    const status = (error as { status?: unknown }).status;
+    if (typeof status === 'number') {
+      return status;
+    }
+  }
+  const match = error instanceof Error ? error.message.match(/"code"\s*:\s*(\d{3})/) : null;
+  return match?.[1] ? Number(match[1]) : undefined;
 }
