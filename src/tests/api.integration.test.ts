@@ -53,4 +53,15 @@ describe('API integration', () => {
     expect(response.status).toBe(400);
     expect(response.body).toHaveProperty('error.code', 'VALIDATION_ERROR');
   });
+
+  it('allows x-language-hint header in CORS preflight for ai transcribe', async () => {
+    const response = await request(app)
+      .options('/api/v1/ai/transcribe?language=en')
+      .set('Origin', 'http://localhost:4200')
+      .set('Access-Control-Request-Method', 'POST')
+      .set('Access-Control-Request-Headers', 'content-type,x-language-hint');
+
+    expect(response.status).toBe(204);
+    expect(response.headers['access-control-allow-headers']).toContain('x-language-hint');
+  });
 });

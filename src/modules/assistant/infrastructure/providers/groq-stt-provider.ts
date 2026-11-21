@@ -5,9 +5,9 @@ import {
 import { parseTranscriptionPayload } from '../../application/transcription-service';
 import {
   type SpeechToTextProvider,
-  type SttLanguageHint,
-  type SttSegmentQuality,
-  type SttTranscriptionResult,
+  type SttRequest,
+  type SttResult,
+  type SttSegment,
 } from '../../application/speech-to-text-provider';
 
 interface GroqSttProviderOptions {
@@ -29,12 +29,7 @@ export class GroqSttProvider implements SpeechToTextProvider {
 
   public constructor(private readonly options: GroqSttProviderOptions) {}
 
-  public async transcribe(input: {
-    audio: Buffer;
-    mimeType: string;
-    languageHint?: SttLanguageHint;
-    signal?: AbortSignal;
-  }): Promise<SttTranscriptionResult> {
+  public async transcribe(input: SttRequest): Promise<SttResult> {
     if (!this.options.apiKey) {
       throw new ApplicationError({
         message: 'Groq STT provider is missing API key',
@@ -56,8 +51,8 @@ export class GroqSttProvider implements SpeechToTextProvider {
       'prompt',
       'Egyptian Arabic dental-clinic conversation with English terms: order, patient, doctor, clinic, crown, bridge.',
     );
-    if (input.languageHint === 'ar' || input.languageHint === 'en') {
-      form.append('language', input.languageHint);
+    if (input.language === 'ar' || input.language === 'en') {
+      form.append('language', input.language);
     }
     form.append(
       'file',
@@ -130,23 +125,24 @@ function stripTrailingSlash(value: string): string {
   return value.endsWith('/') ? value.slice(0, -1) : value;
 }
 
-function parseGroqMetadata(payload: unknown): Omit<SttTranscriptionResult, 'text'> {
+function parseGroqMetadata(payload: unknown): Omit<SttResult, 'text'> {
   if (!isRecord(payload)) {
     return {};
   }
 
   const segments = Array.isArray(payload.segments)
-    ? payload.segments.map(mapSegment).filter((segment): segment is SttSegmentQuality => segment !== null)
+    ? payload.segments.map(mapSegment).filter((segment): segment is SttSegment => segment !== null)
     : undefined;
 
+  const confidence = segments && segments.length > 0 ? computeConfidence(segments) : undefined;
   return {
-    ...(typeof payload.language === 'string' ? { detectedLanguage: payload.language } : {}),
+    ...(typeof payload.language === 'string' ? { language: payload.language } : {}),
     ...(segments && segments.length > 0 ? { segments } : {}),
-    ...(segments && segments.length > 0 ? { confidence: computeConfidence(segments) } : {}),
+    ...(typeof confidence === 'number' ? { confidence } : {}),
   };
 }
 
-function mapSegment(value: unknown): SttSegmentQuality | null {
+function mapSegment(value: unknown): SttSegment | null {
   if (!isRecord(value) || typeof value.start !== 'number' || typeof value.end !== 'number') {
     return null;
   }
@@ -154,16 +150,16 @@ function mapSegment(value: unknown): SttSegmentQuality | null {
   return {
     start: value.start,
     end: value.end,
+    text: typeof value.text === 'string' ? value.text : '',
     ...(typeof value.avg_logprob === 'number' ? { avgLogprob: value.avg_logprob } : {}),
     ...(typeof value.no_speech_prob === 'number' ? { noSpeechProb: value.no_speech_prob } : {}),
     ...(typeof value.compression_ratio === 'number'
       ? { compressionRatio: value.compression_ratio }
       : {}),
-    ...(typeof value.text === 'string' ? { text: value.text } : {}),
   };
 }
 
-function computeConfidence(segments: SttSegmentQuality[]): number | undefined {
+function computeConfidence(segments: SttSegment[]): number | undefined {
   const weighted = segments
     .filter((segment) => typeof segment.avgLogprob === 'number')
     .map((segment) => {

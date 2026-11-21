@@ -55,3 +55,9 @@ export const assistantLookupQuerySchema = z
 export const assistantLookupKindParamSchema = z.object({
   kind: z.enum(['patients', 'doctors', 'clinics', 'services', 'orders']),
 });
+
+export const assistantTranscribeQuerySchema = z
+  .object({
+    language: z.enum(['auto', 'ar', 'en', 'mixed']).optional(),
+  })
+  .strict();

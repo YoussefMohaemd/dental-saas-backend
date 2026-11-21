@@ -1,27 +1,37 @@
-export type SttLanguageHint = 'auto' | 'ar' | 'en' | 'mixed';
+export type VoiceLanguage = 'auto' | 'ar' | 'en' | 'mixed';
 
-export interface SttSegmentQuality {
+export interface SttSegment {
   start: number;
   end: number;
+  text: string;
   avgLogprob?: number;
   noSpeechProb?: number;
   compressionRatio?: number;
-  text?: string;
 }
 
-export interface SttTranscriptionResult {
+export interface SttResult {
   text: string;
-  detectedLanguage?: string;
+  language?: string;
   confidence?: number;
-  segments?: SttSegmentQuality[];
+  segments?: SttSegment[];
+}
+
+export interface SttRequest {
+  audio: Buffer;
+  mimeType: string;
+  language: VoiceLanguage;
+  vocabulary: string[];
+  signal?: AbortSignal;
 }
 
 export interface SpeechToTextProvider {
   name: 'groq' | 'gemini' | 'mock';
-  transcribe(input: {
-    audio: Buffer;
-    mimeType: string;
-    languageHint?: SttLanguageHint;
-    signal?: AbortSignal;
-  }): Promise<SttTranscriptionResult>;
+  transcribe(input: SttRequest): Promise<SttResult>;
 }
+
+/**
+ * @deprecated Use {@link VoiceLanguage}.
+ * Retained only for the Task 0 STT evaluation harness in `scripts/stt-eval`,
+ * which must not be modified by the provider-contract task.
+ */
+export type SttLanguageHint = VoiceLanguage;

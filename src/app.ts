@@ -34,7 +34,10 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', origin ?? env.CORS_ALLOWED_ORIGIN);
   res.header('Vary', 'Origin');
   res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-request-id');
+  res.header(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization, x-request-id, x-language-hint',
+  );
   res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
 
   if (req.method === 'OPTIONS') {

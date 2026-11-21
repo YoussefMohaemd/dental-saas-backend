@@ -14,6 +14,7 @@ export function createSpeechToTextProvider(config: {
   groqModel: string;
   geminiApiKey?: string;
   geminiModel: string;
+  sttTimeoutMs?: number;
 }): SpeechToTextProvider {
   if (config.provider === 'mock') {
     return new MockSttProvider();
@@ -22,7 +23,7 @@ export function createSpeechToTextProvider(config: {
   if (config.provider === 'groq') {
     return new GroqSttProvider({
       model: config.groqModel,
-      timeoutMs: 20_000,
+      timeoutMs: config.sttTimeoutMs ?? 20_000,
       ...(config.groqApiKey ? { apiKey: config.groqApiKey } : {}),
       ...(config.groqBaseUrl ? { baseUrl: config.groqBaseUrl } : {}),
     });
@@ -31,7 +32,7 @@ export function createSpeechToTextProvider(config: {
   if (config.provider === 'gemini') {
     return new GeminiSttProvider({
       model: config.geminiModel,
-      timeoutMs: 20_000,
+      timeoutMs: config.sttTimeoutMs ?? 20_000,
       ...(config.geminiApiKey ? { apiKey: config.geminiApiKey } : {}),
     });
   }

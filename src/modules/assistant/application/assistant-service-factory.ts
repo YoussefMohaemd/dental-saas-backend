@@ -18,6 +18,8 @@ import { MongoosePatientRepository } from '../../patients/infrastructure/mongoos
 import { AssistantLookupService } from './assistant-lookup-service';
 import { TranscriptionService } from './transcription-service';
 import { createSpeechToTextProvider } from '../infrastructure/providers/stt-provider-factory';
+import { SttVocabularyService } from './stt-vocabulary-service';
+import { EntityCorrector } from './entity-corrector';
 
 export function createAssistantLookupService(): AssistantLookupService {
   const patientService = new PatientService(new MongoosePatientRepository());
@@ -113,9 +115,47 @@ export function createAssistantService(): AssistantService {
 }
 
 export function createTranscriptionService(): TranscriptionService {
+  const patientService = new PatientService(new MongoosePatientRepository());
+  const doctorService = new DoctorService(new MongooseDoctorRepository());
+  const clinicService = new ClinicService(new MongooseClinicRepository());
+  const catalogRepository = new MongooseAssistantCatalogRepository();
+  const vocabularyService = new SttVocabularyService({
+    loadDoctors: async (scope) => {
+      const result = await doctorService.listDoctors(
+        {
+          scope,
+          sortBy: 'name',
+          sortDirection: 'asc',
+          statuses: [],
+        },
+        { page: 1, pageSize: 50 },
+      );
+      return result.items.map((item) => ({ id: item.id, label: item.name }));
+    },
+    loadClinics: async (scope) => {
+      const result = await clinicService.listClinics(
+        { scope, sortBy: 'name', sortDirection: 'asc', statuses: [] },
+        { page: 1, pageSize: 50 },
+      );
+      return result.items.map((item) => ({ id: item.id, label: item.name }));
+    },
+    loadServices: async (scope) => {
+      const services = await catalogRepository.listServices(String(scope.tenantId));
+      return services.map((item) => ({ id: item.serviceId, label: item.name }));
+    },
+    loadPatients: async (scope) => {
+      const result = await patientService.listPatients(
+        { scope, search: undefined, sortBy: 'name', sortDirection: 'asc', statuses: [] },
+        { page: 1, pageSize: 50 },
+      );
+      return result.items.map((item) => ({ id: item.id, label: item.name }));
+    },
+  });
+
   const baseConfig = {
     groqModel: env.GROQ_STT_MODEL,
-    geminiModel: env.AI_ASSISTANT_GEMINI_MODEL,
+    geminiModel: env.STT_GEMINI_MODEL,
+    sttTimeoutMs: env.STT_TIMEOUT_MS,
     ...(env.AI_ASSISTANT_GROQ_API_KEY
       ? { groqApiKey: env.AI_ASSISTANT_GROQ_API_KEY }
       : {}),
@@ -144,5 +184,16 @@ export function createTranscriptionService(): TranscriptionService {
   return new TranscriptionService({
     primary: configuredProvider,
     fallback: fallbackProvider,
+  }, {
+    vocabularyService,
+    entityCorrector: new EntityCorrector(),
+  }, {
+    escalationConfidence: env.STT_ESCALATION_CONFIDENCE,
+    retryOnLowQuality: env.STT_RETRY_ON_LOW_QUALITY,
+    noSpeechProbThreshold: env.STT_NO_SPEECH_PROB_THRESHOLD,
+    lowLogprobThreshold: env.STT_LOW_LOGPROB_THRESHOLD,
+    compressionRatioThreshold: env.STT_COMPRESSION_RATIO_THRESHOLD,
+    entityCorrectionEnabled: env.STT_ENTITY_CORRECTION,
+    sendPatientNames: env.STT_SEND_PATIENT_NAMES,
   });
 }

@@ -94,6 +94,15 @@ const envSchema = z.object({
   AI_ASSISTANT_GEMINI_MODEL: z.string().min(1).default('gemini-3.5-flash'),
   STT_PROVIDER: z.enum(['groq', 'gemini', 'mock']).default('groq'),
   GROQ_STT_MODEL: z.string().min(1).default('whisper-large-v3'),
+  STT_GEMINI_MODEL: optionalString.default('gemini-3.8-flash').pipe(z.string().min(1)),
+  STT_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(120_000).default(45_000),
+  STT_ESCALATION_CONFIDENCE: z.coerce.number().min(0).max(1).default(0.8),
+  STT_RETRY_ON_LOW_QUALITY: parseBoolean.default(true),
+  STT_NO_SPEECH_PROB_THRESHOLD: z.coerce.number().min(0).max(1).default(0.6),
+  STT_LOW_LOGPROB_THRESHOLD: z.coerce.number().default(-1),
+  STT_COMPRESSION_RATIO_THRESHOLD: z.coerce.number().positive().default(2.4),
+  STT_ENTITY_CORRECTION: parseBoolean.default(false),
+  STT_SEND_PATIENT_NAMES: parseBoolean.default(false),
   AI_ASSISTANT_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(30_000),
   AI_ASSISTANT_MAX_ACTIONS_PER_MESSAGE: z.coerce.number().int().min(1).max(20).default(8),
   AI_ASSISTANT_MAX_PLANNING_ROUNDS: z.coerce.number().int().min(1).max(12).default(4),
@@ -167,6 +176,17 @@ const refinedEnvSchema = envSchema.superRefine((value, context) => {
       code: z.ZodIssueCode.custom,
       path: ['AI_ASSISTANT_PROVIDER'],
       message: 'AI_ASSISTANT_PROVIDER=mock requires AI_ASSISTANT_ALLOW_MOCK=true outside test',
+    });
+  }
+
+  if (
+    value.STT_GEMINI_MODEL === 'gemini-2.5-flash' ||
+    value.STT_GEMINI_MODEL === 'models/gemini-2.5-flash'
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['STT_GEMINI_MODEL'],
+      message: 'gemini-2.5-flash is deprecated; use gemini-3.8-flash',
     });
   }
 });

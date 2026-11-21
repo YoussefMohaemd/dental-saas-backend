@@ -10,6 +10,7 @@ import { ensureObjectId } from '../../../shared/presentation/http/http-utils';
 import { type RequestWithContext } from '../../../shared/presentation/http/request-context';
 import { type AssistantService } from '../application/assistant-service';
 import { type TranscriptionService } from '../application/transcription-service';
+import { type VoiceLanguage } from '../application/speech-to-text-provider';
 import {
   assistantActionIdParamSchema,
   assistantConfirmBodySchema,
@@ -20,6 +21,7 @@ import {
   assistantMessageBodySchema,
   assistantLookupKindParamSchema,
   assistantLookupQuerySchema,
+  assistantTranscribeQuerySchema,
 } from './assistant.schemas';
 import { type AssistantLookupService } from '../application/assistant-lookup-service';
 
@@ -140,9 +142,14 @@ export class AssistantController {
     }
 
     const contentType = req.header('content-type') ?? '';
+    const scope = readTranscribeScope(req);
+    const query = assistantTranscribeQuerySchema.parse(req.query);
+    const languageHint = query.language ?? parseLanguageHeader(req.header('x-language-hint'));
     const result = await this.transcriptionService.transcribe({
       audio: payload,
       mimeType: contentType,
+      ...(languageHint ? { language: languageHint } : {}),
+      scope,
     });
     const latencyMs = Date.now() - start;
     const requestWithLog = req as Request & {
@@ -192,7 +199,44 @@ async function readPrincipal(req: Request): Promise<{
 
 function buildRequestMeta(req: Request): { requestId?: string } | undefined {
   const requestWithContext = req as RequestWithContext;
-  return requestWithContext.context.requestId
+  return requestWithContext.context?.requestId
     ? { requestId: requestWithContext.context.requestId }
     : undefined;
+}
+
+function parseLanguageHeader(value: string | undefined): VoiceLanguage | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = assistantTranscribeQuerySchema.shape.language.safeParse(value);
+  if (!parsed.success) {
+    return undefined;
+  }
+  return parsed.data;
+}
+
+function readTranscribeScope(req: Request): {
+  tenantId: ReturnType<typeof ensureObjectId>;
+  userId: ReturnType<typeof ensureObjectId>;
+  roles: string[];
+  isAdmin: boolean;
+} {
+  const requestWithContext = req as RequestWithContext;
+  const principal = requestWithContext.context?.principal;
+  if (!principal) {
+    throw new ApplicationError({
+      message: 'Authentication is required',
+      statusCode: 401,
+      code: APPLICATION_ERROR_CODES.UNAUTHORIZED,
+      expose: true,
+    });
+  }
+  const roles = principal.roles.map((role) => String(role));
+  return {
+    tenantId: ensureObjectId(principal.tenantId, 'tenantId'),
+    userId: ensureObjectId(principal.userId, 'userId'),
+    roles,
+    isAdmin: roles.some((role) => role.toLowerCase() === 'admin'),
+  };
 }

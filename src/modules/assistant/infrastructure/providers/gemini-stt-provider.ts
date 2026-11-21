@@ -6,8 +6,8 @@ import {
 } from '../../../../shared/application/errors/application-error';
 import {
   type SpeechToTextProvider,
-  type SttLanguageHint,
-  type SttTranscriptionResult,
+  type SttRequest,
+  type SttResult,
 } from '../../application/speech-to-text-provider';
 
 interface GeminiSttClient {
@@ -50,12 +50,7 @@ export class GeminiSttProvider implements SpeechToTextProvider {
       });
   }
 
-  public async transcribe(input: {
-    audio: Buffer;
-    mimeType: string;
-    languageHint?: SttLanguageHint;
-    signal?: AbortSignal;
-  }): Promise<SttTranscriptionResult> {
+  public async transcribe(input: SttRequest): Promise<SttResult> {
     if (!this.options.apiKey) {
       throw new ApplicationError({
         message: 'Gemini STT provider is missing API key',
@@ -75,7 +70,7 @@ export class GeminiSttProvider implements SpeechToTextProvider {
             role: 'user',
             parts: [
               {
-                text: buildTranscriptionPrompt(input.languageHint),
+                text: buildTranscriptionPrompt(input.language),
               },
               {
                 inlineData: {
@@ -120,13 +115,13 @@ export class GeminiSttProvider implements SpeechToTextProvider {
   }
 }
 
-function buildTranscriptionPrompt(languageHint?: SttLanguageHint): string {
+function buildTranscriptionPrompt(languageHint: SttRequest['language']): string {
   const hintInstruction =
     languageHint && languageHint !== 'auto' ? ` Primary language hint is "${languageHint}".` : '';
   return `Transcribe this audio exactly. Keep Arabic and English words as spoken without translation.${hintInstruction} Return strict JSON only in this shape: {"text":"<transcript>","language":"<detected language>"}.`;
 }
 
-function parseGeminiTranscription(text: string): SttTranscriptionResult {
+function parseGeminiTranscription(text: string): SttResult {
   const candidate = extractJsonObject(text);
   if (!candidate) {
     return { text };
@@ -140,7 +135,7 @@ function parseGeminiTranscription(text: string): SttTranscriptionResult {
 
     return {
       text: parsed.text,
-      ...(typeof parsed.language === 'string' ? { detectedLanguage: parsed.language } : {}),
+      ...(typeof parsed.language === 'string' ? { language: parsed.language } : {}),
     };
   } catch {
     return { text };
