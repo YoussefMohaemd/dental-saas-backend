@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
-const { groqCtor, geminiCtor, mockCtor } = vi.hoisted(() => ({
+const { groqCtor, geminiCtor, deepgramCtor, mockCtor } = vi.hoisted(() => ({
   groqCtor: vi.fn(),
   geminiCtor: vi.fn(),
+  deepgramCtor: vi.fn(),
   mockCtor: vi.fn(),
 }));
 
@@ -15,6 +16,12 @@ vi.mock('./groq-stt-provider', () => ({
 vi.mock('./gemini-stt-provider', () => ({
   GeminiSttProvider: geminiCtor.mockImplementation(function GeminiCtor() {
     return { name: 'gemini' };
+  }),
+}));
+
+vi.mock('./deepgram-stt-provider', () => ({
+  DeepgramSttProvider: deepgramCtor.mockImplementation(function DeepgramCtor() {
+    return { name: 'deepgram' };
   }),
 }));
 
@@ -49,6 +56,25 @@ describe('createSpeechToTextProvider', () => {
 
     expect(geminiCtor).toHaveBeenCalledWith(
       expect.objectContaining({ timeoutMs: 20_000 }),
+    );
+  });
+
+  it('builds deepgram provider with model and timeout when configured', () => {
+    createSpeechToTextProvider({
+      provider: 'deepgram',
+      deepgramApiKey: 'dg-key',
+      deepgramModel: 'nova-3',
+      groqModel: 'whisper-large-v3',
+      geminiModel: 'gemini-3.8-flash',
+      sttTimeoutMs: 33_000,
+    });
+
+    expect(deepgramCtor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        apiKey: 'dg-key',
+        model: 'nova-3',
+        timeoutMs: 33_000,
+      }),
     );
   });
 });

@@ -2,7 +2,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const TRACKED_ENV_KEYS = [
   'AI_ASSISTANT_CREATE_TOOLS_ENABLED',
+  'AI_ASSISTANT_PROVIDER',
   'AI_ASSISTANT_GEMINI_MODEL',
+  'CLOUDFLARE_ACCOUNT_ID',
+  'CLOUDFLARE_AI_API_TOKEN',
+  'STT_PROVIDER',
+  'DEEPGRAM_STT_API_KEY',
+  'DEEPGRAM_STT_MODEL',
   'STT_GEMINI_MODEL',
   'STT_TIMEOUT_MS',
   'STT_TOTAL_DEADLINE_MS',
@@ -37,6 +43,8 @@ describe('env defaults', () => {
   });
 
   it('applies stt defaults with supported gemini stt model', async () => {
+    delete process.env.STT_PROVIDER;
+    delete process.env.DEEPGRAM_STT_MODEL;
     delete process.env.STT_GEMINI_MODEL;
     delete process.env.STT_TIMEOUT_MS;
     delete process.env.STT_TOTAL_DEADLINE_MS;
@@ -46,6 +54,8 @@ describe('env defaults', () => {
 
     const { env } = await import('./env.js');
 
+    expect(env.STT_PROVIDER).toBe('groq');
+    expect(env.DEEPGRAM_STT_MODEL).toBe('nova-3');
     expect(env.STT_GEMINI_MODEL).toBe('gemini-3.8-flash');
     expect(env.STT_TIMEOUT_MS).toBe(15_000);
     expect(env.STT_TOTAL_DEADLINE_MS).toBe(40_000);
@@ -90,5 +100,22 @@ describe('env defaults', () => {
     process.env.STT_ESCALATION_CONFIDENCE = '1.5';
 
     await expect(import('./env.js')).rejects.toThrow(/STT_ESCALATION_CONFIDENCE/);
+  });
+
+  it('requires Cloudflare credentials when Cloudflare assistant provider is selected', async () => {
+    process.env.AI_ASSISTANT_PROVIDER = 'cloudflare';
+    delete process.env.CLOUDFLARE_ACCOUNT_ID;
+    delete process.env.CLOUDFLARE_AI_API_TOKEN;
+
+    await expect(import('./env.js')).rejects.toThrow(/CLOUDFLARE_ACCOUNT_ID/);
+    vi.resetModules();
+    await expect(import('./env.js')).rejects.toThrow(/CLOUDFLARE_AI_API_TOKEN/);
+  });
+
+  it('requires Deepgram api key when deepgram stt provider is selected', async () => {
+    process.env.STT_PROVIDER = 'deepgram';
+    delete process.env.DEEPGRAM_STT_API_KEY;
+
+    await expect(import('./env.js')).rejects.toThrow(/DEEPGRAM_STT_API_KEY/);
   });
 });

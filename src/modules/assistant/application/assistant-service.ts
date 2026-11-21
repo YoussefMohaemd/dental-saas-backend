@@ -659,7 +659,7 @@ export class AssistantService {
       return await this.completePlan(content, history);
     } catch (error) {
       const fallbackActions = buildCatalogFallbackActions(content);
-      if (fallbackActions.length > 0 && isRateLimitError(error)) {
+      if (fallbackActions.length > 0 && (isRateLimitError(error) || isTimeoutError(error))) {
         return {
           reply: buildCatalogFallbackReply(detectLanguageHint(content)),
           actions: fallbackActions,
@@ -1160,6 +1160,15 @@ export function isRateLimitError(error: unknown): boolean {
 
   const upstreamStatus = Number(error.details?.status);
   return error.statusCode === 429 || upstreamStatus === 429;
+}
+
+function isTimeoutError(error: unknown): boolean {
+  if (!(error instanceof ApplicationError)) {
+    return false;
+  }
+
+  const upstreamStatus = Number(error.details?.status);
+  return error.statusCode === 504 || upstreamStatus === 504;
 }
 
 function toConversationView(record: {

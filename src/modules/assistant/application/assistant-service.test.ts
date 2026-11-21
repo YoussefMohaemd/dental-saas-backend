@@ -816,6 +816,91 @@ describe('AssistantService', () => {
     ).rejects.toThrow('Assistant model request timed out');
   });
 
+  it('returns deterministic catalog fallback when model times out on catalog intents', async () => {
+    const provider = {
+      name: 'groq' as const,
+      completePlan: vi.fn().mockRejectedValue(
+        new ApplicationError({
+          message: 'Assistant model request timed out',
+          statusCode: 504,
+          code: APPLICATION_ERROR_CODES.INTERNAL_ERROR,
+          expose: true,
+        }),
+      ),
+    };
+
+    const service = AssistantService.create({
+      provider,
+      conversationRepository: new InMemoryAssistantConversationRepository(),
+      pendingActionRepository: new InMemoryAssistantPendingActionRepository(),
+      auditRepository: new InMemoryAssistantAuditRepository(),
+      ordersService: {
+        listOrders: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+        }),
+        getOrderById: async () => ({}),
+      } as never,
+      patientService: {
+        listPatients: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+        }),
+        getPatientById: async () => ({}),
+      } as never,
+      doctorService: {
+        listDoctors: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+        }),
+      } as never,
+      clinicService: {
+        listClinics: async () => ({
+          items: [],
+          meta: { totalItems: 0, page: 1, pageSize: 20, totalPages: 0 },
+        }),
+      } as never,
+      catalogRepository: {
+        listServices: async () => [
+          {
+            serviceId: 'svc-1',
+            name: 'Implant Planning',
+            description: 'Digital planning service',
+            basePrice: 450,
+            turnaroundDays: 5,
+            scanRequirements: [],
+          },
+        ],
+        getCompanyProfile: async () => null,
+      },
+      options: {
+        maxActionsPerMessage: 8,
+        maxPlanningRounds: 4,
+        maxInputChars: 4000,
+        confirmationTtlSeconds: 900,
+      },
+    });
+
+    const conversation = await service.createConversation({
+      tenantId: '66f100000000000000000001',
+      userId: '66f1000000000000000000aa',
+      roles: ['admin'],
+    });
+
+    const response = await service.postMessage(principal(['admin']), {
+      conversationId: conversation.id,
+      content: 'show services and prices',
+    });
+
+    expect(response.result.type).toBe('text');
+    if (response.result.type !== 'text') {
+      throw new Error('Expected text result');
+    }
+    expect(response.result.text).toContain('The assistant is currently busy');
+    expect(response.result.executions.length).toBeGreaterThan(0);
+    expect(provider.completePlan).toHaveBeenCalledTimes(1);
+  });
+
   it('retries planning without history when provider fails with upstream bad gateway', async () => {
     const provider = {
       name: 'vllm' as const,

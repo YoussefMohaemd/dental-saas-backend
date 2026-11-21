@@ -82,7 +82,7 @@ const envSchema = z.object({
   AUTH_RATE_LIMIT_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10_000).default(20),
   AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_IP: z.coerce.number().int().min(1).max(100_000).default(100),
   AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_ACCOUNT: z.coerce.number().int().min(1).max(10_000).optional(),
-  AI_ASSISTANT_PROVIDER: z.enum(['mock', 'vllm', 'groq', 'gemini']).default('vllm'),
+  AI_ASSISTANT_PROVIDER: z.enum(['mock', 'vllm', 'groq', 'gemini', 'cloudflare']).default('vllm'),
   AI_ASSISTANT_ALLOW_MOCK: parseBoolean.default(false),
   AI_ASSISTANT_MODEL: z.string().min(1).default('qwen/qwen3.8-27b'),
   AI_ASSISTANT_VLLM_BASE_URL: z.string().url().default('http://127.0.0.1:8000/v1'),
@@ -91,9 +91,13 @@ const envSchema = z.object({
   AI_ASSISTANT_GROQ_BASE_URL: optionalString,
   AI_ASSISTANT_GROQ_MAX_COMPLETION_TOKENS: z.coerce.number().int().min(64).max(2000).default(900),
   AI_ASSISTANT_GEMINI_API_KEY: optionalString,
+  CLOUDFLARE_ACCOUNT_ID: optionalString,
+  CLOUDFLARE_AI_API_TOKEN: optionalString,
   AI_ASSISTANT_GEMINI_MODEL: z.string().min(1).default('gemini-3.5-flash'),
-  STT_PROVIDER: z.enum(['groq', 'gemini', 'mock']).default('groq'),
+  STT_PROVIDER: z.enum(['groq', 'gemini', 'deepgram', 'mock']).default('groq'),
   GROQ_STT_MODEL: z.string().min(1).default('whisper-large-v3'),
+  DEEPGRAM_STT_API_KEY: optionalString,
+  DEEPGRAM_STT_MODEL: z.string().min(1).default('nova-3'),
   STT_GEMINI_MODEL: optionalString.default('gemini-3.8-flash').pipe(z.string().min(1)),
   STT_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(120_000).default(15_000),
   STT_TOTAL_DEADLINE_MS: z.coerce.number().int().min(5_000).max(120_000).default(40_000),
@@ -169,6 +173,22 @@ const refinedEnvSchema = envSchema.superRefine((value, context) => {
     });
   }
 
+  if (value.AI_ASSISTANT_PROVIDER === 'cloudflare' && !value.CLOUDFLARE_ACCOUNT_ID) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['CLOUDFLARE_ACCOUNT_ID'],
+      message: 'Required when AI_ASSISTANT_PROVIDER=cloudflare',
+    });
+  }
+
+  if (value.AI_ASSISTANT_PROVIDER === 'cloudflare' && !value.CLOUDFLARE_AI_API_TOKEN) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['CLOUDFLARE_AI_API_TOKEN'],
+      message: 'Required when AI_ASSISTANT_PROVIDER=cloudflare',
+    });
+  }
+
   if (
     value.AI_ASSISTANT_PROVIDER === 'mock' &&
     value.NODE_ENV !== 'test' &&
@@ -189,6 +209,14 @@ const refinedEnvSchema = envSchema.superRefine((value, context) => {
       code: z.ZodIssueCode.custom,
       path: ['STT_GEMINI_MODEL'],
       message: 'gemini-2.5-flash is deprecated; use gemini-3.8-flash',
+    });
+  }
+
+  if (value.STT_PROVIDER === 'deepgram' && !value.DEEPGRAM_STT_API_KEY) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['DEEPGRAM_STT_API_KEY'],
+      message: 'Required when STT_PROVIDER=deepgram',
     });
   }
 });

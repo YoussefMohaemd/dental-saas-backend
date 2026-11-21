@@ -88,6 +88,8 @@ export function createAssistantService(): AssistantService {
     groqBaseUrl: env.AI_ASSISTANT_GROQ_BASE_URL,
     groqMaxCompletionTokens: env.AI_ASSISTANT_GROQ_MAX_COMPLETION_TOKENS,
     geminiApiKey: env.AI_ASSISTANT_GEMINI_API_KEY,
+    cloudflareAccountId: env.CLOUDFLARE_ACCOUNT_ID,
+    cloudflareApiToken: env.CLOUDFLARE_AI_API_TOKEN,
     plannerPromptVersion: env.AI_ASSISTANT_PLANNER_PROMPT_VERSION,
   });
   const llmLogService = new AssistantLlmLogService(new MongooseAssistantLlmCallRepository());
@@ -154,6 +156,7 @@ export function createTranscriptionService(): TranscriptionService {
 
   const baseConfig = {
     groqModel: env.GROQ_STT_MODEL,
+    deepgramModel: env.DEEPGRAM_STT_MODEL,
     geminiModel: env.STT_GEMINI_MODEL,
     sttTimeoutMs: env.STT_TIMEOUT_MS,
     ...(env.AI_ASSISTANT_GROQ_API_KEY
@@ -164,6 +167,9 @@ export function createTranscriptionService(): TranscriptionService {
       : {}),
     ...(env.AI_ASSISTANT_GEMINI_API_KEY
       ? { geminiApiKey: env.AI_ASSISTANT_GEMINI_API_KEY }
+      : {}),
+    ...(env.DEEPGRAM_STT_API_KEY
+      ? { deepgramApiKey: env.DEEPGRAM_STT_API_KEY }
       : {}),
   };
   const configuredProvider = createSpeechToTextProvider({

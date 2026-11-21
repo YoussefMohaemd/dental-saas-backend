@@ -123,4 +123,58 @@ describe('createAssistantLlmProvider', () => {
     ).toThrow('Gemini provider requires AI_ASSISTANT_GEMINI_API_KEY');
   });
 
+  it('builds Cloudflare provider when configured', () => {
+    const provider = createAssistantLlmProvider({
+      provider: 'cloudflare',
+      model: '@cf/zai-org/glm-4.7-flash',
+      timeoutMs: 15_000,
+      vllmBaseUrl: 'http://localhost:8000/v1',
+      vllmApiKey: undefined,
+      groqApiKey: undefined,
+      groqBaseUrl: undefined,
+      geminiApiKey: undefined,
+      cloudflareAccountId: 'acct-1',
+      cloudflareApiToken: 'cf-token',
+      plannerPromptVersion: 'v1',
+    });
+
+    expect(provider.name).toBe('cloudflare');
+  });
+
+  it('throws when Cloudflare provider is configured without account id', () => {
+    expect(() =>
+      createAssistantLlmProvider({
+        provider: 'cloudflare',
+        model: '@cf/zai-org/glm-4.7-flash',
+        timeoutMs: 15_000,
+        vllmBaseUrl: 'http://localhost:8000/v1',
+        vllmApiKey: undefined,
+        groqApiKey: undefined,
+        groqBaseUrl: undefined,
+        geminiApiKey: undefined,
+        cloudflareAccountId: undefined,
+        cloudflareApiToken: 'cf-token',
+        plannerPromptVersion: 'v1',
+      }),
+    ).toThrow('Cloudflare provider requires CLOUDFLARE_ACCOUNT_ID');
+  });
+
+  it('throws when Cloudflare provider is configured without API token', () => {
+    expect(() =>
+      createAssistantLlmProvider({
+        provider: 'cloudflare',
+        model: '@cf/zai-org/glm-4.7-flash',
+        timeoutMs: 15_000,
+        vllmBaseUrl: 'http://localhost:8000/v1',
+        vllmApiKey: undefined,
+        groqApiKey: undefined,
+        groqBaseUrl: undefined,
+        geminiApiKey: undefined,
+        cloudflareAccountId: 'acct-1',
+        cloudflareApiToken: undefined,
+        plannerPromptVersion: 'v1',
+      }),
+    ).toThrow('Cloudflare provider requires CLOUDFLARE_AI_API_TOKEN');
+  });
+
 });

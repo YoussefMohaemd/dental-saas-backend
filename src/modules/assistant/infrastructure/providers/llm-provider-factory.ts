@@ -3,9 +3,10 @@ import { GroqAssistantLlmProvider } from './groq-llm-provider';
 import { GeminiAssistantLlmProvider } from './gemini-llm-provider';
 import { MockAssistantLlmProvider } from './mock-llm-provider';
 import { VllmAssistantLlmProvider } from './vllm-llm-provider';
+import { CloudflareAssistantLlmProvider } from './cloudflare-llm-provider';
 
 export interface AssistantLlmProviderConfig {
-  provider: 'mock' | 'vllm' | 'groq' | 'gemini';
+  provider: 'mock' | 'vllm' | 'groq' | 'gemini' | 'cloudflare';
   model: string;
   timeoutMs: number;
   vllmBaseUrl: string;
@@ -14,6 +15,8 @@ export interface AssistantLlmProviderConfig {
   groqBaseUrl: string | undefined;
   groqMaxCompletionTokens?: number;
   geminiApiKey?: string | undefined;
+  cloudflareAccountId?: string | undefined;
+  cloudflareApiToken?: string | undefined;
   plannerPromptVersion: string;
 }
 
@@ -59,6 +62,21 @@ export function createAssistantLlmProvider(
       model: config.model,
       timeoutMs: config.timeoutMs,
       apiKey: config.geminiApiKey,
+    });
+  }
+
+  if (config.provider === 'cloudflare') {
+    if (!config.cloudflareAccountId) {
+      throw new Error('Cloudflare provider requires CLOUDFLARE_ACCOUNT_ID');
+    }
+    if (!config.cloudflareApiToken) {
+      throw new Error('Cloudflare provider requires CLOUDFLARE_AI_API_TOKEN');
+    }
+    return new CloudflareAssistantLlmProvider({
+      accountId: config.cloudflareAccountId,
+      apiToken: config.cloudflareApiToken,
+      model: config.model,
+      timeoutMs: config.timeoutMs,
     });
   }
 

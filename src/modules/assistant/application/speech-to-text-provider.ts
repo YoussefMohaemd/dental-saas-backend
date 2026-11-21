@@ -25,7 +25,7 @@ export interface SttRequest {
 }
 
 export interface SpeechToTextProvider {
-  name: 'groq' | 'gemini' | 'mock';
+  name: 'groq' | 'gemini' | 'deepgram' | 'mock';
   transcribe(input: SttRequest): Promise<SttResult>;
 }
 

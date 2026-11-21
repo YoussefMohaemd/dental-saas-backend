@@ -3,15 +3,18 @@ import {
   ApplicationError,
 } from '../../../../shared/application/errors/application-error';
 import { type SpeechToTextProvider } from '../../application/speech-to-text-provider';
+import { DeepgramSttProvider } from './deepgram-stt-provider';
 import { GeminiSttProvider } from './gemini-stt-provider';
 import { GroqSttProvider } from './groq-stt-provider';
 import { MockSttProvider } from './mock-stt-provider';
 
 export function createSpeechToTextProvider(config: {
-  provider: 'groq' | 'gemini' | 'mock';
+  provider: 'groq' | 'gemini' | 'deepgram' | 'mock';
   groqApiKey?: string;
   groqBaseUrl?: string;
   groqModel: string;
+  deepgramApiKey?: string;
+  deepgramModel?: string;
   geminiApiKey?: string;
   geminiModel: string;
   sttTimeoutMs?: number;
@@ -34,6 +37,14 @@ export function createSpeechToTextProvider(config: {
       model: config.geminiModel,
       timeoutMs: config.sttTimeoutMs ?? 20_000,
       ...(config.geminiApiKey ? { apiKey: config.geminiApiKey } : {}),
+    });
+  }
+
+  if (config.provider === 'deepgram') {
+    return new DeepgramSttProvider({
+      model: config.deepgramModel ?? 'nova-3',
+      timeoutMs: config.sttTimeoutMs ?? 20_000,
+      ...(config.deepgramApiKey ? { apiKey: config.deepgramApiKey } : {}),
     });
   }
 

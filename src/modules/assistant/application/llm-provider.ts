@@ -15,7 +15,7 @@ export interface AssistantLlmCompletionResult {
 }
 
 export interface AssistantLlmProvider {
-  name: 'mock' | 'vllm' | 'groq' | 'gemini';
+  name: 'mock' | 'vllm' | 'groq' | 'gemini' | 'cloudflare';
   model?: string;
   completePlan(request: AssistantLlmCompletionRequest): Promise<AssistantLlmCompletionResult>;
 }

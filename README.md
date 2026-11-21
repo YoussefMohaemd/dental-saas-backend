@@ -36,7 +36,7 @@ Copy `.env.example` to `.env` and adjust values as needed.
 - `AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_ACCOUNT` maximum login attempts allowed per tenant/email account key in each window (default falls back to `AUTH_RATE_LIMIT_MAX_ATTEMPTS`, then `20`)
 - `AUTH_RATE_LIMIT_MAX_ATTEMPTS` backward-compatible fallback for per-account attempts when `AUTH_RATE_LIMIT_MAX_ATTEMPTS_PER_ACCOUNT` is not set
 - `MONGODB_URI` MongoDB connection URI used by app startup and seed script
-- `AI_ASSISTANT_PROVIDER` (`mock` | `vllm` | `groq`, default `vllm`)
+- `AI_ASSISTANT_PROVIDER` (`mock` | `vllm` | `groq` | `gemini` | `cloudflare`, default `vllm`)
 - `AI_ASSISTANT_ALLOW_MOCK` (`true` | `false`, default `false`; required as `true` to run `mock` outside `NODE_ENV=test`)
 - `AI_ASSISTANT_MODEL` (default `qwen/qwen3.8-27b`)
 - `AI_ASSISTANT_VLLM_BASE_URL` internal OpenAI-compatible vLLM endpoint (default `http://127.0.0.1:8000/v1`)
@@ -44,14 +44,18 @@ Copy `.env.example` to `.env` and adjust values as needed.
 - `AI_ASSISTANT_GROQ_API_KEY` required when `AI_ASSISTANT_PROVIDER=groq`
 - `AI_ASSISTANT_GROQ_BASE_URL` optional Groq API base URL override
 - `AI_ASSISTANT_GEMINI_API_KEY` required when `AI_ASSISTANT_PROVIDER=gemini`
+- `CLOUDFLARE_ACCOUNT_ID` required when `AI_ASSISTANT_PROVIDER=cloudflare`
+- `CLOUDFLARE_AI_API_TOKEN` required when `AI_ASSISTANT_PROVIDER=cloudflare`
 - `AI_ASSISTANT_TIMEOUT_MS` provider request timeout
 - `AI_ASSISTANT_MAX_ACTIONS_PER_MESSAGE`
 - `AI_ASSISTANT_MAX_PLANNING_ROUNDS`
 - `AI_ASSISTANT_MAX_INPUT_CHARS`
 - `AI_ASSISTANT_CONFIRMATION_TTL_SECONDS`
 - `AI_ASSISTANT_PLANNER_PROMPT_VERSION`
-- `STT_PROVIDER` (`groq` | `gemini` | `mock`, default `groq`)
+- `STT_PROVIDER` (`groq` | `gemini` | `deepgram` | `mock`, default `groq`)
 - `GROQ_STT_MODEL` (default `whisper-large-v3`)
+- `DEEPGRAM_STT_API_KEY` required when `STT_PROVIDER=deepgram`
+- `DEEPGRAM_STT_MODEL` (default `nova-3`)
 - `STT_GEMINI_MODEL` (default `gemini-3.8-flash`)
 - `STT_TIMEOUT_MS` single provider timeout in ms (default `15000`)
 - `STT_TOTAL_DEADLINE_MS` total request deadline across retries/fallback in ms (default `40000`)
